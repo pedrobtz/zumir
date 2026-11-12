@@ -1,0 +1,22 @@
+on:
+  pull_request:
+  # Weekly on main rather than on every push to it, and on demand; the
+  # badge follows (README, "Pushes to main").
+  schedule:
+    - cron: "29 2 * * 6"
+  workflow_dispatch:
+
+name: coverage
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    uses: pedrobtz/r-actions/.github/workflows/coverage.yml@v1
+    with:
+      badge-branch: gh-pages
+      badge-path: badges/coverage.svg
+    permissions:
+      contents: write

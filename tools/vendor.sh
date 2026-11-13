@@ -31,8 +31,9 @@ if [ -z "$src" ]; then
   src="$tmp/mir"
   # No CRLF: the files are compared byte for byte.
   git -c core.autocrlf=false clone -q --no-checkout "$fork_url" "$src"
+  git -C "$src" config core.autocrlf false
 fi
-git -C "$src" -c advice.detachedHead=false checkout -q "$fork_pin"
+git -C "$src" -c core.autocrlf=false -c advice.detachedHead=false checkout -q "$fork_pin"
 
 files=$(grep -v '^#' tools/mir-files.txt | grep -v '^[[:space:]]*$')
 

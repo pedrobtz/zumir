@@ -2535,7 +2535,7 @@ static MIR_reg_t get_new_reg (gen_ctx_t gen_ctx, MIR_reg_t old_reg, int sep, siz
   VARR_TRUNC (char, reg_name, 0);
   VARR_PUSH_ARR (char, reg_name, name, strlen (name));
   VARR_PUSH (char, reg_name, sep);
-  sprintf (ind_str, "%lu", (unsigned long) index); /* ??? should be enough to unique */
+  snprintf (ind_str, sizeof (ind_str), "%lu", (unsigned long) index); /* ??? should be enough to unique */
   VARR_PUSH_ARR (char, reg_name, ind_str, strlen (ind_str) + 1);
   if (hard_reg_name == NULL) {
     new_reg = MIR_new_func_reg (ctx, func, type, VARR_ADDR (char, reg_name)) + MAX_HARD_REG;

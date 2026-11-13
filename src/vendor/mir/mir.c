@@ -953,7 +953,7 @@ static const char *type_str (MIR_context_t ctx, MIR_type_t tp) {
   case MIR_T_UNDEF: return "undef";
   default:
     if (MIR_blk_type_p (tp) && (n = tp - MIR_T_BLK) >= 0 && n < MIR_BLK_NUM) {
-      sprintf (str, "blk%d", n);
+      snprintf (str, sizeof (str), "blk%d", n);
       return get_ctx_str (ctx, str);
     }
     return "";
@@ -2425,7 +2425,7 @@ static MIR_reg_t new_temp_reg (MIR_context_t ctx, MIR_type_t type, MIR_func_t fu
     func->last_temp_num++;
     if (func->last_temp_num == 0)
       MIR_get_error_func (ctx) (MIR_unique_reg_error, "out of unique regs");
-    sprintf (reg_name, "%s%d", TEMP_REG_NAME_PREFIX, func->last_temp_num);
+    snprintf (reg_name, sizeof (reg_name), "%s%d", TEMP_REG_NAME_PREFIX, func->last_temp_num);
 
     if (find_rd_by_name (ctx, reg_name, func) == NULL)
       return MIR_new_func_reg (ctx, func, type, reg_name);
@@ -3971,7 +3971,7 @@ static void rename_regs (MIR_context_t ctx, MIR_func_t func, MIR_func_t called_f
   if (vars == NULL) return;
   for (size_t i = 0; i < nvars; i++) {
     VARR_TRUNC (char, temp_string, 0);
-    sprintf (buff, ".c%d_", func->n_inlines);
+    snprintf (buff, sizeof (buff), ".c%d_", func->n_inlines);
     VARR_PUSH_ARR (char, temp_string, buff, strlen (buff));
     var = VARR_GET (MIR_var_t, vars, i);
     type
@@ -5990,7 +5990,7 @@ static void scan_error (MIR_context_t ctx, const char *format, ...) {
 
   va_start (va, format);
   if (VARR_LENGTH (char, error_msg_buf) != 0) VARR_POP (char, error_msg_buf); /* remove last '\0' */
-  sprintf (message, "ln %lu: ", (unsigned long) curr_lno);
+  snprintf (message, sizeof (message), "ln %lu: ", (unsigned long) curr_lno);
   VARR_PUSH_ARR (char, error_msg_buf, message, strlen (message));
   len = vsnprintf (message, sizeof (message), format, va);
   VARR_PUSH_ARR (char, error_msg_buf, message, len);
@@ -6921,7 +6921,7 @@ void _MIR_dump_code (const char *name, uint8_t *code, size_t code_len) {
 #endif
 
   if (name != NULL) fprintf (stderr, "%s:", name);
-  sprintf (cfname, "_mir_%lu.c", (unsigned long) getpid ());
+  snprintf (cfname, sizeof (cfname), "_mir_%lu.c", (unsigned long) getpid ());
   if ((f = fopen (cfname, "w")) == NULL) return;
 #if defined(__APPLE__)
   fprintf (f, "unsigned char code[] = {");
@@ -6932,20 +6932,20 @@ void _MIR_dump_code (const char *name, uint8_t *code, size_t code_len) {
   fprintf (f, "};\n");
   fclose (f);
 #if defined(__aarch64__)
-  sprintf (command, "gcc -c -o %s.o %s 2>&1 && objdump --section=__data -D %s.o; rm -f %s.o %s",
+  snprintf (command, sizeof (command), "gcc -c -o %s.o %s 2>&1 && objdump --section=__data -D %s.o; rm -f %s.o %s",
            cfname, cfname, cfname, cfname, cfname);
 #else
-  sprintf (command, "gcc -c -o %s.o %s 2>&1 && objdump --section=.data -D %s.o; rm -f %s.o %s",
+  snprintf (command, sizeof (command), "gcc -c -o %s.o %s 2>&1 && objdump --section=.data -D %s.o; rm -f %s.o %s",
            cfname, cfname, cfname, cfname, cfname);
 #endif
 #else
-  sprintf (bfname, "_mir_%lu.bin", (unsigned long) getpid ());
+  snprintf (bfname, sizeof (bfname), "_mir_%lu.bin", (unsigned long) getpid ());
   if ((bf = fopen (bfname, "wb")) == NULL) return;
   fprintf (f, "void code (void) {}\n");
   for (i = 0; i < code_len; i++) fputc (code[i], bf);
   fclose (f);
   fclose (bf);
-  sprintf (command,
+  snprintf (command, sizeof (command),
            "gcc -c -o %s.o %s 2>&1 && objcopy --update-section .text=%s %s.o && objdump "
            "--adjust-vma=0x%llx -d %s.o; rm -f "
            "%s.o %s %s",

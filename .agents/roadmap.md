@@ -23,7 +23,7 @@ between pull requests and the full profile.
 | Stage | Title | CI | Issue | Pull request | Done |
 | --- | --- | --- | --- | --- | --- |
 | 0 | [MIR spike](#stage-0--mir-spike) | n/a | [#2](https://github.com/pedrobtz/zumir/issues/2) | [mirspike](https://github.com/pedrobtz/mirspike) | 2026-11-13 |
-| 1 | [Package identity](#stage-1--package-identity) | quick | [#3](https://github.com/pedrobtz/zumir/issues/3) | | |
+| 1 | [Package identity](#stage-1--package-identity) | quick | [#3](https://github.com/pedrobtz/zumir/issues/3) | | 2026-11-13 |
 | 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | | |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | | |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | |

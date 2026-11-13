@@ -33,17 +33,18 @@ call to r-actions.
 
 | Check         | Status  | Where              |
 | ------------- | ------- | ------------------ |
-| sanitizers    | gap #3  |                    |
-| valgrind      | gap #3  |                    |
-| rchk          | gap #3  |                    |
-| gctorture     | gap #3  |                    |
-| analyzers     | gap #3  |                    |
+| sanitizers    | done    | native-checks.yaml |
+| valgrind      | done    | native-checks.yaml |
+| rchk          | done    | native-checks.yaml |
+| gctorture     | done    | gctorture.yaml     |
+| analyzers     | done    | native-checks.yaml |
 | alloc-failure | gap #5  |                    |
 | mutation      | gap #11 |                    |
 | fuzz          | gap #8  |                    |
 | fuzz-reach    | gap #8  |                    |
 
-Stage 1 (#3) wires `native-checks.yaml`; Stage 3 (#5) wires
+Stage 1 (#3) wired `native-checks.yaml` and `gctorture.yaml` on
+2026-11-13; Stage 3 (#5) wires
 `alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
 Stage 11 (#11) schedules `mutation` over the C tests.

@@ -1,0 +1,95 @@
+on:
+  # No `push:`. A pull request already checks its merge with main, so the
+  # push after merge would check the same tree again, in every package at
+  # once. Main is checked by the schedule below, which skips a commit it has
+  # already checked (r-actions README, "Pushes to main").
+  # `labeled`/`unlabeled` so that adding or removing a CI label (`full-ci`,
+  # `ci:minimal`, `skip-ci:<workflow>`) reruns it.
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  # The full set runs weekly and on demand:
+  # `gh workflow run native-checks.yaml --ref main`.
+  schedule:
+    - cron: "26 8 * * 6"
+  workflow_dispatch:
+
+name: native-checks
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+# `profile` goes to the three workflows it changes: quick skips the asan
+# containers, valgrind and cran-special. lto, rchk and analyzers take minutes
+# either way and run on every push. gctorture has its own caller,
+# gctorture.yaml, with step 20 on a schedule.
+jobs:
+  sanitizers:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:sanitizers'))
+    uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
+    with:
+      asan: true
+      profile: auto
+
+  valgrind:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:valgrind'))
+    uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
+    with:
+      profile: auto
+
+  lto:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:lto'))
+    uses: pedrobtz/r-actions/.github/workflows/lto.yml@v1
+
+  rchk:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:rchk'))
+    uses: pedrobtz/r-actions/.github/workflows/rchk.yml@v1
+
+  analyzers:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:analyzers'))
+    uses: pedrobtz/r-actions/.github/workflows/analyzers.yml@v1
+
+  cran-special:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:cran-special'))
+    uses: pedrobtz/r-actions/.github/workflows/cran-special.yml@v1
+    with:
+      profile: auto

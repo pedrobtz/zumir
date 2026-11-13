@@ -69,7 +69,9 @@
 <ul><li>
 <strong>MIR never ends the R process</strong> (D4). MIR’s default error handler calls <code>exit(1)</code>, and <code>MIR_init</code> can reach it before a handler is installed. Every context gets <code>zumir</code>’s handler through <code>MIR_set_error_func</code>, the paths that run before that are patched, and every entry from R or from the table is a recovery point. A missed path kills the analyst’s session.</li>
 <li>
-<strong>No <code>longjmp</code> crosses a consumer’s frames.</strong> Every <code>zumir_</code> entry in the C API returns a status code. Errors are caught at the <code>zumir</code> boundary (§4.3).</li>
+<strong>No <code>longjmp</code> crosses a consumer’s frames.</strong> Every <code>zumir_</code> entry in the C API returns a status code, and every <code>MIR_</code> entry is a shim that traps and records the error in its context, which can then only be freed (§4.3, D20). A trap set in one call never covers a later one.</li>
+<li>
+<strong>A MIR update can break consumers’ binaries.</strong> The table carries a MIR ABI number; bump it whenever an exposed <code>mir.h</code> enum or struct changes (D21).</li>
 <li>
 <strong>The C API table only grows.</strong> Its first field is the version, and later versions only append fields. Consumers compiled against an older header must keep working.</li>
 <li>

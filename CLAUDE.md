@@ -74,8 +74,12 @@ These are fixed by the design before any code exists:
   every entry from R or from the table is a recovery point. A missed
   path kills the analyst’s session.
 - **No `longjmp` crosses a consumer’s frames.** Every `zumir_` entry in
-  the C API returns a status code. Errors are caught at the `zumir`
-  boundary (§4.3).
+  the C API returns a status code, and every `MIR_` entry is a shim that
+  traps and records the error in its context, which can then only be
+  freed (§4.3, D20). A trap set in one call never covers a later one.
+- **A MIR update can break consumers’ binaries.** The table carries a
+  MIR ABI number; bump it whenever an exposed `mir.h` enum or struct
+  changes (D21).
 - **The C API table only grows.** Its first field is the version, and
   later versions only append fields. Consumers compiled against an older
   header must keep working.

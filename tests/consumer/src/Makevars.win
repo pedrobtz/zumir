@@ -1,0 +1,4 @@
+# The reference right-hand sides in models.c must not fuse a multiply and an
+# add, since MIR does not (#18). Not a portable flag; this package is never
+# checked or released.
+PKG_CFLAGS = -ffp-contract=off

@@ -1,0 +1,4 @@
+MIR's own test programs, mir-tests/test*.mir from vnmakarov/mir at commit
+dc2c763f1c8bc746102ce87933d866335f9e6c06 (MIT, Copyright (C) 2018-2024
+Vladimir Makarov; src/vendor/mir/LICENSE), unchanged. test-mir-function.R
+reads them through mir_function()'s path.

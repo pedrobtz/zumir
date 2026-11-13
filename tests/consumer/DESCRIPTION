@@ -1,0 +1,11 @@
+Package: zumirconsumer
+Title: A Stand-in Consumer of zumir's C API
+Version: 0.0.0.9000
+Authors@R: person("Pedro", "Baltazar", , "pedrobtz@gmail.com", role = c("aut", "cre"))
+Description: Builds MIR code through zumir's C API table, as zupmxode will,
+    for zumir's own tests. Not for release.
+License: MIT
+Encoding: UTF-8
+LinkingTo: zumir
+Imports: zumir
+Suggests: testthat (>= 3.0.0)

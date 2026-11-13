@@ -1,0 +1,2 @@
+useDynLib(zumirconsumer, .registration = TRUE)
+import(zumir)

@@ -72,15 +72,17 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Error trap: invalid modules | a `zumir_error` of the documented class each time, the session alive and RSS flat over 10³ failures of three kinds, through an internal test entry point | gap #5: tests/testthat/test-error-trap.R |
 | Executable memory refused (Linux) | the documented tier and reason, not a signal, under a seccomp filter in a forked child | gap #6: tests/testthat/test-tier.R |
 | C API table v1 | a consumer package that links it, emits three right-hand sides, and compares them with C | gap #7: tests/consumer/ |
+| C API compatibility (D21) | a consumer built against the oldest header runs; one built against another MIR ABI number gets `NULL` and a reason | gap #7: tests/consumer/ |
+| Generated code's memory accesses | valgrind with `--smc-check=all` on the native tier, ASan on the interpreter tier, over the `rfunction()` and `cfunction()` suites | gap #11 |
 | Double-expression emitter | each comparison and branch helper against C on NaN and Inf operands | gap #7: tests/consumer/ |
-| Consumer imports | an import resolves in its own context only, and never in `cfunction()` | gap #7: tests/consumer/ |
+| Consumer imports | an import resolves in its own context only, and not under D6's list | gap #7: tests/consumer/; `cfunction()` isolation gap #9: tests/testthat/test-cfunction.R |
 | `mir_function()`: MIR text in | MIR's `run-test` round trip (text read, written back, compared) on `mir-tests/*.mir`, and hand-written expected results for the ones that return a value | gap #19 |
 | c2mir: C source to MIR | the `c-tests` corpus by its own rules (272 `.expect` outputs, exit status for the rest), with a test-only import list for printf, abort and exit | gap #20 |
 | c2mir diagnostics | an error planted at a known line and column is reported there, in the user's source, not the prelude | gap #8: tests/testthat/test-c2mir-errors.R |
 | Import resolver (D6, D14, D18) | R's own exp, log, sqrt and the rest on the same inputs, bitwise; the C ports of R's %%, %/%, min and max against R; a name outside a context's list is a link error | gap #7: tests/testthat/test-imports.R |
 | c2mir prelude | every declared name links and returns what R's function returns; a test-only import is invisible to `cfunction()` | gap #8: tests/testthat/test-prelude.R |
 | `cfunction()` marshalling | a reference written in R for every example and every argument and return type | gap #9: tests/testthat/test-cfunction.R |
-| `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)` and a sign-of-zero check | gap #21 |
+| `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)`, which already tells `0` from `-0` and `NA` from `NaN`; value, attributes, warnings and error class asserted separately | gap #21 |
 | `rfunction()`, random functions | R on generated functions within the subset, on random inputs, seed printed | gap #17: tests/testthat/test-rfunction-random.R |
 | `rfunction()`, refusals | each construct outside §4.6 refused with its name | gap #17: tests/testthat/test-rfunction-refuse.R |
 | `rfunction()` through the emitter | the MIR-text route: the same module printed with `MIR_output`, and the same results | gap #26: tests/testthat/test-rfunction-routes.R |
@@ -97,8 +99,8 @@ cannot apply.
 | Object | Sequences | Fork | Unwind | Owner |
 | --- | --- | --- | --- | --- |
 | MIR context held by R (external pointer) | gap #22 | gap #22 | gap #22 | gap #6: finalizer frees the context and its code; tests/testthat/test-finalizer.R |
-| Compiled function from `cfunction()`, `rfunction()` or `mir_function()` | gap #23 | gap #23 | n/a: a call into generated code cannot be interrupted by R; errors return a status | gap #23 |
-| `zumir_ctx` owned by a consumer through the C API | gap #7: compile after free and free twice, in the consumer package | n/a: the consumer owns fork policy | n/a: `zumir_` entries return a status and never longjmp | gap #7: the consumer frees it with `zumir_ctx_free` |
+| Compiled function from `cfunction()`, `rfunction()` or `mir_function()` | gap #23 | gap #23 | `rfunction()`: gap #17, an endless `while` stopped by `setTimeLimit()` (D23); `cfunction()` and `mir_function()`: n/a, user code as in `.Call()`; errors return a status | gap #23 |
+| `zumir_ctx` owned by a consumer through the C API | gap #7: an error then more calls (a no-op) then compile (the recorded error) then free; free twice; free `NULL`; in C and in C++ with a live destructor, in the consumer package | n/a: the consumer owns fork policy | n/a: every entry, `MIR_` shims included, returns and never longjmps (D20) | gap #7: the consumer frees it with `zumir_ctx_free` |
 | Interpreter contexts, one per thread (D10) | gap #6: tests/testthat/test-threads.R | n/a: created and freed inside one parallel region | n/a: no R call inside the region | gap #6: tests/testthat/test-threads.R |
 <!-- markdownlint-enable MD013 -->
 
@@ -115,4 +117,6 @@ One row per limit the package enforces. "Straddled by" is the test of
 | `rfunction()` index range, 1 to `length(x)` | elements | gap #17: tests/testthat/test-rfunction-errors.R |
 | `rfunction()` `numeric()` size and `seq_len()` argument, a whole number from 0 | elements | gap #17: tests/testthat/test-rfunction-errors.R |
 | `rfunction()` integer counter arithmetic, `.Machine$integer.max` | integer value | gap #17: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` interrupt poll, every 2¹⁶ loop iterations (D23) | iterations | gap #17: tests/testthat/test-rfunction-errors.R |
+| C API table size, read before any appended field (D21) | bytes | gap #7: tests/consumer/ |
 <!-- markdownlint-enable MD013 -->

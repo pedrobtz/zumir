@@ -133,7 +133,9 @@ which holds a write token and is pinned to a commit:
 - `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
   R-devel row added to `runners` (full profile only).
 - `native-checks.yaml`: sanitizers (with ASan), valgrind, lto, rchk,
-  analyzers and cran-special.
+  analyzers and cran-special. `analyzers` runs off pull requests only, with
+  180 minutes: `-fanalyzer` on vendored MIR outran the 45-minute default,
+  and `exclude` does not skip the analysis (pedrobtz/r-actions#113).
 - `gctorture.yaml`: the wide step on pull requests under a 10-minute
   budget; step 20 daily (while the roadmap is implemented) and on dispatch.
 - `platforms.yaml`: `tools/ci/platform.sh` on macOS arm64, Windows and

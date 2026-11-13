@@ -27,7 +27,7 @@ between pull requests and the full profile.
 | 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | [#31](https://github.com/pedrobtz/zumir/pull/31) | 2026-11-13 |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | [#32](https://github.com/pedrobtz/zumir/pull/32) | 2026-11-13 |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | [#33](https://github.com/pedrobtz/zumir/pull/33) | 2026-11-13 |
-| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | | 2026-11-13 |
+| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | [#34](https://github.com/pedrobtz/zumir/pull/34) | 2026-11-13 |
 | 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | | |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |

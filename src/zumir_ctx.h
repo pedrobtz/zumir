@@ -68,6 +68,8 @@ int zumir_probe_tier_ok(int tier);
 /* An external pointer of class zumir_context owning a new context on
  * `tier` with import set `imports`, or a zumir_status. */
 SEXP zumir_rctx_new_sexp(int tier, int imports);
+/* zumir_ctx.c's R entries, for the other entry files. */
+SEXP zumir_ctx_scan(SEXP x, SEXP text);
 
 typedef void (*zumir_body)(zumir_rctx *z, void *arg);
 

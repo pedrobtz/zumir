@@ -2,7 +2,9 @@
 
 S3method(print,zumir_context)
 S3method(print,zumir_function)
+S3method(print,zumir_rfunction)
 export(mir_function)
+export(rfunction)
 export(zumir_info)
 export(zumir_tier)
 useDynLib(zumir, .registration = TRUE)

@@ -13,6 +13,9 @@ NULL
   # R's %% and %/% use long double only when R was built with it; zumir's
   # ports of them follow (src/zumir_imports.c).
   .Call(zumir_set_long_double, capabilities("long.double"))
+  # R 4.6 wraps exp, cos, sqrt and others with small-argument shortcuts;
+  # rfunction()'s math follows the R it runs in.
+  .Call(zumir_set_r46, getRversion() >= "4.6.0")
   # The tier probe runs before anything else maps code (design §4.4).
   probe_tiers()
 }

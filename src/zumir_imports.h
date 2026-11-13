@@ -21,6 +21,8 @@ double zumir_r_min2(double x1, double x2);
 double zumir_r_max2(double x1, double x2);
 int zumir_r_poll(void);
 extern _Thread_local int zumir_r_fmod_warned;
+extern _Thread_local int zumir_r_nan_warned;
+extern _Thread_local char zumir_r_poll_message[512];
 
 #if ZUMIR_HAVE_MIR
 #include "zumir_mir_api.h"

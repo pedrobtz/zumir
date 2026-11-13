@@ -5,7 +5,7 @@
  * src/zumir_mir.c) and zumir's R-free trap files:
  *
  *   cc -Isrc -DNDEBUG tests/c/test-trap-threads.c src/zumir_mir.c \
- *     src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c \
+ *     src/zumir_mir_gen.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c \
  *     -lpthread -lm
  *
  * Exit status 0 when every check holds. */
@@ -84,7 +84,7 @@ static void *run(void *arg) {
       else
         j->wrong++;
     }
-    if (!zumir_mir_free(ctx, arena)) j->wrong++;
+    if (!zumir_mir_free(ctx, arena, 0)) j->wrong++;
   }
   j->depth = zumir_trap_depth();
   return NULL;

@@ -658,6 +658,24 @@ void *_MIR_get_interp_shim (MIR_context_t ctx, MIR_item_t func_item, void *handl
   push_insns (code, push_rbx, sizeof (push_rbx));
 #endif
   push_insns (code, save_pat, sizeof (save_pat));
+#ifdef _WIN32
+  /* Win64 passes a float or double among the first four arguments in
+     xmm<i> alone, unless the call is variadic, and save_pat spills only the
+     integer registers; the handler reads every argument from the home
+     area. Spill those xmm registers over their home slots too. */
+  {
+    MIR_func_t func = func_item->u.func;
+    for (uint32_t i = 0; i < func->nargs && i < 4; i++) {
+      MIR_type_t type = VARR_GET (MIR_var_t, func->vars, i).type;
+      if (type == MIR_T_F || type == MIR_T_D) {
+        /* movss/movsd %xmm<i>, 8*(i+1)(%rsp) */
+        uint8_t spill[] = {type == MIR_T_F ? 0xf3 : 0xf2, 0x0f, 0x11,
+                           (uint8_t) (0x44 | (i << 3)), 0x24, (uint8_t) (8 * (i + 1))};
+        push_insns (code, spill, sizeof (spill));
+      }
+    }
+  }
+#endif
   addr = push_insns (code, prepare_pat, sizeof (prepare_pat));
   imm = nres * 16;
 #ifdef _WIN32

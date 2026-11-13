@@ -88,6 +88,9 @@ test_that("failing each of MIR's allocations in turn: an error, never a crash", 
   types <- c(syntax = 1L, operand = 26L, import = 20L)
   alloc_error <- 3L # MIR_alloc_error
   on.exit(.Call(zumir_test_fail_alloc, 0))
+  # Contexts other tests hold stay counted until collected.
+  gc()
+  base <- .Call(zumir_test_live_arenas)
   for (kind in names(types)) {
     seen <- integer()
     for (n in 1:260) {
@@ -102,5 +105,5 @@ test_that("failing each of MIR's allocations in turn: an error, never a crash", 
     # module's own error.
     expect_identical(seen[[260]], types[[kind]], info = kind)
   }
-  expect_identical(.Call(zumir_test_live_arenas), 0)
+  expect_identical(.Call(zumir_test_live_arenas), base)
 })

@@ -6,7 +6,7 @@ interpreter)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   1c4b1cca143472d87f181ed90cd5bcb5e6047f14
+  Fork commit:   3e643e832b01f0214687c37eaf2c695072219e04
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -21,6 +21,8 @@ interpreter)
                  4c27a18f Return NULL from MIR_init2 and _MIR_init instead of exiting
                  5803194c Load unaligned hash and reduce keys with memcpy
                  1c4b1cca Declare MIR_insn's operands as a flexible array member
+                 c65e7044 Report code-memory failures through the error function
+                 3e643e83 Spill float arguments in the Win64 interpreter shim
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -70,6 +72,16 @@ The patches, with the fork branch that carries each one alone:
             same offset, in C++), sized with offsetof. gcc
             -fsanitize=bounds-strict. fix/flexible-insn-ops; upstream: not
             filed yet (#30). Changes tools/mir-abi.txt; no consumer yet.
+  c65e7044  _MIR_set_code returns whether both mem_protect calls succeeded;
+            _MIR_publish_code, _MIR_change_code and _MIR_update_code_arr
+            report a code-memory failure through the error function (D11),
+            so refused W+X memory is an error, not a SIGSEGV.
+            fix/code-memory-errors; upstream: not filed yet (#30).
+  3e643e83  The Win64 interpreter shim spills xmm0-xmm3 for float and double
+            arguments; it spilled only the integer registers, so a C
+            caller's double argument read as a stale slot (x * 2 + 1 gave 1
+            for every x). fix/win64-interp-float-args; upstream: not filed
+            yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

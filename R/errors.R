@@ -29,3 +29,27 @@ test_invalid_module <- function(kind, finish = TRUE) {
   cnd$trap <- res
   stop(cnd)
 }
+
+# A .Call result that may be a zumir_status (src/zumir_ctx.h): returns the
+# result, or signals the status as a condition. kind "mir": MIR raised, the
+# context is failed. kind "context": the context cannot be used (freed,
+# restored from a saved session, failed earlier, not a context).
+zumir_check <- function(res, call = sys.call(-1)) {
+  if (!inherits(res, "zumir_status")) {
+    return(res)
+  }
+  if (identical(res$kind, "mir")) {
+    stop(mir_condition(
+      list(
+        type = res$type,
+        status = 0L,
+        message = res$message
+      ),
+      call = call
+    ))
+  }
+  stop(structure(
+    class = c("zumir_context_error", "zumir_error", "error", "condition"),
+    list(message = res$message, call = call, mir_type = res$type)
+  ))
+}

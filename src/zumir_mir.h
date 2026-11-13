@@ -15,6 +15,22 @@
  * tools/verify-vendor checks that the two agree. */
 #define ZUMIR_MIR_COMMIT "dc2c763f1c8bc746102ce87933d866335f9e6c06"
 
+/* The local patches, as src/vendor/PROVENANCE lists them (zumir_info()).
+ * tools/verify-vendor checks the two agree. */
+#define ZUMIR_MIR_PATCHES \
+  "ea7f1643 Fix two warnings Rtools gcc 14 reports",\
+  "773a4834 Release code memory with a zero size on Windows",\
+  "dafb8e1b Remove variables clang -Wall reports as unused",\
+  "f35a0021 Drop the semicolons after DEF_* macros at file scope",\
+  "6edb5ce2 Give mem_page_size a prototype",\
+  "1571f134 Use snprintf with the buffer's size instead of sprintf",\
+  "0b8063f7 Clear curr_func and curr_module first in MIR_finish",\
+  "4c27a18f Return NULL from MIR_init2 and _MIR_init instead of exiting",\
+  "5803194c Load unaligned hash and reduce keys with memcpy",\
+  "1c4b1cca Declare MIR_insn's operands as a flexible array member",\
+  "c65e7044 Report code-memory failures through the error function",\
+  "3e643e83 Spill float arguments in the Win64 interpreter shim"
+
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0
 #elif defined(_WIN32) && !(defined(__x86_64__) || defined(_M_AMD64))

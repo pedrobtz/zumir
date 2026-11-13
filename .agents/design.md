@@ -394,6 +394,12 @@ all four hold for it. If native code is not, because the architecture
 is not one MIR targets or because the system refuses memory that is
 writable and executable, `ZUMIR_TIER_AUTO` means the interpreter.
 `zumir_info()` says which capabilities hold, and why the others do not.
+Built in Stage 4 (2026-11-13): the probe compiles a two-function module
+from MIR text (`arith`, `x * 2 + 1`; `ext`, a call to `exp`) and calls
+both, so `run` and `external` are checked against C, `exp` bitwise. A
+refused mapping's `errno` is kept by the context's arena, so a missing
+`MAP_JIT` entitlement on macOS reads as such. `zumir_tier()` is
+`"native"`, `"interp"` or, under Q5 (c), `"none"`.
 
 Two facts from the spike constrain this. The probe must *fail*, not
 crash, so it rests on the code-memory patch (§4.2, D11). And MIR's
@@ -827,6 +833,11 @@ decides it and the maintainer may overturn it.
 - **D11 (C), 2026-11-13.** A code-memory failure (`mem_map`,
   `mem_protect`) is an error through the context's error function, never
   a write into protected memory. Patched in MIR and offered upstream.
+  Built in Stage 4 as one fork patch at the funnel: `_MIR_set_code`
+  returns whether both protection changes held, and `_MIR_publish_code`,
+  `_MIR_change_code` and `_MIR_update_code_arr` report a failure as
+  `MIR_alloc_error`, since none of `_MIR_publish_code`'s thirty callers
+  checked its NULL.
 - **D12 (M), revised 2026-11-13.** MIR's local patches live on a fork,
   [`pedrobtz/mir`](https://github.com/pedrobtz/mir), as `qio` keeps
   carquet's: its `master` mirrors upstream, its `zumir` branch is the
@@ -949,7 +960,12 @@ decides it and the maintainer may overturn it.
 - **Q4.** Is v0.1.0 a CRAN submission or a GitHub release? The board's
   `CRAN intent` for this card decides; this RFC assumes `Planned`,
   because `zupmxode` cannot reach CRAN otherwise.
-- **Q5.** Where W+X memory is refused, what runs? (a) A dual-mapped code
+- **Q5. Decided (c), 2026-11-13, by the maintainer.** Where W+X memory
+  is refused, no tier runs: the load-time probe reports both tiers
+  unavailable with the reason, `zumir_tier()` is `"none"`, and entries
+  that need code error with a classed condition; `zupmxode` brings its
+  own IR interpreter for that case. (a) is not built for v0.1.0. The
+  question as it stood: Where W+X memory is refused, what runs? (a) A dual-mapped code
   allocator, one file mapped read-execute and read-write as TinyCC's
   `CONFIG_SELINUX` does, patched into MIR so it writes through the second
   mapping: both tiers then work. (c) No tier: `zumir` reports it, and

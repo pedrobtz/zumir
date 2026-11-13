@@ -39,7 +39,10 @@ RFC 0073. It outranks this file: `CLAUDE.md` orients, the design decides.
 Scaffolded 2026-11-13 with `create-pkg.sh`. Stage 1 (package identity)
 gave it its `DESCRIPTION`, routine registration with dynamic lookup off,
 and the CI and assurance wiring. Stage 2 vendored MIR, clean on every
-leg. There is no exported function yet. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+leg; Stage 3 added the error trap; Stage 4 contexts held by R, the
+load-time tier probe, and the first exports, `zumir_info()` and
+`zumir_tier()`. Q5 is decided (c): where W+X memory is refused, no tier
+runs and `zumir_tier()` is `"none"`. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -90,6 +93,10 @@ These are fixed by the design before any code exists:
   context that raised may only be finished, under a trap of its own.
 - **`mir.h` only through `src/zumir_mir_api.h`.** Its inline
   `MIR_init2` writes to `stderr`; the header puts the redirection first.
+- **A context R holds is a `zumir_context` external pointer**
+  (`src/zumir_ctx.c`); every MIR call on it goes through
+  `zumir_rctx_run()`, and entries return a `zumir_status` that
+  `zumir_check()` signals in R, so no R error is raised under a trap.
 - **Contexts only from `zumir_mir_new(&arena)`**, under a trap, and freed
   only by `zumir_mir_free(ctx, arena)`: the arena's allocator raises
   instead of returning NULL (MIR does not always check), and after a
@@ -124,7 +131,11 @@ These are fixed by the design before any code exists:
 
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
-`test-error-trap.R`: MIR's errors as `zumir_mir_error` conditions through
+Stage 4's: `test-tier.R` (the probe; W+X refused under seccomp in a child
+process, Linux), `test-tiers.R` (native against interpreter, bitwise, on the
+spike's three models in `src/zumir_test_models.c`), `test-threads.R`,
+`test-finalizer.R` and `test-context-sequences.R`, through the internal
+context wrappers in `R/context.R`. `test-error-trap.R`: MIR's errors as `zumir_mir_error` conditions through
 an internal entry (`test_invalid_module()`), an error inside
 `MIR_finish_func` then `MIR_finish`, and in a child process 10³ failures of
 each kind with RSS flat, and every one of MIR's first 260 allocations

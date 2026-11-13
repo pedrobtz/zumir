@@ -81,6 +81,14 @@ cmp -s "$WORK/abi.txt" tools/mir-abi.txt ||
 grep -q "#define ZUMIR_MIR_COMMIT \"$up_pin\"" src/zumir_mir.h ||
   fail "ZUMIR_MIR_COMMIT in src/zumir_mir.h is not \"$up_pin\""
 
+# 6. zumir_info() reports the same patch list (ZUMIR_MIR_PATCHES).
+sed -n '/^#define ZUMIR_MIR_PATCHES/,/^$/p' src/zumir_mir.h |
+  sed -n 's/^ *"\(.*\)",*\\*$/\1/p' > "$WORK/info-patches"
+cmp -s "$WORK/info-patches" "$WORK/listed" || {
+  fail "ZUMIR_MIR_PATCHES in src/zumir_mir.h differs from the patch list in $PROV"
+  diff -u "$WORK/listed" "$WORK/info-patches" >> "$FAILURES" || true
+}
+
 if [ "$CANARY" -eq 1 ]; then
   if [ -s "$FAILURES" ]; then
     echo "==> canary OK: verification failed with the last patch left out"

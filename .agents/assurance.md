@@ -71,12 +71,13 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Compiled code against CRAN's rules | the shared object's imports (`nm -u`, `objdump -p` on Windows) hold no exit, abort, printf, puts, stderr, stdout, sprintf or rand; its exports are `R_init_zumir` alone | tools/ci/platform.sh, in platforms.yaml, on every runner |
 | MIR generator: module to machine code | the same function in C from the leg's compiler, bitwise on x86-64 | gap #7: tests/consumer/ |
 | MIR generator on aarch64 | the same C built with `-ffp-contract=off`, bitwise | gap #18 |
-| MIR interpreter | native code on the same module, bitwise, on the three spike right-hand sides | gap #6: tests/testthat/test-tiers.R |
+| MIR interpreter | native code on the same module, bitwise, on the three spike right-hand sides (50 random draws each, and 0, -0, ±Inf, NaN, NA, subnormal and the largest double) | tests/testthat/test-tiers.R |
 | Error trap: invalid modules | MIR's own error type (syntax, operand mode, undeclared reference) as a `zumir_mir_error` each time, the context finished and no trap left; in a child process 10³ failures of each kind all caught, the session alive and RSS growth under 4 MB for the second 10³ (a leaked context per failure is about 97 MB) | tests/testthat/test-error-trap.R |
 | Allocation failure inside MIR | each of MIR's first 260 allocations failed in turn through zumir's allocator hook: a `zumir_mir_error` of `MIR_alloc_error` or the module's own type every time, never a crash, and no arena left (`zumir_test_live_arenas`); the weekly `alloc-failure` sweep fails R's allocations too | tests/testthat/test-error-trap.R; alloc-failure.yaml |
 | Error trap on threads | each of two threads gets its own 500 errors, with its own MIR error type, and leaves no trap behind; under ASan and UBSan on Linux | tests/c/test-trap-threads.c, in tools/ci/platform.sh |
 | MIR's exit, abort and stderr | what MIR writes to stderr reaches zumir's buffer, a caller's FILE is untouched, exit and abort land in the trap or, with none, become an R error | tests/testthat/test-mir-stdio.R |
-| Executable memory refused (Linux) | the documented tier and reason, not a signal, under a seccomp filter in a forked child | gap #6: tests/testthat/test-tier.R |
+| Executable memory refused (Linux) | under a seccomp filter in a child R process: tier `"none"`, `compile` false on both tiers with MIR's code-memory error and `EACCES`, and the process alive | tests/testthat/test-tier.R, on ubuntu-latest (R CMD check) and ubuntu-24.04-arm (platform.sh) |
+| Tier probe | each tier's four capabilities, `arith` against `x * 2 + 1` and `ext` against libm's `exp`, bitwise; `zumir_tier()` from them | tests/testthat/test-tier.R |
 | C API table v1 | a consumer package that links it, emits three right-hand sides, and compares them with C | gap #7: tests/consumer/ |
 | C API compatibility (D21) | a consumer built against the oldest header runs; one built against another MIR ABI number gets `NULL` and a reason | gap #7: tests/consumer/ |
 | Generated code's memory accesses | valgrind with `--smc-check=all` on the native tier, ASan on the interpreter tier, over the `rfunction()` and `cfunction()` suites | gap #11 |
@@ -104,10 +105,10 @@ cannot apply.
 <!-- markdownlint-disable MD013 -->
 | Object | Sequences | Fork | Unwind | Owner |
 | --- | --- | --- | --- | --- |
-| MIR context held by R (external pointer) | gap #22 | gap #22 | gap #22 | gap #6: finalizer frees the context and its code; tests/testthat/test-finalizer.R |
+| MIR context held by R (external pointer) | free twice, use after free, `readRDS` of a saved one, an R error between two MIR calls, a MIR error then more calls (each a `zumir_context_error`, free still works): tests/testthat/test-context-sequences.R | a forked child gets the parent's answer (`parallel::mcparallel`): same file | an R error between two MIR calls leaves the context usable: same file; MIR errors never longjmp past the entry's trap (D4) | the finalizer frees the context and its arena: `zumir_info()$memory` back to baseline after `gc()`, under gctorture too: tests/testthat/test-finalizer.R |
 | Compiled function from `cfunction()`, `rfunction()` or `mir_function()` | gap #23 | gap #23 | `rfunction()`: gap #17, an endless `while` stopped by `setTimeLimit()` (D23); `cfunction()` and `mir_function()`: n/a, user code as in `.Call()`; errors return a status | gap #23 |
 | `zumir_ctx` owned by a consumer through the C API | gap #7: an error then more calls (a no-op) then compile (the recorded error) then free; free twice; free `NULL`; in C and in C++ with a live destructor, in the consumer package | n/a: the consumer owns fork policy | n/a: every entry, `MIR_` shims included, returns and never longjmps (D20) | gap #7: the consumer frees it with `zumir_ctx_free` |
-| Interpreter contexts, one per thread (D10) | gap #6: tests/testthat/test-threads.R | n/a: created and freed inside one parallel region | n/a: no R call inside the region | gap #6: tests/testthat/test-threads.R |
+| Interpreter contexts, one per thread (D10) | 8 threads, a context each, against the serial run bitwise: tests/testthat/test-threads.R | n/a: created and freed inside one parallel region | n/a: no R call inside the region | each thread frees its own; no arena left: tests/testthat/test-threads.R |
 <!-- markdownlint-enable MD013 -->
 
 ## Limits

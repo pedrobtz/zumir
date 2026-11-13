@@ -8,7 +8,8 @@
 #      R's compiler and flags (design D2: the checks every MIR bump re-runs).
 #   2. The package built, then its symbols: nothing of MIR's exported, and
 #      no CRAN-flagged library symbol linked.
-#   3. The error trap on two threads at once (tests/c).
+#   3. The error trap on two threads at once (tests/c); on Linux, the R
+#      suite against the package built in step 2.
 #   4. Linux: the package built with MIR forced out installs, loads and
 #      reports no target (tests/testthat/test-no-target.R).
 #
@@ -160,7 +161,7 @@ echo "ok: no CRAN-flagged symbol linked"
 # from MIR and zumir's R-free trap files, with R's compiler and flags; on
 # Linux also under ASan and UBSan.
 group "Trap on two threads"
-trap_srcs="tests/c/test-trap-threads.c src/zumir_mir.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c"
+trap_srcs="tests/c/test-trap-threads.c src/zumir_mir.c src/zumir_mir_gen.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c"
 $cc_cmd $r_cflags -Isrc -DNDEBUG $trap_srcs -o "$tmp/test-trap-threads" -lpthread -lm
 "$tmp/test-trap-threads"
 if [ "$os" = ubuntu ]; then
@@ -169,6 +170,15 @@ if [ "$os" = ubuntu ]; then
   "$tmp/test-trap-threads-asan"
 fi
 endgroup
+
+# ---------------------------------------------------------------------------
+# The R suite on this runner (Linux, Stage 4): R CMD check has no aarch64
+# Linux leg, and the W+X test (test-tier.R) must run on both Linux CPUs.
+if [ "$os" = ubuntu ]; then
+  group "R suite"
+  R_LIBS="$lib${R_LIBS:+:$R_LIBS}" NOT_CRAN=true "$Rscript" tools/ci-run-tests.R
+  endgroup
+fi
 
 # ---------------------------------------------------------------------------
 # 4. No target (Stage 2): MIR forced out, as on a CPU it does not target.

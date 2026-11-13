@@ -31,17 +31,17 @@ package writes no bytes another program reads. -->
 check. Add `(own)` when that workflow is the package's own rather than a
 call to r-actions.
 
-| Check         | Status | Where              |
-| ------------- | ------ | ------------------ |
-| sanitizers    | gap #3 |                    |
-| valgrind      | gap #3 |                    |
-| rchk          | gap #3 |                    |
-| gctorture     | gap #3 |                    |
-| analyzers     | gap #3 |                    |
-| alloc-failure | gap #5 |                    |
-| mutation      | gap #11 |                   |
-| fuzz          | gap #8 |                    |
-| fuzz-reach    | gap #8 |                    |
+| Check         | Status  | Where              |
+| ------------- | ------- | ------------------ |
+| sanitizers    | gap #3  |                    |
+| valgrind      | gap #3  |                    |
+| rchk          | gap #3  |                    |
+| gctorture     | gap #3  |                    |
+| analyzers     | gap #3  |                    |
+| alloc-failure | gap #5  |                    |
+| mutation      | gap #11 |                    |
+| fuzz          | gap #8  |                    |
+| fuzz-reach    | gap #8  |                    |
 
 Stage 1 (#3) wires `native-checks.yaml`; Stage 3 (#5) wires
 `alloc-failure`, with the error trap it exercises; Stage 7 (#8) wires

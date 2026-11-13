@@ -284,7 +284,11 @@ struct MIR_insn {
   DLIST_LINK (MIR_insn_t) insn_link;
   MIR_insn_code_t code : 32;
   unsigned int nops : 32; /* number of operands */
-  MIR_op_t ops[1];
+#ifdef __cplusplus
+  MIR_op_t ops[1]; /* ISO C++ has no flexible array member; same offset */
+#else
+  MIR_op_t ops[]; /* nops elements, at least one allocated */
+#endif
 };
 
 /* Definition of double list of insns */
@@ -480,7 +484,7 @@ static inline MIR_context_t MIR_init2 (MIR_alloc_t alloc, MIR_code_alloc_t code_
     fprintf (stderr,
              "mir.h header has version %g different from used mir code version %g -- good bye!\n",
              MIR_API_VERSION, _MIR_get_api_version ());
-    exit (1);
+    return NULL;
   }
   return _MIR_init (alloc, code_alloc);
 }

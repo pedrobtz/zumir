@@ -6,7 +6,7 @@ interpreter)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   1571f1340f0eeb524ed127fa4e5c6ed6c4b377a6
+  Fork commit:   1c4b1cca143472d87f181ed90cd5bcb5e6047f14
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -17,6 +17,10 @@ interpreter)
                  f35a0021 Drop the semicolons after DEF_* macros at file scope
                  6edb5ce2 Give mem_page_size a prototype
                  1571f134 Use snprintf with the buffer's size instead of sprintf
+                 0b8063f7 Clear curr_func and curr_module first in MIR_finish
+                 4c27a18f Return NULL from MIR_init2 and _MIR_init instead of exiting
+                 5803194c Load unaligned hash and reduce keys with memcpy
+                 1c4b1cca Declare MIR_insn's operands as a flexible array member
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -51,6 +55,21 @@ The patches, with the fork branch that carries each one alone:
   1571f134  snprintf with the destination array's size for all ten sprintf
             calls. R's compiled-code check rejects sprintf.
             fix/snprintf; upstream: not filed yet (#30).
+  0b8063f7  MIR_finish clears curr_func and curr_module first, so a context
+            whose MIR_finish_func was left by a longjmp can be finished
+            (the spike's patch 0001). fix/finish-clears-current; upstream:
+            not filed yet (#30).
+  4c27a18f  MIR_init2's version check and _MIR_init's first allocation
+            return NULL instead of exiting: both run before an error
+            function can be installed. fix/init-returns-null; upstream:
+            not filed yet (#30).
+  5803194c  The hash and reduce code load unaligned keys with memcpy and
+            memcmp, not casts. UBSan "load of misaligned address".
+            fix/unaligned-loads; upstream: not filed yet (#30).
+  1c4b1cca  struct MIR_insn's ops is a flexible array member in C (ops[1],
+            same offset, in C++), sized with offsetof. gcc
+            -fsanitize=bounds-strict. fix/flexible-insn-ops; upstream: not
+            filed yet (#30). Changes tools/mir-abi.txt; no consumer yet.
 
 Not patched, built differently instead (design §4.2):
 

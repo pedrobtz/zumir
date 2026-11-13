@@ -13,6 +13,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(__x86_64__) || defined(__i386__) || defined(__PPC64__) || defined(__s390__) \
   || defined(__m32c__) || defined(cris) || defined(__CR16__) || defined(__vax__)        \
@@ -34,9 +35,17 @@ static inline uint64_t mir_get_key_part (const uint8_t *v, size_t len, int relax
 
   if (relax_p || MIR_LITTLE_ENDIAN) {
 #if MIR_HASH_UNALIGNED_ACCESS
-    if (len == sizeof (uint64_t)) return *(uint64_t *) v;
+    /* memcpy, not a cast: v need not be aligned, and a misaligned load is
+       undefined behaviour. Compilers emit the same single load for it. */
+    if (len == sizeof (uint64_t)) {
+      uint64_t w;
+      memcpy (&w, v, sizeof (w));
+      return w;
+    }
     if (len >= sizeof (uint32_t)) {
-      tail = (uint64_t) * (uint32_t *) v << 32;
+      uint32_t w;
+      memcpy (&w, v, sizeof (w));
+      tail = (uint64_t) w << 32;
       start = 4;
     }
 #endif

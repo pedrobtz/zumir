@@ -5,6 +5,7 @@
 #include <R.h>
 #include <Rinternals.h>
 
+#include "zumir_trap.h"
 #include "zumir_mir_stdio.h"
 
 /* Writes `text` to stderr with fprintf, then '!' with fputc, then a perror
@@ -29,10 +30,26 @@ SEXP zumir_test_sink(SEXP text, SEXP path) {
   return out;
 }
 
-/* MIR's exit (status) as zumir handles it before Stage 3: an R error with
- * what MIR wrote to stderr first. */
-SEXP zumir_test_exit(SEXP text) {
+/* MIR's exit (status), as MIR's own code calls it: with `trapped` FALSE
+ * there is no trap, and the package's handler raises an R error; with it
+ * TRUE the trap catches it and c(status, message) is returned. */
+SEXP zumir_test_exit(SEXP text, SEXP trapped) {
+  zumir_trap t;
   zumir_mir_message_clear();
-  fprintf(stderr, "%s", CHAR(STRING_ELT(text, 0)));
-  exit(3);
+  if (Rf_asLogical(trapped) != TRUE) {
+    fprintf(stderr, "%s", CHAR(STRING_ELT(text, 0)));
+    exit(3);
+  }
+  zumir_trap_push(&t);
+  if (setjmp(t.env) == 0) {
+    fprintf(stderr, "%s\n", CHAR(STRING_ELT(text, 0)));
+    abort();
+  }
+  SEXP out = PROTECT(Rf_allocVector(STRSXP, 2));
+  char status[16];
+  snprintf(status, sizeof(status), "%d", t.status);
+  SET_STRING_ELT(out, 0, Rf_mkChar(status));
+  SET_STRING_ELT(out, 1, Rf_mkChar(t.message));
+  UNPROTECT(1);
+  return out;
 }

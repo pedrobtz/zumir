@@ -112,7 +112,11 @@ struct MIR_insn {
   DLIST_LINK (MIR_insn_t) insn_link;
   MIR_insn_code_t code : 32;
   unsigned int nops : 32;
+#ifdef __cplusplus
   MIR_op_t ops[1];
+#else
+  MIR_op_t ops[];
+#endif
 };
 typedef struct MIR_var {
   MIR_type_t type;

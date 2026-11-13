@@ -11,4 +11,5 @@ Roxygen: list(markdown = TRUE)
 Suggests: 
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
+Config/Needs/website: knitr, rmarkdown
 URL: https://pedrobtz.github.io/zumir/

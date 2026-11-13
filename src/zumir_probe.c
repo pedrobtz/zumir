@@ -58,16 +58,18 @@ static void map_reason(char *buf, size_t n, const char *mir_message, int err) {
 #if defined(__APPLE__)
   if (err == EPERM || err == EACCES || err == EINVAL) {
     snprintf(buf, n,
-             "%s; macOS refused MAP_JIT memory (%s): R may lack the "
+             "%.200s; macOS refused MAP_JIT memory (%.60s): R may lack the "
              "com.apple.security.cs.allow-jit entitlement",
              mir_message, strerror(err));
     return;
   }
 #endif
+  /* The precisions keep the reason inside its buffer, as gcc's
+   * -Wformat-truncation checks. */
   if (err != 0)
-    snprintf(buf, n, "%s (%s)", mir_message, strerror(err));
+    snprintf(buf, n, "%.400s (%.60s)", mir_message, strerror(err));
   else
-    snprintf(buf, n, "%s", mir_message);
+    snprintf(buf, n, "%.500s", mir_message);
 }
 
 static void probe_tier(int tier) {

@@ -1,15 +1,27 @@
 Package: zumir
-Title: What the Package Does (One Line, Title Case)
+Title: Native Code from R Without a Compiler, with 'MIR'
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
+Authors@R: c(
+    person("Pedro", "Baltazar", , "pedrobtz@gmail.com",
+           role = c("aut", "cre", "cph")),
+    person("Vladimir", "Makarov", role = "cph",
+           comment = "Author of the vendored 'MIR' library")
+  )
+Description: Brings 'MIR', a lightweight just-in-time compiler, to R. Other
+    packages link to it through a versioned C interface to build functions
+    and get native code back, or 'MIR' interpreter code where no code
+    generator exists for the processor. R users can compile a short numeric
+    C function, or a numeric R function in a documented subset of the
+    language, to native code from R, with no system compiler installed.
 License: MIT + file LICENSE
-Config/roxygen2/version: 8.1.1
+URL: https://pedrobtz.github.io/zumir/, https://github.com/pedrobtz/zumir
+BugReports: https://github.com/pedrobtz/zumir/issues
 Encoding: UTF-8
+Language: en-GB
 Roxygen: list(markdown = TRUE)
-Suggests: 
+Config/roxygen2/version: 8.1.1
+Suggests:
     testthat (>= 3.0.0)
 Config/testthat/edition: 3
 Config/Needs/website: knitr, rmarkdown
-URL: https://pedrobtz.github.io/zumir/
+SystemRequirements: GNU C11 or later, for the vendored 'MIR'

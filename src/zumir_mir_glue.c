@@ -24,6 +24,7 @@
 #include <stdlib.h>
 
 #include "zumir_mir_api.h"
+#include "vendor/mir/mir-gen.h"
 #include "zumir_trap.h"
 
 /* zumir_mir.c: MIR's own code allocator, static in mir.c's unit. */
@@ -62,14 +63,25 @@ struct zumir_arena {
   zumir_block head; /* circular list of live blocks */
   zumir_mapping *mappings;
   size_t bytes, blocks;
-  int failed; /* an allocation failed: never MIR_finish */
+  int failed;    /* an allocation failed: never MIR_finish */
+  int map_errno; /* errno of the last code mapping refused, or 0 */
 };
 
+int zumir_arena_map_errno(const zumir_arena *a) {
+  return a->map_errno;
+}
+
+#include <errno.h>
 #include <stdatomic.h>
 static _Atomic long live_arenas;
+static _Atomic long long live_bytes;
 
 long zumir_mir_live_arenas(void) {
   return live_arenas;
+}
+
+double zumir_mir_live_bytes(void) {
+  return (double) live_bytes;
 }
 
 size_t zumir_arena_bytes(const zumir_arena *a) {
@@ -103,6 +115,7 @@ static void link_block(zumir_arena *a, zumir_block *b, size_t size) {
   a->head.h.next = b;
   a->bytes += size;
   a->blocks++;
+  live_bytes += (long long) size;
 }
 
 static void unlink_block(zumir_arena *a, zumir_block *b) {
@@ -110,6 +123,7 @@ static void unlink_block(zumir_arena *a, zumir_block *b) {
   b->h.next->h.prev = b->h.prev;
   a->bytes -= b->h.size;
   a->blocks--;
+  live_bytes -= (long long) b->h.size;
 }
 
 static void *zm_malloc(size_t size, void *user_data) {
@@ -162,8 +176,10 @@ static void *zm_mem_map(size_t len, void *user_data) {
   MIR_code_alloc_t real = a->real_code_alloc;
   zumir_mapping *m = malloc(sizeof(*m));
   if (m == NULL) return MAP_FAILED;
+  errno = 0;
   void *addr = real->mem_map(len, real->user_data);
   if (addr == MAP_FAILED) {
+    a->map_errno = errno;
     free(m);
     return MAP_FAILED;
   }
@@ -191,7 +207,10 @@ static int zm_mem_unmap(void *addr, size_t len, void *user_data) {
 static int zm_mem_protect(void *addr, size_t len, MIR_mem_protect_t prot, void *user_data) {
   zumir_arena *a = user_data;
   MIR_code_alloc_t real = a->real_code_alloc;
-  return real->mem_protect(addr, len, prot, real->user_data);
+  errno = 0;
+  int r = real->mem_protect(addr, len, prot, real->user_data);
+  if (r != 0) a->map_errno = errno;
+  return r;
 }
 
 MIR_context_t zumir_mir_new(zumir_arena *volatile *arena) {
@@ -212,13 +231,14 @@ MIR_context_t zumir_mir_new(zumir_arena *volatile *arena) {
   return ctx;
 }
 
-int zumir_mir_free(MIR_context_t ctx, zumir_arena *a) {
+int zumir_mir_free(MIR_context_t ctx, zumir_arena *a, int gen) {
   volatile int finished = 1;
   if (a == NULL) return 1;
   if (ctx != NULL && !a->failed) {
     zumir_trap t;
     zumir_trap_push(&t);
     if (setjmp(t.env) == 0) {
+      if (gen) MIR_gen_finish(ctx);
       MIR_finish(ctx);
       zumir_trap_pop(&t);
     } else {

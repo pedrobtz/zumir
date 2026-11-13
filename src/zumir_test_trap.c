@@ -83,7 +83,7 @@ SEXP zumir_test_invalid(SEXP s_kind, SEXP s_finish) {
   }
   /* With `finish` FALSE the context is leaked on purpose, for the RSS
    * test's own check that a leak shows. */
-  if (finish) finished = zumir_mir_free(ctx, arena);
+  if (finish) finished = zumir_mir_free(ctx, arena, 0);
 
   if (!raised) return R_NilValue;
   const char *names[] = {"type", "status", "message", "finished", "depth", ""};

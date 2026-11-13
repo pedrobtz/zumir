@@ -23,10 +23,15 @@ MIR_context_t zumir_mir_new(zumir_arena *volatile *arena);
 
 /* Frees a context and its arena: MIR_finish under a trap, unless an
  * allocation failed, then whatever is still allocated or mapped. ctx may be
- * NULL. Returns 1 when MIR_finish ran and returned, else 0. */
-int zumir_mir_free(MIR_context_t ctx, zumir_arena *arena);
+ * NULL; gen is nonzero when MIR_gen_init was called on it. Returns 1 when
+ * MIR_finish ran and returned, else 0. */
+int zumir_mir_free(MIR_context_t ctx, zumir_arena *arena, int gen);
 
 size_t zumir_arena_bytes(const zumir_arena *arena);
+/* errno of the last code mapping or protection change refused, or 0. */
+int zumir_arena_map_errno(const zumir_arena *arena);
+/* Bytes held by all live arenas. */
+double zumir_mir_live_bytes(void);
 /* Arenas not yet freed, across the process: 0 when nothing leaked. */
 long zumir_mir_live_arenas(void);
 

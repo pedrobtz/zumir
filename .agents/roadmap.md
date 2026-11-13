@@ -26,7 +26,7 @@ between pull requests and the full profile.
 | 1 | [Package identity](#stage-1--package-identity) | quick | [#3](https://github.com/pedrobtz/zumir/issues/3) | [#29](https://github.com/pedrobtz/zumir/pull/29) | 2026-11-13 |
 | 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | [#31](https://github.com/pedrobtz/zumir/pull/31) | 2026-11-13 |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | [#32](https://github.com/pedrobtz/zumir/pull/32) | 2026-11-13 |
-| 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | |
+| 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | 2026-11-13 |
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
 | 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | | |
@@ -308,7 +308,8 @@ detected without crashing, and the session's tier is known and reported.
 
 **Work.**
 
-- First, Q5 decided by the maintainer and written into the design:
+- First, Q5 decided by the maintainer and written into the design
+  (done 2026-11-13: (c), no tier, so the stage is not split):
   (a), the dual-mapped allocator as a fallback, or (c), no tier. Option
   (b) is struck (design §4.4). If it chooses (a), split this stage in the
   roadmap before starting: first a mirspike-style spike of the allocator
@@ -816,11 +817,6 @@ pointers for user code, with copies for outputs: valgrind (with
 
 - [Q6](design.md#14-open-questions) is settled by Stage 6 (inference,
   with `types =` only if needed); it does not block it.
-- [Q5](design.md#14-open-questions): what runs where W+X memory is
-  refused, now (a) the dual-mapped allocator as a fallback or (c) no
-  tier. It is decided before Stage 5 freezes the table's capability
-  flags. The maintainer decides it as Stage 4's first task; Stage 4
-  can start, but not finish, before then.
 - [Q2](design.md#14-open-questions) blocks Stage 9: one function per
   `cfunction()` source, or several. It meets D24 in the same wrapper,
   so the maintainer reads both before the stage starts.

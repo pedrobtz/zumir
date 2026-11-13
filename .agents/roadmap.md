@@ -24,7 +24,7 @@ between pull requests and the full profile.
 | --- | --- | --- | --- | --- | --- |
 | 0 | [MIR spike](#stage-0--mir-spike) | n/a | [#2](https://github.com/pedrobtz/zumir/issues/2) | [mirspike](https://github.com/pedrobtz/mirspike) | 2026-11-13 |
 | 1 | [Package identity](#stage-1--package-identity) | quick | [#3](https://github.com/pedrobtz/zumir/issues/3) | [#29](https://github.com/pedrobtz/zumir/pull/29) | 2026-11-13 |
-| 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | | |
+| 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | | 2026-11-13 |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | | |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | |
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
@@ -58,7 +58,7 @@ Oracles, chosen here for every boundary:
 - **Error recovery**: the session alive and its RSS flat across 10³
   failures; the condition class.
 - **CRAN's compiled-code rules**: `nm -u` on the built objects, and
-  `tools/verify-vendor` (upstream plus exactly the patch queue).
+  `tools/verify-vendor` (upstream plus exactly the fork's patch series).
 
 ## Stage 0 — MIR spike
 
@@ -168,6 +168,14 @@ pass on each.
 
 **Work.**
 
+**Deviation (2026-11-13), the maintainer's:** the patches are commits on
+the fork `pedrobtz/mir` (D12, revised), not files in `tools/patches/`,
+and filing them upstream is deferred to #30; each has its own `fix/`
+branch on the fork, ready to file. `vendor-upstream.yml` is not wired:
+it compares release tags, and MIR is pinned past the only one. Two more
+patches than planned: unused variables under clang `-Wall` on macOS, and
+one function without a prototype under clang `-pedantic`.
+
 - `tools/vendor.sh` (from mirspike): pinned commit, file list, checksums,
   patch queue re-applied; `tools/verify-vendor`; `src/vendor/mir/` with
   `LICENSE`; `src/vendor/PROVENANCE`; `inst/COPYRIGHTS`.
@@ -221,7 +229,8 @@ pass on each.
   only allowed warning is "checking compiled code", which Stage 3 removes.
 - MIR's own tests pass on every runner.
 - `verify-vendor` passes; every patch has an upstream issue or pull request
-  linked in `PROVENANCE`.
+  linked in `PROVENANCE`, or (the deviation above) a `fix/` branch on the
+  fork and a line on #30.
 
 **Design.** [§4.1](design.md#41-what-is-vendored),
 [§4.2](design.md#42-patches), D2, D7, D12.

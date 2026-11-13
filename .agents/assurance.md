@@ -33,7 +33,7 @@ call to r-actions.
 
 | Check         | Status  | Where              |
 | ------------- | ------- | ------------------ |
-| sanitizers    | gap #4  |                    |
+| sanitizers    | done    | native-checks.yaml |
 | valgrind      | done    | native-checks.yaml |
 | rchk          | done    | native-checks.yaml |
 | gctorture     | done    | gctorture.yaml     |
@@ -45,7 +45,7 @@ call to r-actions.
 
 Stage 1 (#3) wired `native-checks.yaml` and `gctorture.yaml` on
 2026-11-13, without `sanitizers`: its instrumentation guard fails a build
-with nothing to instrument, so it joins with MIR in Stage 2 (#4). Stage 3
+with nothing to instrument, so it joined with MIR in Stage 2 (#4). Stage 3
 (#5) wires
 `alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
@@ -66,9 +66,9 @@ One row per boundary the package crosses. An oracle knows the answer:
 <!-- markdownlint-disable MD013 -->
 | Boundary | Oracle | Carried by |
 | --- | --- | --- |
-| Vendored MIR, built and patched | MIR's own c2mir-free test targets at the pinned commit, their expected outputs, run on the patched copy built without R | gap #4: tools/ci/platform.sh |
-| Vendored MIR, provenance | upstream at the pinned commit plus exactly the patch queue | gap #4: tools/verify-vendor |
-| Compiled code against CRAN's rules | `nm -u` on the built objects finds no exit, abort, printf, puts, stderr, stdout, sprintf or rand | gap #5: tools/ci/platform.sh |
+| Vendored MIR, built and patched | MIR's own c2mir-free test targets at the pinned commit (28, `inline-test` left for c2mir), their expected outputs, run on the vendored copy built without R, with R's compiler and flags, on macOS, Windows and Linux x86-64 and aarch64 | tools/ci/platform.sh, in platforms.yaml |
+| Vendored MIR, provenance | the fork commit, file for file, and that commit the upstream pin plus exactly the patch list, one commit each; its canary leaves the last patch out and must fail | tools/verify-vendor, in vendor.yaml |
+| Compiled code against CRAN's rules | the shared object's imports (`nm -u`, `objdump -p` on Windows) hold no exit, abort, printf, puts, stderr, stdout, sprintf or rand; its exports are `R_init_zumir` alone | exports: tools/ci/platform.sh; imports: gap #5, the guard allows exit, stderr and sprintf until Stage 3 |
 | MIR generator: module to machine code | the same function in C from the leg's compiler, bitwise on x86-64 | gap #7: tests/consumer/ |
 | MIR generator on aarch64 | the same C built with `-ffp-contract=off`, bitwise | gap #18 |
 | MIR interpreter | native code on the same module, bitwise, on the three spike right-hand sides | gap #6: tests/testthat/test-tiers.R |

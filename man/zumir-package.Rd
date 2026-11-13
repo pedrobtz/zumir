@@ -28,6 +28,7 @@ Authors:
 Other contributors:
 \itemize{
   \item Vladimir Makarov (Author of the vendored 'MIR' library) [copyright holder]
+  \item logzero (Co-author of the vendored 'MIR' file real-time.h) [copyright holder]
 }
 
 }

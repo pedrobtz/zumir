@@ -18,12 +18,14 @@ a shared file disagree, this file wins for this package.
 
 ## What this is
 
-`zumir` brings MIR, Vladimir Makarov's lightweight JIT compiler, to R in two
+`zumir` brings MIR, Vladimir Makarov's lightweight JIT compiler, to R in three
 ways. First, as a provider: family packages (`zupmxode` first) use
 `LinkingTo: zumir` and a versioned C API table to build MIR functions and get
 back native function pointers, or the interpreter where native code can't be
 made. Second, as `cfunction()`: R users compile a short numeric C function
 with MIR's own `c2mir` compiler, with no Rtools, Xcode tools or `gcc` needed.
+Third, as `rfunction()`: a numeric R function, in the subset of design §4.6,
+compiled to native code that returns exactly what R returns.
 There are no `Imports`, only `Suggests: testthat`. MIR is vendored, and the
 whole package is one shared object. It is not a full C compiler, not a sandbox
 (user code runs with `.Call()`'s rights), and not a wrapper around the system

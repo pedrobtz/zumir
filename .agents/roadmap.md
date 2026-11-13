@@ -6,9 +6,10 @@ Tracking: [v0.1.0 (#1)](https://github.com/pedrobtz/zumir/issues/1), with one
 sub-issue per stage; [CRAN-submission (#15)](https://github.com/pedrobtz/zumir/issues/15).
 
 Moved here from the design's §10 on 2026-11-13. The design's six stages
-become Stages 0 and 2 to 8 below, with the portfolio's identity, assurance
+become Stages 0, 2 to 5 and 7 to 9 below, with the portfolio's identity, assurance
 and closing stages around them. The spike's findings split the design's
-old Stage 2 (error trap, allocators, tier detection) in two.
+old Stage 2 (error trap, allocators, tier detection) in two, and
+`rfunction()` (design D15) adds Stage 6.
 
 ## Stages
 
@@ -20,13 +21,14 @@ old Stage 2 (error trap, allocators, tier detection) in two.
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | | |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | |
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | quick | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
-| 6 | [c2mir, prelude and import resolver](#stage-6--c2mir-prelude-and-import-resolver) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
-| 7 | [cfunction()](#stage-7--cfunction) | quick | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
-| 8 | [Benchmarks and README](#stage-8--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
-| 9 | [Assurance](#stage-9--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
-| 10 | [Full CI](#stage-10--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
-| 11 | [v0.1.0 readiness](#stage-11--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
-| 12 | [Review](#stage-12--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
+| 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
+| 7 | [c2mir, prelude and import resolver](#stage-7--c2mir-prelude-and-import-resolver) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
+| 8 | [cfunction()](#stage-8--cfunction) | quick | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
+| 9 | [Benchmarks and README](#stage-9--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
+| 10 | [Assurance](#stage-10--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
+| 11 | [Full CI](#stage-11--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
+| 12 | [v0.1.0 readiness](#stage-12--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
+| 13 | [Review](#stage-13--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
 
 Oracles, chosen here for every boundary:
 
@@ -39,6 +41,8 @@ Oracles, chosen here for every boundary:
 - **`c2mir`**: the leg's system C compiler on the same source (the `c-tests`
   expected outputs, and a differential on the fuzz corpus).
 - **`cfunction()`**: a reference written in R for every example.
+- **`rfunction()`**: R itself, the same function evaluated by R on the
+  same inputs, compared with `identical()`.
 - **Threads**: the serial result, bitwise.
 - **Error recovery**: the session alive and its RSS flat across 10³
   failures; the condition class.
@@ -291,6 +295,8 @@ table and call the result; R users can run MIR text.
 - `zumir_api_v1` registered with `R_RegisterCCallable`;
   `inst/include/zumir.h`, standalone C99, with inline wrappers.
 - `mir_function()`.
+- The double-expression emitter in `zumir.h` (D13), moved from the
+  spike's emitter; `zumir_import()` for consumer imports (D14).
 - A consumer test package under `tests/consumer/`, built in CI against the
   installed `zumir`, that emits the three spike right-hand sides.
 
@@ -304,6 +310,11 @@ table and call the result; R users can run MIR text.
 - The header compiles alone as C99 with `-pedantic`, in CI.
 - The table only grows: a test that the version field is first and `1`, in
   the consumer package.
+- The emitter: the consumer's three right-hand sides are written with it,
+  so the bitwise comparison above covers it; each comparison and branch
+  helper against C on `NaN` and `±Inf` operands, in the consumer's tests.
+- A consumer import (`expit`) resolves in the consumer's context and not
+  in another context or in `cfunction()`, in the consumer's tests.
 
 **Exit criteria.**
 
@@ -311,9 +322,64 @@ table and call the result; R users can run MIR text.
 - Every Tests line exists and was seen to fail.
 
 **Design.** [§4.3](design.md#43-the-c-api), [§5](design.md#5-public-r-api-complete-v010-surface)
-(`mir_function()`), D3.
+(`mir_function()`), D3, D13, D14.
 
-## Stage 6 — c2mir, prelude and import resolver
+## Stage 6 — rfunction()
+
+**Issue.** [#17](https://github.com/pedrobtz/zumir/issues/17), sub-issue of
+[v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
+
+**CI.** `quick`: R code over Stage 5's emitter, no new native boundary.
+
+**Goal.** A numeric R function in §4.6's subset compiles to native code
+and returns exactly what R returns.
+
+**Work.**
+
+- The R walker: the subset check, argument shapes (Q6), locals and
+  `numeric()` sizes; compile errors naming the construct and its
+  position.
+- Lowering through the emitter, with the status the generated code
+  returns for run-time errors (`if (NA)`, an index out of range).
+- The wrapper: `as.double()` at the boundary, sizes evaluated in R,
+  outputs allocated, one `.Call`; `tier =`.
+- A generator of random functions within the subset, for the
+  differential test.
+
+**Tests.**
+
+- Each construct of §4.6 (operators, `%%` and `%/%` on negative and
+  non-finite operands, `^`, `min`/`max` with `NA` and `NaN`, `&&`/`||`
+  with `NA`, every loop form, `break`/`next`) against R on chosen inputs
+  (`NA`, `NaN`, `±Inf`, `-0`, subnormals, empty vectors), `identical()`,
+  in `tests/testthat/test-rfunction-ops.R`.
+- Random functions from the generator, on random inputs, against R,
+  `identical()`, with the seed printed on failure, in
+  `tests/testthat/test-rfunction-random.R`.
+- Run-time errors: `if (NA)`, `while (NA)`, `NA && x` give R's message
+  with class `zumir_error`, in `tests/testthat/test-rfunction-errors.R`.
+- D16's deviations: an index at `0`, `length + 1`, `NA` and `1.5`, and a
+  size of `-1`, `NA` and `2.5`, each an error rather than R's answer, in
+  the same file.
+- Refusals: every construct outside the subset (a call to another R
+  function, `<<-`, a list, a data frame, `repeat`, string values)
+  refused with its name, in
+  `tests/testthat/test-rfunction-refuse.R`.
+- Native against interpreter: identical on the random functions, in
+  `tests/testthat/test-rfunction-random.R`.
+- Under a hostile session (`OutDec = ","`, `digits = 3`, `LC_ALL=C`):
+  results unchanged.
+
+**Exit criteria.**
+
+- Every Tests line exists, compares with R, and was seen to fail.
+- The random differential runs at least 10⁴ functions per CI leg on the
+  quick profile without a difference.
+
+**Design.** [§4.6](design.md#46-rfunction), [§5](design.md#5-public-r-api-complete-v010-surface),
+[§6](design.md#6-errors), D15, D16, Q6.
+
+## Stage 7 — c2mir, prelude and import resolver
 
 **Issue.** [#8](https://github.com/pedrobtz/zumir/issues/8), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -355,7 +421,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§4.5](design.md#45-cfunction) steps 1 to 4, D5, D6, D9.
 
-## Stage 7 — cfunction()
+## Stage 8 — cfunction()
 
 **Issue.** [#9](https://github.com/pedrobtz/zumir/issues/9), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -368,7 +434,8 @@ system header, with only the allowed library names resolving.
 
 - `cfunction()` with its signature parser, argument checks, output
   allocation and the one `.Call` wrapper; `tier =`.
-- The Get started article's chunks switched to `eval = TRUE`.
+- The Get started article's chunks switched to `eval = TRUE`, its
+  `rfunction()` section included.
 
 **Tests.**
 
@@ -388,7 +455,7 @@ system header, with only the allowed library names resolving.
 **Design.** [§4.5](design.md#45-cfunction) step 5, [§5](design.md#5-public-r-api-complete-v010-surface),
 [§6](design.md#6-errors), Q2.
 
-## Stage 8 — Benchmarks and README
+## Stage 9 — Benchmarks and README
 
 **Issue.** [#10](https://github.com/pedrobtz/zumir/issues/10), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -416,7 +483,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§9](design.md#9-performance-targets).
 
-## Stage 9 — Assurance
+## Stage 10 — Assurance
 
 **Issue.** [#11](https://github.com/pedrobtz/zumir/issues/11), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -444,7 +511,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§8](design.md#8-testing).
 
-## Stage 10 — Full CI
+## Stage 11 — Full CI
 
 **Issue.** [#12](https://github.com/pedrobtz/zumir/issues/12), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -466,7 +533,7 @@ system header, with only the allowed library names resolving.
   the merge commit, and a step-20 gctorture run green on the pull
   request's last commit.
 
-## Stage 11 — v0.1.0 readiness
+## Stage 12 — v0.1.0 readiness
 
 **Issue.** [#13](https://github.com/pedrobtz/zumir/issues/13), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -489,7 +556,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§11](design.md#11-acceptance-criteria-for-v010).
 
-## Stage 12 — Review
+## Stage 13 — Review
 
 **Issue.** [#14](https://github.com/pedrobtz/zumir/issues/14), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1). No pull request closes it.
@@ -520,9 +587,11 @@ system header, with only the allowed library names resolving.
 
 ## Blocking open questions
 
+- [Q6](design.md#14-open-questions) is settled by Stage 6 (inference,
+  with `types =` only if needed); it does not block it.
 - [Q5](design.md#14-open-questions) blocks Stage 4: what runs where W+X
   memory is refused. Stage 4 implements the answer.
-- [Q2](design.md#14-open-questions) blocks Stage 7: one function per
+- [Q2](design.md#14-open-questions) blocks Stage 8: one function per
   `cfunction()` source, or several.
-- [Q4](design.md#14-open-questions) decides whether Stage 11 ends in a
+- [Q4](design.md#14-open-questions) decides whether Stage 12 ends in a
   CRAN submission; the board's `CRAN intent` answers it.

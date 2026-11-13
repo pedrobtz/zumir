@@ -35,7 +35,7 @@ RFC is now a pointer here.
 ## 1. What zumir is
 
 `zumir` brings MIR, Vladimir Makarov's lightweight JIT compiler, to R in
-two ways:
+three ways:
 
 1. **A provider** (`LinkingTo: zumir`) for family packages that generate
    code: they build MIR functions through a versioned C API table and get
@@ -44,6 +44,13 @@ two ways:
 2. **C without a toolchain** for R users: `cfunction()` compiles a short
    C function with MIR's own C compiler and returns an R function that
    calls it. No Rtools, no Xcode command-line tools, no `gcc`.
+3. **Native code from R itself**: `rfunction()` compiles a numeric R
+   function, a subset of R written as R, to native code and returns an R
+   function with the same arguments and the same results. R's parser
+   reads it; nothing else is needed.
+
+`cfunction()` and `rfunction()` are what the package offers R users; the
+provider is what the family builds on.
 
 MIR's README measures its generator at about 250 µs for a small C
 program, about a hundredth of `gcc -O2`'s time, with generated code
@@ -61,6 +68,9 @@ What it is not:
 - **Not a full C compiler.** `c2mir` implements C11 with gaps (open
   issues #394 and #286), and `cfunction()` takes plain numeric functions,
   not programs (§5, D5).
+- **Not a compiler for all of R.** `rfunction()` takes numeric kernels
+  (§4.6): doubles, loops, conditions and a math table, not data frames,
+  closures, environments or calls into other R functions.
 - **Not a sandbox.** Code compiled by `cfunction()` runs in the R process
   with the rights `.Call()` code has. A bad pointer crashes R, as it
   would in a package's C code.
@@ -85,19 +95,22 @@ In v0.1.0:
   an R function, for tests, teaching, and checking a lowering by hand.
 - **`cfunction()`**: C source with numeric signatures, compiled by
   `c2mir` and wrapped as an R function (§5).
+- **`rfunction()`**: a numeric R function compiled to MIR through the
+  same emitter consumers use (§4.6), with R itself as its test oracle.
 - **Two tiers**, native and interpreter, chosen automatically with
   override, reported by `zumir_info()`.
 
 Out of v0.1.0 (§13): caching generated code between sessions, MIR's
 parallel generator branch, a Python package, `mir2c`, C code that
-includes R's headers or calls R's API.
+includes R's headers or calls R's API, and `rfunction()` beyond §4.6's
+subset (element-wise vector arithmetic, integer and logical results).
 
 ## 3. Position in the `zu*` family
 
 | | zumir |
 | --- | --- |
 | Role | provider and tool |
-| R prefix | `mir_`, with `cfunction()` |
+| R prefix | `mir_`, with `cfunction()` and `rfunction()` |
 | Info function | `zumir_info()` |
 | Root condition class | `zumir_error` |
 | Public C prefix | `zumir_`, and MIR's own `MIR_` names through the table |
@@ -212,6 +225,21 @@ interfaces, external symbol loading), about forty entries, plus the
 `longjmp`s across the consumer's frames: an error inside MIR is caught
 at the `zumir` boundary and reported (D4).
 
+**Helpers for lowering.** `zumir.h` also carries a small emitter for
+straight-line `double` code (D13): new registers, loads and stores at an
+offset from a pointer argument (`y[i]`, `par[k]`), the four operations,
+negation, constants, comparisons and branches, and calls to the math
+table by name with their prototypes made once per module. It is the
+spike's emitter, made general; `zupmxode`'s lowering becomes a loop over
+its IR with one helper call per instruction, and `rfunction()` (§4.6) is
+built on the same helpers.
+
+**Imports.** A consumer registers its own C functions in its context
+(`zumir_import(z, "expit", &expit)`, MIR's `MIR_load_external`), and the
+import resolver for that context accepts them beside D6's list (D14).
+`zupmxode` needs `logit`, `expit`, `probit` and friends this way.
+`cfunction()` keeps D6's fixed list.
+
 **Threads.** MIR's own rule, from `MIR.md`: MIR functions may be used
 from different threads without synchronisation if each thread works in
 its own context. `zumir` keeps that rule and adds one: generated code
@@ -263,6 +291,59 @@ runs there is open (Q5).
 
 Signatures are limited to what can be marshalled without R's API (§5).
 
+### 4.6 `rfunction()`
+
+`rfunction(f)` takes an R function and returns one with the same formals.
+R's parser has already read `f`; an R walker checks its body against the
+subset below, infers each argument's shape, and lowers it through the
+§4.3 emitter to one MIR function. Anything outside the subset is a
+compile error naming the construct, so a function either compiles or
+says why; it never silently means something else (D15, D16).
+
+**Values.**
+
+- Every argument is a `double` scalar or a `double` vector. An argument
+  that is indexed (`x[i]`) or passed to `length()` is a vector; any other
+  is a scalar, checked to be length one at the call. Integer and logical
+  arguments are converted with `as.double()` at the boundary, which keeps
+  `NA` as `NA`.
+- Locals are `double` scalars, `integer` loop counters, or `double`
+  vectors made by `numeric(<size>)`, where `<size>` uses only arguments
+  and `length()`. The wrapper evaluates the size in R and allocates the
+  vector before the call, so generated code never allocates.
+- The result is a scalar expression or a vector local, returned by the
+  last expression or `return()`.
+
+**Code.**
+
+- `{`, `<-` and `=` to locals, `x[i] <- v` on vector locals.
+- `if`/`else`, `for (i in seq_len(n))`, `for (i in seq_along(x))`,
+  `for (i in a:b)`, `while`, `break`, `next`.
+- `+ - * /`, unary `-`, `^` (by R's own `R_pow`), `%%` and `%/%` with R's
+  semantics for negative and non-finite operands; `==`, `!=`, `<`, `<=`,
+  `>`, `>=`; `!`, `&&`, `||` with R's three-valued logic.
+- The math table: `exp`, `log` (one argument), `log1p`, `expm1`, `sqrt`,
+  `abs`, `floor`, `ceiling`, `trunc`, `sin`, `cos`, `tan`, two-argument
+  `min` and `max` with R's `NA` and `NaN` rules, `length`, `is.na`,
+  `is.nan`, `is.finite`.
+
+**Semantics.**
+
+- Arithmetic is IEEE double, unfused, as R's own evaluator does it, so
+  results equal R's bit for bit on every platform, `NA` payloads
+  included (§7 on FMA).
+- `if (NA)`, `while (NA)` and `NA && x` where R would error, error with
+  R's message, as a `zumir_error` raised by the wrapper from a status the
+  generated code returns.
+- **Deviations from R** (D16), each an error rather than a different
+  answer: an index out of range (R reads `NA` or extends the vector), a
+  non-integer or `NA` index, and a size expression that is not a
+  non-negative whole number.
+
+**Oracle.** R itself: every test calls `f` and `rfunction(f)` on the
+same inputs, random and chosen (`NA`, `NaN`, `±Inf`, `-0`, subnormals,
+empty vectors), and compares with `identical()`.
+
 ## 5. Public R API (complete v0.1.0 surface)
 
 ```r
@@ -290,9 +371,27 @@ f <- mir_function("
      endmodule", "add")
 f(1, 2)                      # 3
 
+ss <- rfunction(function(x) {
+  s <- 0
+  for (i in seq_along(x)) s <- s + x[i] * x[i]
+  s
+})
+ss(c(1, 2, 3))               # 14, identical to the R function's answer
+
+csum <- rfunction(function(x) {
+  y <- numeric(length(x))
+  acc <- 0
+  for (i in seq_along(x)) {
+    acc <- acc + x[i]
+    y[i] <- acc
+  }
+  y
+})
+
 zumir_info()                 # MIR commit, targets, tier, patches, memory
 zumir_tier()                 # "native" or "interp" for this session
 cfunction(src, tier = "interp")
+rfunction(f, tier = "interp")
 ```
 
 Argument types: `int`, `double`, `const int *`, `const double *`,
@@ -302,6 +401,11 @@ C type is non-`const`; outputs named in `out` are allocated by the
 wrapper and returned, as a list when there are several.
 
 ## 6. Errors
+
+- `rfunction()` refuses a construct outside §4.6 at compile time, with
+  the construct named and its position in the source; errors at run time
+  (§4.6) are `zumir_error` conditions with R's own wording where R has
+  one.
 
 - Compile errors from `c2mir` carry the line and column of the user's
   source, not of the prelude.
@@ -340,6 +444,10 @@ wrapper and returned, as a list when there are several.
 - A subset of MIR's own `c-tests` and `mir-tests`, run through the
   vendored copy on every leg, on both tiers.
 - Every `cfunction()` example against a reference written in R.
+- `rfunction()` against R itself (§4.6): each construct of the subset,
+  and a generator of random functions within the subset run on random
+  and chosen inputs, compared with `identical()`; every refused construct
+  refused with its name.
 - Native against interpreter on the same modules: identical results.
 - Threads: one context per thread compiling at once, and one compiled
   function called from eight threads, against serial results.
@@ -361,6 +469,8 @@ Measured by `tools/run-benchmarks`, recorded in `.agents/benchmarks.md`.
 | generated code on a numeric kernel against `gcc -O2` | within 1.5× |
 | interpreter on the same kernel | recorded |
 | `cfunction()` call overhead against `.Call` of compiled C | within 1.2× |
+| `rfunction()` on a loop kernel against the same kernel by `cfunction()` | within 1.5× |
+| `rfunction()` against R's byte-compiled function on the same kernel | recorded |
 
 ## 10. Roadmap
 
@@ -383,8 +493,9 @@ its results are its Stage 0.
 Marked **(M)** when the maintainer decided it and **(C)** when this RFC
 decides it and the maintainer may overturn it.
 
-- **D1 (M), 2026-11-12.** One package does both jobs: it vendors MIR for
-  the family and gives R users `cfunction()`. The provider alone would
+- **D1 (M), 2026-11-12; amended 2026-11-13.** One package does both
+  jobs: it vendors MIR for the family and gives R users `cfunction()` and
+  `rfunction()`, its two selling points. The provider alone would
   have no use outside the family; `cfunction()` is what makes the
   package worth publishing by itself, and it shares every line of the
   vendoring and the error trap.
@@ -426,12 +537,31 @@ decides it and the maintainer may overturn it.
   requests, in bursts months apart; each patch is offered upstream and
   dropped from the queue when a pinned commit contains it. A fork is
   reconsidered if a needed patch is refused or the queue stops rebasing.
+- **D13 (C), 2026-11-13.** `zumir.h` carries a straight-line `double`
+  emitter (§4.3). Lowering is the same work for every consumer, and the
+  spike showed it gives bit-identical code; `zupmxode`'s IR stays its own
+  (RFC 0047 D13), only the step from IR to MIR is shared.
+- **D14 (C), 2026-11-13.** Consumers register their own imports per
+  context; `cfunction()` keeps D6's fixed list.
+- **D15 (M), 2026-11-13.** `rfunction()` ships in v0.1.0, named without
+  the `mir_` prefix for the reason D8 gives `cfunction()`. Its v0.1.0
+  subset is §4.6: scalar doubles, indexed vectors in loops, conditions,
+  the math table, and R's `NA` rules exactly. Element-wise vector
+  arithmetic with recycling, integer and logical results wait (§13).
+- **D16 (C), 2026-11-13.** Where the subset cannot match R cheaply, it
+  errors rather than answering differently: out-of-range and non-integer
+  indices, and sizes that are not whole numbers. An `rfunction()` result
+  is either R's answer or an error.
 - **D9 (C).** `c2mir` ships in v0.1.0, not later. Without it there is no
   `cfunction()` and so no reason to publish; with it, `zupmxode` still
   never compiles C text, because it emits MIR directly.
 
 ## 13. Later versions, in the order they are expected
 
+- **`rfunction()` beyond the subset**: element-wise vector arithmetic
+  with recycling, integer and logical results, several outputs as a
+  list, and R's own `Rmath` functions (`gammafn`, `dnorm`, …) where their
+  warnings can be kept from unwinding through generated code.
 - **Caching generated code** with MIR's binary format, for consumers
   whose modules are large enough that generation shows.
 - **Signatures with R vectors of other types** in `cfunction()`
@@ -463,3 +593,8 @@ decides it and the maintainer may overturn it.
   `zupmxode` adapting its call. (c) No tier: `zumir` reports it, and
   `zupmxode` brings its own IR interpreter for that case only. The spike
   showed the problem, not the fix; (a) is this RFC's proposal.
+- **Q6.** Should `rfunction()` take argument shapes from use, as §4.6
+  proposes, or from an explicit `types =` argument? Inference keeps the
+  call as plain R; an explicit argument makes a scalar-or-vector
+  ambiguity impossible. This RFC takes inference, with `types =` as an
+  override if Stage 6 finds a case inference gets wrong.

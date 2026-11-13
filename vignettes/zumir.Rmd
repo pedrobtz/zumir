@@ -13,14 +13,39 @@ vignette: >
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
 ```
 
-Compiling C from R usually means installing a toolchain: Rtools on Windows,
-the Xcode command-line tools on macOS, `gcc` elsewhere. Locked-down
-machines, Shiny servers and slim containers often have none. zumir vendors
-MIR, a small JIT compiler with its own C front end, so a short numeric C
-function can be compiled and called from R with nothing else installed.
+Making R code fast usually means rewriting it in C or C++ and installing a
+toolchain: Rtools on Windows, the Xcode command-line tools on macOS, `gcc`
+elsewhere. Locked-down machines, Shiny servers and slim containers often
+have none. zumir vendors MIR, a small JIT compiler, so a numeric R function,
+or a short C function, can be compiled to native code from R with nothing
+else installed.
 
 ```{r setup}
 library(zumir)
+```
+
+## Compile an R function
+
+`rfunction()` takes a numeric R function and compiles it to native code.
+The result has the same arguments and returns exactly what the R function
+returns. It accepts doubles, loops over indices, conditions and the usual
+maths; anything else is refused with the construct named.
+
+```{r}
+csum_r <- function(x) {
+  y <- numeric(length(x))
+  acc <- 0
+  for (i in seq_along(x)) {
+    acc <- acc + x[i]
+    y[i] <- acc
+  }
+  y
+}
+csum <- rfunction(csum_r)
+
+x <- c(1, 2, NA, 4)
+csum(x)
+identical(csum(x), csum_r(x))
 ```
 
 ## Compile a C function
@@ -79,8 +104,8 @@ f(1, 2)
 
 ## Native code or the interpreter
 
-Where the system won't hand out executable memory, or MIR has no code
-generator for the CPU, zumir falls back to MIR's interpreter. Results are
+Where MIR has no code generator for the CPU, zumir falls back to MIR's
+interpreter. Results are
 the same, only slower. `zumir_tier()` says which tier this session uses,
 and `zumir_info()` says why. You can also ask for the interpreter yourself.
 
@@ -88,10 +113,7 @@ and `zumir_info()` says why. You can also ask for the interpreter yourself.
 zumir_tier()
 zumir_info()
 
-sq_interp <- cfunction("
-  void sq(int n, const double *x, double *y) {
-    for (int i = 0; i < n; i++) y[i] = x[i] * x[i];
-  }", out = "y", n = "n", tier = "interp")
+csum_interp <- rfunction(csum_r, tier = "interp")
 ```
 
 ## Next

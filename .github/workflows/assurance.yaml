@@ -7,7 +7,7 @@ on:
   # No `push:`: a pull request already checks its merge with main,
   # and the schedule checks main (r-actions README, "Pushes to main").
   schedule:
-    - cron: "41 3 * * 0"
+    - cron: "5 9 * * 6"
   workflow_dispatch:
 
 name: assurance
@@ -19,6 +19,4 @@ jobs:
   assurance:
     uses: pedrobtz/r-actions/.github/workflows/assurance.yml@v1
     with:
-      # `warn` until Stage 1 (#3) gates pkgdown.yaml, the one job of the
-      # package's own; then `fail`, as the roadmap says.
-      ungated-jobs: warn
+      ungated-jobs: fail

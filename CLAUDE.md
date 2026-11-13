@@ -36,8 +36,10 @@ RFC 0073. It outranks this file: `CLAUDE.md` orients, the design decides.
 
 ## Current state
 
-Scaffolded 2026-11-13 with `create-pkg.sh`; no functionality yet. The roadmap
-in `.agents/roadmap.md` takes it to v0.1.0.
+Scaffolded 2026-11-13 with `create-pkg.sh`. Stage 1 (package identity)
+gave it its `DESCRIPTION`, routine registration with dynamic lookup off,
+and the CI and assurance wiring; there is no MIR and no exported function
+yet. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -54,7 +56,19 @@ through the C API.
 
 ## Commands
 
-Only the shared commands so far.
+The shared commands, plus:
+
+```sh
+R CMD INSTALL . && Rscript tools/ci-run-tests.R   # the suite as CI runs it
+ZUMIR_TEST_SEED=<n> Rscript tools/ci-run-tests.R  # replay a shuffled order
+bash tools/ci/platform.sh <macos|windows|ubuntu>  # the per-OS checks
+```
+
+`tools/ci-run-tests.R` runs the installed package's tests in its
+namespace, shuffled, with the seed printed. Tests that start a child R
+process (`helper-child.R`) skip under `devtools::load_all()`, where there
+is no installed copy, so run this or `devtools::check()` before claiming
+them green.
 
 ## Architecture
 
@@ -96,17 +110,34 @@ These are fixed by the design before any code exists:
 
 ## Testing
 
-None yet: no conformance suite, no helpers, no runtime to report. Design §8
+One test so far, `test-load.R`: the installed package loads in a child R
+process with dynamic symbol lookup off, and unloading it removes its DLL.
+`helper-child.R` holds the child-process helpers (`installed_lib()`,
+`run_child()`); Stage 3's error-trap loop uses them too. Design §8
 plans MIR's own tests, `mir-tests` through `mir_function()`, and `c-tests`
 through `c2mir` by the corpus's own rules, on both tiers; `.agents/assurance.md`
 lists every oracle and its gap.
 
 ## Continuous integration
 
-The package calls `pedrobtz/r-actions` for `R-CMD-check.yaml` (profile
-`auto`) and `coverage.yaml`. `pkgdown.yaml` builds the site with
-`r-lib/actions`, and `assurance.yaml` calls r-actions' `assurance.yml`. The
-roadmap marks Stages 2 to 5, 7 and 8 `full`, with the closing three.
+Every workflow calls `pedrobtz/r-actions` at `@v1`, except `coverage.yaml`,
+which holds a write token and is pinned to a commit:
+
+- `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
+  R-devel row added to `runners` (full profile only).
+- `native-checks.yaml`: valgrind, lto, rchk, analyzers and cran-special;
+  sanitizers (with ASan) joins in Stage 2, once there is C to instrument.
+- `gctorture.yaml`: the wide step on pull requests under a 10-minute
+  budget; step 20 daily (while the roadmap is implemented) and on dispatch.
+- `platforms.yaml`: `tools/ci/platform.sh` once per macOS and Windows
+  runner, skipped on R-only changes. Empty until Stage 2.
+- `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`
+  with `ungated-jobs: fail`.
+
+Every job tests the labels in its `if:` (`ci.md`, Labels). The scheduled
+slot is Saturday 08:00 to 09:59 UTC, a different minute per workflow;
+gctorture's daily run is at 09:56. The roadmap marks Stages 2 to 5, 7, 8
+and 9 `full`, with the closing three.
 
 ## Vendored native code
 

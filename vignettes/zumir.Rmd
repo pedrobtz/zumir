@@ -1,0 +1,101 @@
+---
+title: "Get started with zumir"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get started with zumir}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+# Not evaluated: written from .agents/design.md before the API exists.
+# Switch eval on, and check the output, once the functions are in.
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+Compiling C from R usually means installing a toolchain: Rtools on Windows,
+the Xcode command-line tools on macOS, `gcc` elsewhere. Locked-down
+machines, Shiny servers and slim containers often have none. zumir vendors
+MIR, a small JIT compiler with its own C front end, so a short numeric C
+function can be compiled and called from R with nothing else installed.
+
+```{r setup}
+library(zumir)
+```
+
+## Compile a C function
+
+`cfunction()` takes the source of one C function and returns an R function
+that calls it. Arguments named in `out` are allocated for you and returned.
+Lengths come from the `int` argument you name.
+
+```{r}
+# Open: should one source hold several functions, returned as a list? (Q2)
+sq <- cfunction("
+  void sq(int n, const double *x, double *y) {
+    for (int i = 0; i < n; i++) y[i] = x[i] * x[i];
+  }", out = "y", n = "n")
+
+sq(x = c(1, 2, 3))
+```
+
+## Return a value
+
+A function that returns `int` or `double` gives that value back directly.
+
+```{r}
+dot <- cfunction("
+  double dot(int n, const double *x, const double *y) {
+    double s = 0;
+    for (int i = 0; i < n; i++) s += x[i] * y[i];
+    return s;
+  }", n = "n")
+
+dot(x = c(1, 2, 3), y = c(4, 5, 6))
+```
+
+Arguments can be `int`, `double`, `const int *`, `const double *`, `int *`
+and `double *`. The source may use the C maths library and a few memory and
+string functions, but it can't include system headers or call R's API.
+
+## Write MIR directly
+
+`mir_function()` takes MIR's textual IR instead of C. It is useful for
+tests, for learning MIR, and for checking a lowering by hand.
+
+```{r}
+f <- mir_function("
+  m: module
+     export add
+  add: func d, d:a, d:b
+     local d:r
+     dadd r, a, b
+     ret r
+     endfunc
+     endmodule", "add")
+
+f(1, 2)
+```
+
+## Native code or the interpreter
+
+Where the system won't hand out executable memory, or MIR has no code
+generator for the CPU, zumir falls back to MIR's interpreter. Results are
+the same, only slower. `zumir_tier()` says which tier this session uses,
+and `zumir_info()` says why. You can also ask for the interpreter yourself.
+
+```{r}
+zumir_tier()
+zumir_info()
+
+sq_interp <- cfunction("
+  void sq(int n, const double *x, double *y) {
+    for (int i = 0; i < n; i++) y[i] = x[i] * x[i];
+  }", out = "y", n = "n", tier = "interp")
+```
+
+## Next
+
+See the [reference index](../reference/index.html) for every function.
+Packages that generate code, such as zupmxode, use zumir's C API instead of
+these R functions.

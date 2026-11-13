@@ -18,3 +18,4 @@
 ^tools/ci$
 ^tools/ci-run-tests\.R$
 ^\.gitattributes$
+^tests/c$

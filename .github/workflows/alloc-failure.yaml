@@ -1,0 +1,26 @@
+# Fails each allocation in turn, R's and MIR's, while the error trap runs its
+# three invalid modules (tools/alloc-exercise.R): a failed allocation must
+# come back as an error, MIR's through the trap, never as a crash.
+on:
+  schedule:
+    # The sweep restarts R once per allocation, so this is scheduled, not
+    # run on pull requests.
+    - cron: "33 9 * * 6"
+  workflow_dispatch:
+
+name: alloc-failure
+
+permissions:
+  contents: read
+
+jobs:
+  alloc-failure:
+    uses: pedrobtz/r-actions/.github/workflows/alloc-failure.yml@v1
+    with:
+      run: R_ENABLE_JIT=0 Rscript tools/alloc-exercise.R
+      baseline-run: R_ENABLE_JIT=0 Rscript -e "library(zumir)"
+      expect-pattern: "cannot allocate|memory exhausted|zumir_error"
+      target-pattern: "Not enough memory|no memory|MIR_init failed"
+      min-target-hits: 1
+      ignore-crash-pattern: "^ 1: (grepl?|sub|gsub|strsplit|gzfile)\\("
+      max-allocations: 3000

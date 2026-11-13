@@ -697,7 +697,7 @@ struct MIR_code_reloc {
 
 typedef struct MIR_code_reloc MIR_code_reloc_t;
 
-extern void _MIR_set_code (MIR_code_alloc_t alloc, size_t prot_start, size_t prot_len,
+extern int _MIR_set_code (MIR_code_alloc_t alloc, size_t prot_start, size_t prot_len,
                            uint8_t *base, size_t nloc, const MIR_code_reloc_t *relocs,
                            size_t reloc_size);
 extern void _MIR_change_code (MIR_context_t ctx, uint8_t *addr, const uint8_t *code,

@@ -4442,18 +4442,27 @@ void _MIR_flush_code_cache (void *start, void *bound) {
 }
 
 #if !defined(MIR_BOOTSTRAP) || !defined(__APPLE__) || !defined(__aarch64__)
-void _MIR_set_code (MIR_code_alloc_t code_alloc, size_t prot_start, size_t prot_len, uint8_t *base,
-                    size_t nloc, const MIR_code_reloc_t *relocs, size_t reloc_size) {
-  MIR_mem_protect (code_alloc, (uint8_t *) prot_start, prot_len, PROT_WRITE_EXEC);
+/* Returns 0, or -1 when the code memory could not be made writable or made
+   executable again: then nothing was written, or what was is not
+   executable, and the caller reports the failure. */
+int _MIR_set_code (MIR_code_alloc_t code_alloc, size_t prot_start, size_t prot_len, uint8_t *base,
+                   size_t nloc, const MIR_code_reloc_t *relocs, size_t reloc_size) {
+  if (MIR_mem_protect (code_alloc, (uint8_t *) prot_start, prot_len, PROT_WRITE_EXEC) != 0)
+    return -1;
   if (reloc_size == 0) {
     for (size_t i = 0; i < nloc; i++)
       memcpy (base + relocs[i].offset, &relocs[i].value, sizeof (void *));
   } else {
     for (size_t i = 0; i < nloc; i++) memcpy (base + relocs[i].offset, relocs[i].value, reloc_size);
   }
-  MIR_mem_protect (code_alloc, (uint8_t *) prot_start, prot_len, PROT_READ_EXEC);
+  return MIR_mem_protect (code_alloc, (uint8_t *) prot_start, prot_len, PROT_READ_EXEC) != 0 ? -1 : 0;
 }
 #endif
+
+static void MIR_NO_RETURN code_memory_error (MIR_context_t ctx, const char *what) {
+  MIR_get_error_func (ctx) (MIR_alloc_error,
+                            "%s code memory (writable and executable memory refused?)", what);
+}
 
 static uint8_t *add_code (MIR_context_t ctx MIR_UNUSED, code_holder_t *ch_ptr, const uint8_t *code,
                           size_t code_len) {
@@ -4464,8 +4473,10 @@ static uint8_t *add_code (MIR_context_t ctx MIR_UNUSED, code_holder_t *ch_ptr, c
   MIR_code_reloc_t reloc;
   reloc.offset = 0;
   reloc.value = code;
-  _MIR_set_code (ctx->code_alloc, (size_t) ch_ptr->start, ch_ptr->bound - ch_ptr->start, mem, 1,
-                 &reloc, code_len);
+  if (_MIR_set_code (ctx->code_alloc, (size_t) ch_ptr->start, ch_ptr->bound - ch_ptr->start, mem,
+                     1, &reloc, code_len)
+      != 0)
+    code_memory_error (ctx, "cannot write");
   _MIR_flush_code_cache (mem, ch_ptr->free);
   return mem;
 }
@@ -4475,8 +4486,9 @@ uint8_t *_MIR_publish_code (MIR_context_t ctx, const uint8_t *code,
   code_holder_t *ch_ptr;
   uint8_t *res = NULL;
 
-  if ((ch_ptr = get_last_code_holder (ctx, code_len)) != NULL)
-    res = add_code (ctx, ch_ptr, code, code_len);
+  if ((ch_ptr = get_last_code_holder (ctx, code_len)) == NULL)
+    code_memory_error (ctx, "cannot map");
+  res = add_code (ctx, ch_ptr, code, code_len);
   return res;
 }
 
@@ -4499,7 +4511,8 @@ void _MIR_change_code (MIR_context_t ctx, uint8_t *addr, const uint8_t *code,
   len = (size_t) addr + code_len - start;
   reloc.offset = 0;
   reloc.value = code;
-  _MIR_set_code (ctx->code_alloc, start, len, addr, 1, &reloc, code_len);
+  if (_MIR_set_code (ctx->code_alloc, start, len, addr, 1, &reloc, code_len) != 0)
+    code_memory_error (ctx, "cannot change");
   _MIR_flush_code_cache (addr, addr + code_len);
 }
 
@@ -4512,7 +4525,8 @@ void _MIR_update_code_arr (MIR_context_t ctx, uint8_t *base, size_t nloc,
     if (max_offset < relocs[i].offset) max_offset = relocs[i].offset;
   start = (size_t) base / page_size * page_size;
   len = (size_t) base + max_offset + sizeof (void *) - start;
-  _MIR_set_code (ctx->code_alloc, start, len, base, nloc, relocs, 0);
+  if (_MIR_set_code (ctx->code_alloc, start, len, base, nloc, relocs, 0) != 0)
+    code_memory_error (ctx, "cannot update");
   _MIR_flush_code_cache (base, base + max_offset + sizeof (void *));
 }
 

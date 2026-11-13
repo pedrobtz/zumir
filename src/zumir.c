@@ -13,8 +13,13 @@ static SEXP zumir_has_target(void) {
   return Rf_ScalarLogical(ZUMIR_HAVE_MIR ? TRUE : FALSE);
 }
 
+SEXP zumir_test_sink(SEXP text, SEXP path);
+SEXP zumir_test_exit(SEXP text);
+
 static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_has_target", (DL_FUNC) &zumir_has_target, 0},
+  {"zumir_test_sink", (DL_FUNC) &zumir_test_sink, 2},
+  {"zumir_test_exit", (DL_FUNC) &zumir_test_exit, 1},
   {NULL, NULL, 0}
 };
 

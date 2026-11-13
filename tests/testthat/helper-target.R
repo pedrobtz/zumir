@@ -16,3 +16,19 @@ expected_mir_target <- function(
   }
   arch %in% c("x86_64", "aarch64", "powerpc64le", "ppc64le", "s390x", "riscv64")
 }
+
+# The C library's text for ENOENT, as perror() writes it.
+strerror_enoent <- function() {
+  msg <- tryCatch(
+    file(
+      tempfile(
+        pattern = "missing-",
+        tmpdir = file.path(tempdir(), "no-such-dir")
+      ),
+      "r"
+    ),
+    warning = conditionMessage,
+    error = function(e) NA_character_
+  )
+  sub(".*'[^']*': ", "", msg)
+}

@@ -11,17 +11,23 @@ installed_lib <- function() {
   dirname(path)
 }
 
+# `code` runs in a fresh Rscript with `lib` first on the library path. The
+# path is set inside the script, not through system2(env =): on Windows
+# that prepends `R_LIBS=...` to the command line, which only commands such
+# as R and make accept, and Rscript does not.
 run_child <- function(lib, code) {
   script <- tempfile(fileext = ".R")
   on.exit(unlink(script))
-  writeLines(code, script)
+  writeLines(
+    c(sprintf(".libPaths(c(%s, .libPaths()))", deparse(lib)), code),
+    script
+  )
   rscript <- file.path(R.home("bin"), "Rscript")
   out <- suppressWarnings(system2(
     rscript,
     c("--vanilla", shQuote(script)),
     stdout = TRUE,
-    stderr = TRUE,
-    env = paste0("R_LIBS=", shQuote(lib))
+    stderr = TRUE
   ))
   status <- attr(out, "status")
   list(status = if (is.null(status)) 0L else status, output = out)

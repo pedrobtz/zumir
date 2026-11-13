@@ -7,7 +7,9 @@
 #include "zumir_mir.h"
 
 #if ZUMIR_HAVE_MIR
+#include "zumir_mir_gcc.h"
 #define MIR_DIRECT_DISPATCH 1
+#include "zumir_mir_stdio.h"
 #include "vendor/mir/mir.c"
 #else
 /* ISO C forbids an empty translation unit. */

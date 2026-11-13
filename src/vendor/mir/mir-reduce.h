@@ -220,7 +220,7 @@ static inline uint32_t _reduce_dict_find_longest (struct reduce_data *data, uint
     s2 = &data->buf[pos];
 #if MIR_HASH_UNALIGNED_ACCESS
     assert (_REDUCE_START_LEN >= 4);
-    if (*(uint32_t *) &s1[0] != *(uint32_t *) &s2[0]) continue;
+    if (memcmp (s1, s2, sizeof (uint32_t)) != 0) continue;
     len = 4;
 #else
     len = 0;

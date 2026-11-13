@@ -2190,11 +2190,16 @@ MIR_op_mode_t MIR_insn_op_mode (MIR_context_t ctx, MIR_insn_t insn, size_t nop, 
   }
 }
 
+/* The size of an insn with NOPS operands; room for one is always there. */
+static size_t insn_size (size_t nops) {
+  return offsetof (struct MIR_insn, ops) + sizeof (MIR_op_t) * (nops == 0 ? 1 : nops);
+}
+
 static MIR_insn_t create_insn (MIR_context_t ctx, size_t nops, MIR_insn_code_t code) {
   MIR_insn_t insn;
 
   if (nops == 0) nops = 1;
-  insn = MIR_malloc (ctx->alloc, sizeof (struct MIR_insn) + sizeof (MIR_op_t) * (nops - 1));
+  insn = MIR_malloc (ctx->alloc, insn_size (nops));
   if (insn == NULL)
     MIR_get_error_func (ctx) (MIR_alloc_error, "Not enough memory for insn creation");
 #if defined(_WIN32) || __SIZEOF_LONG_DOUBLE__ == 8
@@ -2396,7 +2401,7 @@ void _MIR_register_unspec_insn (MIR_context_t ctx, uint64_t code, const char *na
 MIR_insn_t MIR_copy_insn (MIR_context_t ctx, MIR_insn_t insn) {
   size_t size;
   mir_assert (insn != NULL);
-  size = sizeof (struct MIR_insn) + sizeof (MIR_op_t) * (insn->nops == 0 ? 0 : insn->nops - 1);
+  size = insn_size (insn->nops);
   MIR_insn_t new_insn = MIR_malloc (ctx->alloc, size);
 
   if (new_insn == NULL)

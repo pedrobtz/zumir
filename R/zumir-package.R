@@ -8,3 +8,7 @@
 ## mockable bindings: start
 ## mockable bindings: end
 NULL
+
+.onUnload <- function(libpath) {
+  library.dynam.unload("zumir", libpath)
+}

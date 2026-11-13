@@ -84,6 +84,12 @@ These are fixed by the design before any code exists:
   context gets `zumir`'s handler through `MIR_set_error_func`, the paths that
   run before that are patched, and every entry from R or from the table is a
   recovery point. A missed path kills the analyst's session.
+- **Every call into MIR is under a trap** (`src/zumir_trap.h`): push, then
+  `setjmp` in the entry's own frame, MIR calls, pop. Nothing between the
+  `setjmp` and the MIR calls' end may call R or allocate R memory, and a
+  context that raised may only be finished, under a trap of its own.
+- **`mir.h` only through `src/zumir_mir_api.h`.** Its inline
+  `MIR_init2` writes to `stderr`; the header puts the redirection first.
 - **No `longjmp` crosses a consumer's frames.** Every `zumir_` entry in the
   C API returns a status code, and every `MIR_` entry is a shim that traps
   and records the error in its context, which can then only be freed
@@ -113,7 +119,12 @@ These are fixed by the design before any code exists:
 
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
-`test-mir-stdio.R`: writes to MIR's `stderr` reach the buffer, other
+`test-error-trap.R`: MIR's errors as `zumir_mir_error` conditions through
+an internal entry (`test_invalid_module()`), an error inside
+`MIR_finish_func` then `MIR_finish`, and in a child process 10³ failures of
+each kind with RSS flat. `tests/c/test-trap-threads.c` (built without R by
+`platform.sh`): the trap on two threads at once. `test-mir-stdio.R`: writes
+to MIR's `stderr` reach the buffer, other
 `FILE`s are untouched, and `exit` becomes an R error, through an internal
 entry compiled under the same macros. `test-no-target.R`: MIR is compiled
 in exactly where `helper-target.R`'s
@@ -142,6 +153,9 @@ which holds a write token and is pinned to a commit:
   Linux x86-64 and aarch64 (macOS x86-64 too on the schedule and on
   dispatch): MIR's own tests on the vendored copy, the symbol guards, and
   on Linux the build with MIR forced out.
+- `alloc-failure.yaml`: weekly and on dispatch, fails each allocation in
+  turn while `tools/alloc-exercise.R` runs the error trap's three invalid
+  modules.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`

@@ -782,7 +782,16 @@ decides it and the maintainer may overturn it.
 - **D4 (C).** MIR never terminates the process. The error handler is
   replaced on every context, the paths before installation are
   patched, and every entry from R or from the table is a recovery point
-  (D20 says how).
+  (D20 says how). Built in Stage 3 (2026-11-13) as `src/zumir_trap.c`:
+  a thread-local stack of recovery points, each a `jmp_buf` in the
+  entry's own frame; MIR's error function and its redirected `exit` and
+  `abort` copy the message into the innermost one, pop it and `longjmp`.
+  With no trap on the thread, a handler `R_init_zumir` installs raises an
+  R error; every entry sets a trap, so that is a zumir bug, not a path.
+  A trapped error reaches R as a condition of class
+  `c("zumir_mir_error", "zumir_error", "error", "condition")` carrying
+  MIR's `MIR_error_type_t` as `mir_type`. The trap files use no R API, so
+  the C tests under `tests/c/` link them without R.
 - **D5 (C).** `cfunction()` reads no system header. Machines without a
   toolchain have none, and the prelude is what makes the same source
   compile on every platform.

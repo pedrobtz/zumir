@@ -38,7 +38,7 @@ call to r-actions.
 | rchk          | done    | native-checks.yaml |
 | gctorture     | done    | gctorture.yaml     |
 | analyzers     | done    | native-checks.yaml |
-| alloc-failure | gap #5  |                    |
+| alloc-failure | done    | alloc-failure.yaml |
 | mutation      | gap #11 |                    |
 | fuzz          | gap #8  |                    |
 | fuzz-reach    | gap #8  |                    |
@@ -72,7 +72,9 @@ One row per boundary the package crosses. An oracle knows the answer:
 | MIR generator: module to machine code | the same function in C from the leg's compiler, bitwise on x86-64 | gap #7: tests/consumer/ |
 | MIR generator on aarch64 | the same C built with `-ffp-contract=off`, bitwise | gap #18 |
 | MIR interpreter | native code on the same module, bitwise, on the three spike right-hand sides | gap #6: tests/testthat/test-tiers.R |
-| Error trap: invalid modules | a `zumir_error` of the documented class each time, the session alive and RSS flat over 10³ failures of three kinds, through an internal test entry point | gap #5: tests/testthat/test-error-trap.R |
+| Error trap: invalid modules | MIR's own error type (syntax, operand mode, undeclared reference) as a `zumir_mir_error` each time, the context finished and no trap left; in a child process 10³ failures of each kind all caught, the session alive and RSS growth under 4 MB for the second 10³ (a leaked context per failure is about 97 MB) | tests/testthat/test-error-trap.R |
+| Error trap on threads | each of two threads gets its own 500 errors, with its own MIR error type, and leaves no trap behind; under ASan and UBSan on Linux | tests/c/test-trap-threads.c, in tools/ci/platform.sh |
+| MIR's exit, abort and stderr | what MIR writes to stderr reaches zumir's buffer, a caller's FILE is untouched, exit and abort land in the trap or, with none, become an R error | tests/testthat/test-mir-stdio.R |
 | Executable memory refused (Linux) | the documented tier and reason, not a signal, under a seccomp filter in a forked child | gap #6: tests/testthat/test-tier.R |
 | C API table v1 | a consumer package that links it, emits three right-hand sides, and compares them with C | gap #7: tests/consumer/ |
 | C API compatibility (D21) | a consumer built against the oldest header runs; one built against another MIR ABI number gets `NULL` and a reason | gap #7: tests/consumer/ |

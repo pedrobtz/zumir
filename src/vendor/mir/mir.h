@@ -480,7 +480,7 @@ static inline MIR_context_t MIR_init2 (MIR_alloc_t alloc, MIR_code_alloc_t code_
     fprintf (stderr,
              "mir.h header has version %g different from used mir code version %g -- good bye!\n",
              MIR_API_VERSION, _MIR_get_api_version ());
-    exit (1);
+    return NULL;
   }
   return _MIR_init (alloc, code_alloc);
 }

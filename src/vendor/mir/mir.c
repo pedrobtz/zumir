@@ -741,8 +741,7 @@ MIR_context_t _MIR_init (MIR_alloc_t alloc, MIR_code_alloc_t code_alloc) {
   if (code_alloc == NULL) code_alloc = &default_code_alloc;
 
   mir_assert (MIR_OP_BOUND < OUT_FLAG);
-  if ((ctx = MIR_malloc (alloc, sizeof (struct MIR_context))) == NULL)
-    default_error (MIR_alloc_error, "Not enough memory for ctx");
+  if ((ctx = MIR_malloc (alloc, sizeof (struct MIR_context))) == NULL) return NULL;
   ctx->string_ctx = NULL;
   ctx->alias_ctx = NULL;
   ctx->reg_ctx = NULL;
@@ -880,6 +879,11 @@ static void remove_all_modules (MIR_context_t ctx) {
 }
 
 void MIR_finish (MIR_context_t ctx) {
+  /* An error handler may longjmp out of MIR_finish_func or
+     MIR_finish_module, leaving them set. Finishing such a context must free
+     it, not read the freed function's name and report an error again. */
+  curr_func = NULL;
+  curr_module = NULL;
   interp_finish (ctx);
   remove_all_modules (ctx);
   HTAB_DESTROY (MIR_item_t, module_item_tab);

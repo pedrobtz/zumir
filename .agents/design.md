@@ -119,7 +119,7 @@ subset (element-wise vector arithmetic, integer and logical results).
 | Info function | `zumir_info()` |
 | Root condition class | `zumir_error` |
 | Public C prefix | `zumir_`, and MIR's own `MIR_` names through the table |
-| From C | yes, by `R_GetCCallable("zumir", "zumir_api")` |
+| From C | yes, by `R_GetCCallable("zumir", "zumir_api_get")` |
 | Hides symbols | yes; the table is the only way in |
 | Vendored code | MIR (MIT) |
 | Language | en-GB |
@@ -218,7 +218,8 @@ R-specific.
   unsupported generation target"` on a CPU MIR does not target. The build
   leaves MIR out there (a `configure` test, or a preprocessor guard in a
   wrapper file), so the package still installs and every entry reports
-  that there is no target (§7).
+  that there is no target (§7). The same guard leaves MIR out on Windows
+  aarch64 (D25).
 - **No `-fsigned-char`.** Upstream builds with it; R CMD check flags it as
   a non-portable flag. Replaced by a source fix or a `configure` test.
 - **Symbol hiding.** MIR's external symbols are given hidden visibility
@@ -227,22 +228,40 @@ R-specific.
 
 ### 4.3 The C API
 
-A consumer calls `R_GetCCallable("zumir", "zumir_api")` once and gets a
-pointer to a `const zumir_api_v1` struct. Its first field is the API
-version; later versions only append fields. `inst/include/zumir.h`
-declares it and provides inline wrappers, so consumer code reads as
-ordinary MIR code:
+A consumer calls `R_GetCCallable("zumir", "zumir_api_get")` once. That
+is a function, because `R_GetCCallable` returns a function pointer and
+ISO C does not convert one to a data pointer. The consumer calls it with
+the table version and the MIR ABI number its header was compiled with,
+and gets a pointer to a `const zumir_api_v1` struct, or `NULL` and a
+reason string when the loaded `zumir` cannot serve that request (D21).
+`inst/include/zumir.h` declares the table and wraps the lookup in one
+inline `zumir_api_load()`.
+
+The table opens with four fields, in this order, that never change:
+its version, its size in bytes, the MIR ABI number and capability
+flags (§4.4). Later versions only append fields, so a consumer reads a
+field only when the size says it is there. The MIR ABI number counts
+changes to what a consumer compiles in from `mir.h`: the opcode and
+type enums, and the layout of `MIR_op_t` and every struct it reaches.
+A MIR update that changes any of these bumps it, and `zumir_api_get`
+then refuses a consumer built against the old number. A consumer
+binary built before the update gets an error at load, not wrong
+opcodes. `tools/vendor.sh` diffs those parts of `mir.h` on every update,
+so the bump is not left to memory.
+
+Consumer code reads as ordinary MIR code:
 
 ```c
 #include <zumir.h>
 
-zumir_ctx *z = zumir_ctx_new(&status);      /* MIR context + error trap */
+const zumir_api_v1 *api = zumir_api_load(&why);   /* NULL: why says why */
+zumir_ctx *z = zumir_ctx_new(&status);      /* MIR context + error state */
 MIR_context_t ctx = zumir_mir(z);
 MIR_module_t mod = MIR_new_module(ctx, "m");
 /* ... MIR_new_func, MIR_new_insn, MIR_finish_func ... */
 MIR_finish_module(ctx);
 void *fn = zumir_compile(z, mod, "rhs", ZUMIR_TIER_AUTO, &tier, &status);
-/* fn is a C function pointer on either tier */
+/* fn is a C function pointer on either tier, or NULL with status set */
 zumir_ctx_free(z);                          /* frees code with the context */
 ```
 
@@ -250,9 +269,25 @@ The table carries the subset of MIR's API a code generator needs
 (context, module, function, register, operand and instruction
 construction, finishing, loading, linking, generator and interpreter
 interfaces, external symbol loading), about forty entries, plus the
-`zumir_` functions. Every `zumir_` entry returns a status and never
-`longjmp`s across the consumer's frames: an error inside MIR is caught
-at the `zumir` boundary and reported (D4).
+`zumir_` functions.
+
+**Errors through the table (D20).** No entry `longjmp`s across the
+consumer's frames. A trap set inside one call is gone when that call
+returns, so every entry is its own recovery point. The `MIR_` entries
+are not MIR's functions. They are `zumir` shims with MIR's names and
+signatures, and each one sets the trap, calls MIR and clears the trap.
+When MIR reports an error, the shim records it in the context and
+returns a null or zero value. From then on the context is *failed*:
+every `MIR_` shim on it does nothing and returns a null or zero value,
+`zumir_compile()` returns `NULL` with the recorded status, and
+`zumir_status(z)` gives the status and the message. A failed context
+can only be freed. MIR's state after a trapped error is not trusted
+(see the `curr_func` patch, §4.2), so it is not reset and reused. A
+consumer builds a whole module and checks once, at `zumir_compile()`,
+with no check after each instruction. The `zumir_` entries return a
+status directly. `zumir_ctx_new()` and `zumir_ctx_free()` are recovery
+points too: a failure inside `MIR_init2` returns `NULL` with a status.
+Freeing a context twice, or freeing `NULL`, does nothing.
 
 **Helpers for lowering.** `zumir.h` also carries a small emitter for
 straight-line `double` code (D13): new registers, loads and stores at an
@@ -269,12 +304,30 @@ import resolver for that context accepts them beside D6's list (D14).
 `zupmxode` needs `logit`, `expit`, `probit` and friends this way.
 `cfunction()` keeps D6's fixed list.
 
+**Lifetimes.** A function pointer from `zumir_compile()` is valid
+while its context lives, and only then. Whoever holds the context keeps
+it alive for as long as the pointer can be called: in R, the closures
+`mir_function()`, `cfunction()` and `rfunction()` return hold the
+context's external pointer. A consumer's import (`zumir_import()`) is a
+pointer into the consumer's own shared object. The consumer owns the
+context, so it frees the context before that object can unload. An
+external pointer restored by `readRDS()`, or cleared, holds `NULL`, and
+every entry given one fails with a classed error rather than following
+it. In a forked child, a context and its code work as in the parent,
+since the mappings are copied.
+
 **Threads.** MIR's own rule, from `MIR.md`: MIR functions may be used
 from different threads without synchronisation if each thread works in
-its own context. `zumir` keeps that rule and adds one: generated code
-may be called from any thread, because it is code. A consumer that
-compiles once and runs on many threads, as `zupmxode` does, needs no
-lock beyond its own compile step. **Interpreted code is not shareable:**
+its own context. `zumir` keeps that rule and adds two. First, a context
+compiles, then runs: no MIR call is made on a context while code from
+it may be running, because generation redirects the thunks that code
+calls through. Second, generated code may be called from any thread
+when its module writes no MIR data item and its imports are safe to
+call from any thread. D6's list and `rfunction()`'s list are, except
+for `rfunction()`'s interrupt poll (§4.6), which runs only on R's main
+thread. A consumer that compiles once and runs on many threads, as
+`zupmxode` does, needs no lock beyond its own compile step.
+**Interpreted code is not shareable:**
 the interpreter keeps per-call state in its context, and one interpreted
 function called from eight threads gave wrong answers on every leg of the
 spike. On the interpreter tier each thread gets its own context, compiled
@@ -289,22 +342,35 @@ Windows, `mmap` and `mprotect` elsewhere.
 
 ### 4.4 Tier detection
 
-At load, `zumir` generates and calls a one-instruction function. If
-that fails, because the architecture is not one MIR targets or because
-the system refuses memory that is writable and executable, native code
-is reported unavailable for the session and `ZUMIR_TIER_AUTO` means the
-interpreter. `zumir_info()` says which, and why.
+At load, `zumir` generates and calls a small function that does
+arithmetic and calls one import (`exp`), first natively and then on the
+interpreter. Each tier is reported as four capabilities, because they
+fail separately: generating native code, running the interpreter,
+getting a C-callable entry point, and calling an external function.
+They are the table's capability flags (§4.3). A tier is available when
+all four hold for it. If native code is not, because the architecture
+is not one MIR targets or because the system refuses memory that is
+writable and executable, `ZUMIR_TIER_AUTO` means the interpreter.
+`zumir_info()` says which capabilities hold, and why the others do not.
 
 Two facts from the spike constrain this. The probe must *fail*, not
 crash, so it rests on the code-memory patch (§4.2, D11). And MIR's
-interpreter needs executable memory too: `MIR_set_interp_interface`
-generates a machine-code shim per function, so where W+X memory is
-refused neither tier can be called through a C function pointer. What
-runs there is open (Q5), decided at the start of the stage that builds
-this.
+interpreter needs executable memory too. `MIR_set_interp_interface`
+generates a machine-code shim per function. Below that, at the pinned
+commit, loading a module gives every function a generated thunk
+([`mir.c` line 1950](https://github.com/vnmakarov/mir/blob/dc2c763/mir.c#L1950)),
+and the interpreter calls external functions through a generated
+bridge
+([`mir-interp.c` line 1768](https://github.com/vnmakarov/mir/blob/dc2c763/mir-interp.c#L1768)).
+So where W+X memory is refused, neither tier runs at all, with or
+without the shim. What runs there is open (Q5), decided at the start of
+the stage that builds this.
 
 The probe runs before anything else maps code, in `.onLoad`, so a refusal
-is found before a consumer has compiled anything. On macOS, `MAP_JIT`
+is found before a consumer has compiled anything. Running it later, at
+the first compile, would not make a crash recoverable, since a signal
+ends the session wherever it happens. It would also need a once-guard
+for consumers that compile off the main thread. On macOS, `MAP_JIT`
 works because CRAN's R carries the `allow-jit` entitlement; an R built or
 embedded without it was not tested and must be detected by the same
 probe. The interpreter's figures above were measured with computed-goto
@@ -352,22 +418,55 @@ only for `rfunction()`: the C library's `exp`, `log`, `log1p`, `expm1`,
 `R_pow` for `^`, a pure function of libR that neither allocates nor
 raises a condition; and zumir's own C ports of R's `%%`, `%/%` and
 two-argument `min`/`max` (R's `myfmod`, `myfloor` and `rmin`/`rmax`
-rules). Nothing in the list calls back into R.
+rules). One entry calls back into R: the interrupt poll (below), which
+does so only inside `R_ToplevelExec()`, so no R error or interrupt jumps
+through generated code.
+
+**Names (D22).** R looks names up at run time, and a user can rebind
+any of them, `exp` and `+` included. At compile time the walker checks
+that every operator and function name in the body, looked up from
+`environment(f)`, is base's own function. A rebound name is refused,
+and so is a local or argument that has the name of a function or
+operator the body calls. The compiled function keeps base's meaning
+even if the name is rebound later; that is a documented difference.
 
 **Values.**
 
-- Every argument is a `double` scalar or a `double` vector. An argument
-  that is indexed (`x[i]`), passed to `length()` or to `seq_along()` is a
-  vector; any other is a scalar, checked to be length one at the call.
-  An argument that is not `double` (integer, logical, character) is
+- Every argument is a `double` scalar or a `double` vector with no
+  attributes. An argument that is indexed (`x[i]`), passed to
+  `length()` or to `seq_along()` is a vector. Any other is a scalar,
+  checked to be length one at the call. Inference reads the whole body,
+  not one path through it. A scalar argument of another length is an
+  error, where R might answer with a vector (D16).
+- An argument that is not `double` (integer, logical, character) is
   refused at the call with a classed error: R's own function would
   compute in another type and return another type, so converting would
   change the answer (D16).
+- An argument with any attribute is refused at the call: names, `dim`,
+  or a class. A classed double (`Date`, `difftime`, a user's S3 class)
+  sends R's arithmetic to a method, and a named one keeps its names in
+  R's result, so either would change the answer (D16).
+- Formals have no defaults and there is no `...`; both are refused at
+  compile time. An argument is never assigned to: `n <- n + 1` on an
+  argument is refused, and the body writes `m <- n + 1` instead.
 - Locals are `double` scalars, `logical` scalars (from comparisons,
   `is.na()`, `!`, `&&`, `||`), `integer` loop counters, or `double`
-  vectors made by `numeric(<size>)`, where `<size>` uses only arguments
-  and `length()`. The wrapper evaluates the size in R and allocates the
-  vector before the call, so generated code never allocates.
+  vectors made by `numeric(<size>)`.
+- **Vector locals (D22).** Each one is made by exactly one
+  `numeric(<size>)` statement at the top level of the body, before any
+  loop or branch, never inside one. `<size>` uses only constants,
+  arguments, `length()` of arguments and arithmetic. Since arguments are
+  never assigned, the size is what R would compute where the statement
+  stands. The wrapper evaluates the size in R and allocates the vector
+  before the call, so generated code never allocates. After that, a
+  vector local changes only by `y[i] <- v`. Assigning it whole
+  (`z <- y`, `y <- x`, a second `numeric()`) is refused. So no two names
+  share a vector, and R's copy-on-modify never has to be imitated.
+- **Definite assignment (D22).** Every local is assigned on every path
+  before it is read. A local that may be unassigned on some path
+  (`if (c) a <- 1; a`) is refused at compile time, although R would run
+  it on the inputs where the path assigns it (D16). The loop variable is
+  not read after its loop.
 - A logical in arithmetic is `1`, `0` or `NA`, as in R. An integer
   counter in arithmetic with another integer stays integer, as in R; an
   overflow, where R would give `NA` with a warning, is an error (D16).
@@ -403,6 +502,13 @@ status, and the wrapper acts on it after the call:
   error.
 - An index out of range, not a whole number or `NA`, and an integer
   overflow, are errors (D16).
+- **Interrupts (D23).** Every loop's back edge counts iterations, and
+  every 2¹⁶ iterations it calls the interrupt poll. The poll runs
+  `R_CheckUserInterrupt()` inside `R_ToplevelExec()`. When that reports
+  an interrupt or a time limit (`setTimeLimit()`), the generated code
+  returns at once with an interrupt status. The wrapper then raises R's
+  own interrupt or time-limit condition. So `while (TRUE) {}` is
+  stopped by Ctrl-C, as it is in R.
 
 **Semantics.** Arithmetic is IEEE double, unfused, as R's evaluator does
 it, so every non-NaN result equals R's bit for bit, signed zeros
@@ -412,8 +518,11 @@ same holds here. Every other NaN or `NA` result is the one R gives.
 
 **Oracle.** R itself: every test calls `f` and `rfunction(f)` on the
 same inputs, random and chosen (`NA`, `NaN`, `±Inf`, `-0`, subnormals,
-empty vectors), and compares with `identical(num.eq = FALSE)` plus a
-sign-of-zero check, allowing only the NA-or-NaN case above.
+empty vectors), and compares with `identical(num.eq = FALSE)`. That
+compares non-NaN doubles bit for bit, so `0` and `-0` differ, and tells
+`NA` from `NaN`; checked on R 4.6. Only the NA-or-NaN case above is
+allowed. The value, its type and attributes, the warnings and the error
+class are separate assertions, so a failure says which one differs.
 
 ## 5. Public R API (complete v0.1.0 surface)
 
@@ -467,9 +576,22 @@ rfunction(f, tier = "interp")
 
 Argument types: `int`, `double`, `const int *`, `const double *`,
 `int *` and `double *`, with lengths named by an `int` argument or fixed.
-Return types: `void`, `int`, `double`. Inputs are not copied unless the
-C type is non-`const`; outputs named in `out` are allocated by the
-wrapper and returned, as a list when there are several.
+Return types: `void`, `int`, `double`.
+
+**Pointers (D24).** A `const` pointer is an input. It is passed without
+a copy, since the function cannot write through it. A non-`const`
+pointer is an output and must be named in `out`; one that is not is
+refused when the function is compiled, because its writes would be
+lost. When the caller supplies a value for an output, the wrapper
+copies it and passes the copy, so the output starts from that value
+(`y` in, the modified `y` out). When the caller does not, the wrapper
+allocates it zero-filled at its declared length. The caller's vector is
+never written, so R's copy semantics hold. Outputs are returned, with
+the function's return value first when it is not `void`, as a named
+list when there are several.
+
+Code compiled by `cfunction()` is the user's, as in `.Call()`: a loop
+that never ends is not interrupted.
 
 ## 6. Errors
 
@@ -482,6 +604,8 @@ wrapper and returned, as a list when there are several.
   source, not of the prelude.
 - MIR errors, in either API, become a `zumir_error` condition from R and
   a status code from C. The process never exits on MIR's account (D4).
+  From C, the context that saw the error is failed and can only be freed
+  (D20).
 - Calls through `cfunction()` validate types and lengths in R before the
   call. Inside the call the code is the user's; a crash there is a crash,
   as it is in `.Call()`.
@@ -495,6 +619,11 @@ wrapper and returned, as a list when there are several.
   macOS and Linux. These are the r-actions legs.
 - **Built, not tested here**: ppc64le, s390x and riscv64 on Linux, which
   MIR targets and its own CI tests. Debian builds R on them.
+- **Windows aarch64**: no target in v0.1.0 (D25). R has a Windows ARM64
+  build, but MIR's aarch64 target is tested only under the Linux and
+  macOS calling conventions, and MIR's CI never builds Windows on ARM.
+  The CPU matches, so without the guard MIR would be built and run
+  untested. It installs as "Elsewhere" below.
 - **Elsewhere**: the package installs with MIR left out of the build
   (§4.2), reports that MIR has no target, and `cfunction()`,
   `rfunction()` and the provider API return an error condition and a
@@ -522,13 +651,25 @@ wrapper and returned, as a list when there are several.
 - Every `cfunction()` example against a reference written in R.
 - `rfunction()` against R itself (§4.6): each construct of the subset,
   and a generator of random functions within the subset run on random
-  and chosen inputs, compared with `identical()`; every refused construct
-  refused with its name.
+  and chosen inputs, compared with `identical(num.eq = FALSE)`; every
+  refused construct refused with its name. About 10² random functions
+  per pull request and 10⁴ on the full profile, each with a time limit,
+  and every failing function saved as a reproducer with its seed.
 - Native against interpreter on the same modules: identical results.
 - Threads: one context per thread compiling at once, and one compiled
   function called from eight threads, against serial results.
 - Error recovery: modules that are invalid on purpose, through both APIs,
   in a loop of 10³, with the session alive and no memory growth after.
+  Through the C API, from an installed consumer package, in C and in
+  C++: a C++ object with a destructor, live across the failing calls, is
+  destroyed exactly once, and the failed context then only frees.
+- Compatibility: a consumer built against the oldest supported header
+  runs against the current provider, and one built against a different
+  MIR ABI number gets `NULL` and its reason from `zumir_api_get`.
+- Generated code's memory accesses: ASan does not instrument code MIR
+  generates. Native code is checked under valgrind with
+  `--smc-check=all`, which does see it. The interpreter tier is checked
+  under ASan, since there every load and store the program makes is C.
 - Finalisers: contexts and code freed when R collects the objects that
   hold them.
 - A fuzz target over `c2mir` input through `cfunction()`'s path, built
@@ -583,17 +724,23 @@ decides it and the maintainer may overturn it.
   half years of fixes. This deviates from `.claude/shared/native-code.md`
   ("pin a stable upstream release"), on purpose. `tools/vendor.sh` records
   the hash, and an update is
-  a deliberate pull request that re-runs the spike's checks (the MIR
-  tests, the three right-hand sides, threads, executable memory, the
-  error loop) on every leg.
+  a deliberate pull request that re-runs, on every leg, the checks the
+  spike began and this repository carries on: MIR's own tests in
+  `tools/ci/platform.sh` (Stage 2), the consumer package's three
+  right-hand sides (Stage 5), the thread and W+X tests (Stage 4), and the
+  error loop (Stage 3). It also re-checks the MIR ABI number (D21).
+  The spike's repository is throwaway; nothing depends on it.
 - **D3 (C).** MIR's API is exposed through a versioned table of function
   pointers, under MIR's own names, plus `zumir_` functions. Wrapping
   every MIR call in a `zumir_` equivalent would double the surface and
   hide MIR's documentation from consumers; exposing the raw symbols is
-  not possible across R packages.
+  not possible across R packages. Amended 2026-11-13: the `MIR_` entries
+  are shims under MIR's names and signatures, not MIR's own functions
+  (D20).
 - **D4 (C).** MIR never terminates the process. The error handler is
   replaced on every context, the paths before installation are
-  patched, and every entry from R or from the table is a recovery point.
+  patched, and every entry from R or from the table is a recovery point
+  (D20 says how).
 - **D5 (C).** `cfunction()` reads no system header. Machines without a
   toolchain have none, and the prelude is what makes the same source
   compile on every platform.
@@ -638,15 +785,23 @@ decides it and the maintainer may overturn it.
   errors rather than answering differently: out-of-range and non-integer
   indices, sizes and `seq_len()` or `a:b` bounds that are not whole
   numbers, arguments that are not `double`, results R would type as
-  integer or logical, and integer overflow. An `rfunction()` result
-  is either R's answer or an error.
+  integer or logical, and integer overflow. Amended 2026-11-13, after
+  review: also arguments with attributes, a scalar argument of length
+  other than one, formals with defaults, assignment to an argument,
+  vector locals made outside the top level or assigned whole, a local
+  not assigned on every path, and a name rebound away from base's
+  function (D22). An `rfunction()` result is either R's answer or an
+  error. The user-facing documentation lists every one of these.
 - **D17 (M), 2026-11-13.** `rfunction()` reaches MIR by two routes: MIR
   text first, then a `.Call` bridge to the §4.3 emitter, each its own
   stage. The text route is the bridge's oracle (the same module printed,
   the same results) and its compile-time benchmark.
 - **D18 (C), 2026-11-13.** `rfunction()`'s imports are a fixed internal
-  list (§4.6): the C library's math, `R_pow`, and zumir's C ports of R's
-  `%%`, `%/%`, `min` and `max`. The import resolver, with D6's list,
+  list (§4.6): the C library's math, `R_pow`, zumir's C ports of R's
+  `%%`, `%/%`, `min` and `max`, and the interrupt poll (D23). `R_pow`
+  being in reach while D6 keeps `cfunction()` away from R's symbols is
+  no contradiction: this lowering is zumir's own code, and no user
+  source names an import. The import resolver, with D6's list,
   consumer imports (D14) and this one, is built with the C API, before
   `rfunction()` and `c2mir` need it.
 - **D19 (C), 2026-11-13.** `c2mir` stays the front end of `cfunction()`.
@@ -654,6 +809,40 @@ decides it and the maintainer may overturn it.
   numeric functions need, or the fuzz target finds crashes upstream does
   not fix, TinyCC (§3) is weighed as the front end of `cfunction()` alone,
   with its LGPL as the cost. The provider and `rfunction()` stay on MIR.
+- **D20 (C), 2026-11-13.** Every table entry is a recovery point because
+  every `MIR_` entry is a shim that traps, records an error in its
+  context and returns. A context with an error is failed: later calls
+  do nothing, `zumir_compile()` reports the error, and the context can
+  only be freed (§4.3). A trap set in `zumir_ctx_new()` cannot cover
+  calls made after it returns, and checking after every instruction
+  would bury the consumer's lowering in status checks.
+- **D21 (C), 2026-11-13.** The table is fetched through a getter,
+  `zumir_api_get`, and opens with its version, its size, a MIR ABI
+  number and capability flags. A MIR update that changes an exposed
+  enum or struct bumps the ABI number, and the getter refuses consumers
+  built against another. Appending fields protects the table's layout;
+  only the ABI number protects the opcodes and structs consumers
+  compile in from `mir.h`. CRAN does not rebuild a consumer's binary
+  when `zumir` updates.
+- **D22 (C), 2026-11-13.** `rfunction()`'s values follow R's semantics
+  by restriction, not by imitation (§4.6): arguments have no attributes
+  and are never assigned, names must resolve to base's functions,
+  vector locals are made once at the top level and never assigned
+  whole, and every local is definitely assigned. Each rule removes a
+  case where hoisting allocations, sharing a vector or binding a name
+  early would give an answer R does not.
+- **D23 (C), 2026-11-13.** Loops compiled by `rfunction()` poll for
+  interrupts every 2¹⁶ iterations, through `R_ToplevelExec()`, and
+  return at once when one is pending. R code can always be interrupted,
+  so a compiled version that cannot be would be a difference in
+  behaviour.
+- **D24 (C), 2026-11-13.** In `cfunction()`, a non-`const` pointer is an
+  output named in `out`, optionally seeded from the caller's value by a
+  copy (§5). Writing into the caller's vector would break R's value
+  semantics, and copying without returning the copy would drop the
+  writes.
+- **D25 (C), 2026-11-13.** Windows aarch64 is a "no target" platform in
+  v0.1.0 (§7), until MIR's aarch64 target is tested under that ABI.
 
 ## 13. Later versions, in the order they are expected
 
@@ -688,10 +877,19 @@ decides it and the maintainer may overturn it.
 - **Q5.** Where W+X memory is refused, what runs? (a) A dual-mapped code
   allocator, one file mapped read-execute and read-write as TinyCC's
   `CONFIG_SELINUX` does, patched into MIR so it writes through the second
-  mapping: both tiers then work. (b) `MIR_interp_arr` without a shim, with
-  `zupmxode` adapting its call. (c) No tier: `zumir` reports it, and
-  `zupmxode` brings its own IR interpreter for that case only. The spike
-  showed the problem, not the fix; (a) is this RFC's proposal. The
+  mapping: both tiers then work. (c) No tier: `zumir` reports it, and
+  `zupmxode` brings its own IR interpreter for that case only. Option
+  (b), `MIR_interp_arr` without the interpreter's shim, was struck on
+  2026-11-13: module loading and external calls generate code too
+  (§4.4), so it needs W+X memory as well. The spike showed the problem,
+  not the fix; (a) is this RFC's proposal, and (c) is an acceptable
+  answer for v0.1.0. If (a): it is the fallback, used only where the
+  direct allocator's probe is refused, not the default. As the default
+  it would double the mapped address space and move every platform off
+  upstream's tested path. As a fallback it is one more code path, tested
+  by the seccomp leg on Linux, and macOS keeps `MAP_JIT`. It is built
+  after a mirspike-style spike of the allocator alone under SELinux
+  `deny_execmem`, since it is the security-sensitive piece. The
   maintainer decides it at the start of the stage that builds tier
   detection (2026-11-13); option (a) touches every code write in
   `mir.c`, since MIR's code allocator has no address to write through.

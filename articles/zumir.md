@@ -78,8 +78,9 @@ R’s API.
 
 ## Write MIR directly
 
-`mir_function()` takes MIR’s textual IR instead of C. It is useful for
-tests, for learning MIR, and for checking a lowering by hand.
+[`mir_function()`](https://pedrobtz.github.io/zumir/reference/mir_function.md)
+takes MIR’s textual IR instead of C. It is useful for tests, for
+learning MIR, and for checking a lowering by hand.
 
 ``` r
 

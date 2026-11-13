@@ -131,11 +131,11 @@ include system headers or call R’s API.</p>
 <div class="section level2">
 <h2 id="write-mir-directly">Write MIR directly<a class="anchor" aria-label="anchor" href="#write-mir-directly"></a>
 </h2>
-<p><code>mir_function()</code> takes MIR’s textual IR instead of C. It
+<p><code><a href="../reference/mir_function.html">mir_function()</a></code> takes MIR’s textual IR instead of C. It
 is useful for tests, for learning MIR, and for checking a lowering by
 hand.</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu">mir_function</span><span class="op">(</span><span class="st">"</span></span>
+<code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mir_function.html">mir_function</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  m: module</span></span>
 <span><span class="st">     export add</span></span>
 <span><span class="st">  add: func d, d:a, d:b</span></span>

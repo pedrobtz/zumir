@@ -37,6 +37,8 @@
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="zumir-0009000">zumir 0.0.0.9000<a class="anchor" aria-label="anchor" href="#zumir-0009000"></a></h2>
 <ul><li><p>Initial CRAN submission.</p></li>
 <li><p>Bundles MIR, Vladimir Makarov’s JIT compiler (core, code generator and interpreter), at upstream commit <code>dc2c763</code>, with six local patches that make it build without warnings under R’s compilers. MIR can no longer end the R session or print from it: its exits and messages go to zumir. On a CPU MIR has no code generator for, and on Windows on ARM, the package installs without it.</p></li>
+<li><p><code><a href="../reference/mir_function.html">mir_function()</a></code> compiles a function from MIR’s textual form, natively or on MIR’s interpreter, and returns an R function that calls it.</p></li>
+<li><p>Packages can build and compile MIR code through zumir’s C API: put <code>LinkingTo: zumir</code> in DESCRIPTION and include <code>zumir.h</code>. MIR’s errors are reported through the context, never by ending the R session.</p></li>
 <li><p><code><a href="../reference/zumir_info.html">zumir_info()</a></code> reports the vendored MIR and its patches, which tiers run in this session and why the others do not, and the memory MIR contexts hold. <code><a href="../reference/zumir_info.html">zumir_tier()</a></code> is the default tier: <code>"native"</code>, <code>"interp"</code>, or <code>"none"</code> where the system refuses writable and executable memory.</p></li>
 </ul></div>
   </main></div>

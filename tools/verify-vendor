@@ -1,0 +1,97 @@
+#!/bin/sh
+# tools/verify-vendor [--canary]: verify that src/vendor/mir/ is the fork's
+# pinned commit, file for file, and that the fork commit is the pinned
+# upstream commit plus exactly the patches src/vendor/PROVENANCE lists, one
+# commit each (design D12). Exits non-zero on any difference. Run from the
+# package root; MIR_SRC names an existing clone of the fork instead.
+#
+#   tools/verify-vendor            the gate
+#   tools/verify-vendor --canary   compare against the fork commit's parent,
+#                                  that is with the last patch left out, and
+#                                  require verification to FAIL
+set -eu
+CANARY=0
+[ "${1:-}" = "--canary" ] && CANARY=1
+PROV=src/vendor/PROVENANCE
+[ -f "$PROV" ] || { echo "missing $PROV" >&2; exit 1; }
+
+up_pin=$(awk '/^  Commit:/ {print $2}' "$PROV")
+fork_url=$(awk '/^  Fork:/ {print $2}' "$PROV")
+fork_pin=$(awk '/^  Fork commit:/ {print $3}' "$PROV")
+echo "==> upstream $up_pin, fork $fork_pin"
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+FAILURES="$WORK/failures"
+: > "$FAILURES"
+fail() { echo "FAIL: $*" >> "$FAILURES"; }
+
+src=${MIR_SRC:-}
+if [ -z "$src" ]; then
+  src="$WORK/mir"
+  git -c core.autocrlf=false clone -q --no-checkout "$fork_url" "$src"
+fi
+git -C "$src" cat-file -e "$fork_pin^{commit}" 2>/dev/null ||
+  { echo "FAIL: the fork has no commit $fork_pin" >&2; exit 1; }
+git -C "$src" cat-file -e "$up_pin^{commit}" 2>/dev/null ||
+  { echo "FAIL: the fork has no upstream commit $up_pin" >&2; exit 1; }
+
+# 1. The series is built on the pinned upstream commit, linearly.
+git -C "$src" merge-base --is-ancestor "$up_pin" "$fork_pin" ||
+  fail "upstream $up_pin is not an ancestor of the fork commit"
+[ -z "$(git -C "$src" rev-list --merges "$up_pin..$fork_pin")" ] ||
+  fail "the series $up_pin..$fork_pin contains a merge"
+
+# 2. It is exactly the patch list, in order: abbreviated hash and subject.
+git -C "$src" log --reverse --format='%h %s' --abbrev=8 "$up_pin..$fork_pin" > "$WORK/series"
+awk '/^  Local patches:/ {on = 1; next}
+     on && /^ +[0-9a-f]{8} / {sub(/^ +/, ""); print; next}
+     on {exit}' "$PROV" > "$WORK/listed"
+cmp -s "$WORK/series" "$WORK/listed" || {
+  fail "the fork's series differs from the patch list in $PROV"
+  diff -u "$WORK/listed" "$WORK/series" >> "$FAILURES" || true
+}
+
+# 3. src/vendor/mir is the fork commit (or, in the canary, its parent).
+ref=$fork_pin
+[ "$CANARY" -eq 1 ] && ref="$fork_pin~1" && echo "==> canary: comparing with $ref"
+grep -v '^#' tools/mir-files.txt | grep -v '^[[:space:]]*$' > "$WORK/paths"
+count=0
+while read -r f; do
+  if [ ! -f "src/vendor/mir/$f" ]; then
+    fail "src/vendor/mir/$f is missing"
+  elif ! git -C "$src" show "$ref:$f" > "$WORK/blob" 2>/dev/null; then
+    fail "$f is not in the fork at $ref"
+  elif ! cmp -s "$WORK/blob" "src/vendor/mir/$f"; then
+    fail "src/vendor/mir/$f differs from the fork at $ref"
+  fi
+  count=$((count + 1))
+done < "$WORK/paths"
+for local in src/vendor/mir/*; do
+  b=$(basename "$local")
+  case "$b" in *.o | *.so | *.dll | *.dylib | *.a) continue ;; esac
+  grep -qx "$b" "$WORK/paths" || fail "src/vendor/mir/$b is not in tools/mir-files.txt"
+done
+
+# 4. The consumer-visible part of mir.h is the one recorded (D21).
+tools/mir-abi src/vendor/mir/mir.h > "$WORK/abi.txt"
+cmp -s "$WORK/abi.txt" tools/mir-abi.txt ||
+  fail "the enums and structs of mir.h differ from tools/mir-abi.txt"
+
+# 5. The build reports the pinned upstream commit.
+grep -q "#define ZUMIR_MIR_COMMIT \"$up_pin\"" src/zumir_mir.h ||
+  fail "ZUMIR_MIR_COMMIT in src/zumir_mir.h is not \"$up_pin\""
+
+if [ "$CANARY" -eq 1 ]; then
+  if [ -s "$FAILURES" ]; then
+    echo "==> canary OK: verification failed with the last patch left out"
+    exit 0
+  fi
+  echo "CANARY FAILED: verification passed with the last patch left out" >&2
+  exit 1
+fi
+if [ -s "$FAILURES" ]; then
+  cat "$FAILURES" >&2
+  echo "==> vendor tree FAILED verification" >&2
+  exit 1
+fi
+echo "==> vendor tree verified ($count files, MIR $up_pin plus $(wc -l < "$WORK/series" | tr -d ' ') patches)"

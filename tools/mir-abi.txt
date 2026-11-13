@@ -1,0 +1,228 @@
+typedef enum MIR_error_type {
+  REP8 (ERR_EL, no, syntax, binary_io, alloc, finish, no_module, nested_module, no_func),
+  REP5 (ERR_EL, func, vararg_func, nested_func, wrong_param_value, hard_reg),
+  REP5 (ERR_EL, reserved_name, import_export, undeclared_func_reg, repeated_decl, reg_type),
+  REP6 (ERR_EL, wrong_type, unique_reg, undeclared_op_ref, ops_num, call_op, unspec_op),
+  REP6 (ERR_EL, wrong_lref, ret, op_mode, out_op, invalid_insn, ctx_change)
+} MIR_error_type_t;
+typedef enum {
+  REP4 (INSN_EL, MOV, FMOV, DMOV, LDMOV),
+  REP6 (INSN_EL, EXT8, EXT16, EXT32, UEXT8, UEXT16, UEXT32),
+  REP3 (INSN_EL, I2F, I2D, I2LD),
+  REP3 (INSN_EL, UI2F, UI2D, UI2LD),
+  REP3 (INSN_EL, F2I, D2I, LD2I),
+  REP6 (INSN_EL, F2D, F2LD, D2F, D2LD, LD2F, LD2D),
+  REP5 (INSN_EL, NEG, NEGS, FNEG, DNEG, LDNEG),
+  REP4 (INSN_EL, ADDR, ADDR8, ADDR16, ADDR32),
+  REP5 (INSN_EL, ADD, ADDS, FADD, DADD, LDADD),
+  REP5 (INSN_EL, SUB, SUBS, FSUB, DSUB, LDSUB),
+  REP5 (INSN_EL, MUL, MULS, FMUL, DMUL, LDMUL),
+  REP7 (INSN_EL, DIV, DIVS, UDIV, UDIVS, FDIV, DDIV, LDDIV),
+  REP4 (INSN_EL, MOD, MODS, UMOD, UMODS),
+  REP6 (INSN_EL, AND, ANDS, OR, ORS, XOR, XORS),
+  REP6 (INSN_EL, LSH, LSHS, RSH, RSHS, URSH, URSHS),
+  REP5 (INSN_EL, EQ, EQS, FEQ, DEQ, LDEQ),
+  REP5 (INSN_EL, NE, NES, FNE, DNE, LDNE),
+  REP7 (INSN_EL, LT, LTS, ULT, ULTS, FLT, DLT, LDLT),
+  REP7 (INSN_EL, LE, LES, ULE, ULES, FLE, DLE, LDLE),
+  REP7 (INSN_EL, GT, GTS, UGT, UGTS, FGT, DGT, LDGT),
+  REP7 (INSN_EL, GE, GES, UGE, UGES, FGE, DGE, LDGE),
+  REP8 (INSN_EL, ADDO, ADDOS, SUBO, SUBOS, MULO, MULOS, UMULO, UMULOS),
+  REP5 (INSN_EL, JMP, BT, BTS, BF, BFS),
+  REP5 (INSN_EL, BEQ, BEQS, FBEQ, DBEQ, LDBEQ),
+  REP5 (INSN_EL, BNE, BNES, FBNE, DBNE, LDBNE),
+  REP7 (INSN_EL, BLT, BLTS, UBLT, UBLTS, FBLT, DBLT, LDBLT),
+  REP7 (INSN_EL, BLE, BLES, UBLE, UBLES, FBLE, DBLE, LDBLE),
+  REP7 (INSN_EL, BGT, BGTS, UBGT, UBGTS, FBGT, DBGT, LDBGT),
+  REP7 (INSN_EL, BGE, BGES, UBGE, UBGES, FBGE, DBGE, LDBGE),
+  REP2 (INSN_EL, BO, UBO),
+  REP2 (INSN_EL, BNO, UBNO),
+  INSN_EL (LADDR),
+  INSN_EL (JMPI),
+  REP4 (INSN_EL, CALL, INLINE, INLAY, JCALL),
+  INSN_EL (SWITCH),
+  INSN_EL (RET),
+  INSN_EL (JRET),
+  INSN_EL (ALLOCA),
+  REP2 (INSN_EL, BSTART, BEND),
+  INSN_EL (VA_ARG),
+  INSN_EL (VA_BLOCK_ARG),
+  INSN_EL (VA_START),
+  INSN_EL (VA_END),
+  INSN_EL (LABEL),
+  INSN_EL (UNSPEC),
+  REP3 (INSN_EL, PRSET, PRBEQ, PRBNE),
+  INSN_EL (USE),
+  INSN_EL (PHI),
+  INSN_EL (INVALID_INSN),
+  INSN_EL (INSN_BOUND),
+} MIR_insn_code_t;
+typedef enum {
+  REP8 (TYPE_EL, I8, U8, I16, U16, I32, U32, I64, U64),
+  REP3 (TYPE_EL, F, D, LD),
+  REP2 (TYPE_EL, P, BLK),
+  TYPE_EL (RBLK) = TYPE_EL (BLK) + MIR_BLK_NUM,
+  REP2 (TYPE_EL, UNDEF, BOUND),
+} MIR_type_t;
+typedef union {
+  int64_t i;
+  uint64_t u;
+  float f;
+  double d;
+  long double ld;
+} MIR_imm_t;
+typedef struct {
+  MIR_type_t type : 8;
+  MIR_scale_t scale;
+  MIR_alias_t alias;
+  MIR_alias_t nonalias;
+  uint32_t nloc;
+  MIR_reg_t base, index;
+  MIR_disp_t disp;
+} MIR_mem_t;
+typedef enum {
+  REP8 (OP_EL, UNDEF, REG, VAR, INT, UINT, FLOAT, DOUBLE, LDOUBLE),
+  REP6 (OP_EL, REF, STR, MEM, VAR_MEM, LABEL, BOUND),
+} MIR_op_mode_t;
+struct MIR_str {
+  size_t len;
+  const char *s;
+};
+typedef struct {
+  void *data;
+  MIR_op_mode_t mode : 8;
+  MIR_op_mode_t value_mode : 8;
+  union {
+    MIR_reg_t reg;
+    MIR_reg_t var;
+    int64_t i;
+    uint64_t u;
+    float f;
+    double d;
+    long double ld;
+    MIR_item_t ref;
+    MIR_str_t str;
+    MIR_mem_t mem;
+    MIR_mem_t var_mem;
+    MIR_label_t label;
+  } u;
+} MIR_op_t;
+struct MIR_insn {
+  void *data;
+  DLIST_LINK (MIR_insn_t) insn_link;
+  MIR_insn_code_t code : 32;
+  unsigned int nops : 32;
+  MIR_op_t ops[1];
+};
+typedef struct MIR_var {
+  MIR_type_t type;
+  const char *name;
+  size_t size;
+} MIR_var_t;
+typedef struct MIR_func {
+  const char *name;
+  MIR_item_t func_item;
+  size_t original_vars_num;
+  DLIST (MIR_insn_t) insns, original_insns;
+  uint32_t nres, nargs, last_temp_num, n_inlines;
+  MIR_type_t *res_types;
+  char vararg_p;
+  char expr_p;
+  char jret_p;
+  VARR (MIR_var_t) * vars;
+  VARR (MIR_var_t) * global_vars;
+  void *machine_code;
+  void *call_addr;
+  void *internal;
+  struct MIR_lref_data *first_lref;
+} *MIR_func_t;
+typedef struct MIR_proto {
+  const char *name;
+  uint32_t nres;
+  MIR_type_t *res_types;
+  char vararg_p;
+  VARR (MIR_var_t) * args;
+} *MIR_proto_t;
+typedef struct MIR_data {
+  const char *name;
+  MIR_type_t el_type;
+  size_t nel;
+  union {
+    long double d;
+    uint8_t els[1];
+  } u;
+} *MIR_data_t;
+typedef struct MIR_ref_data {
+  const char *name;
+  MIR_item_t ref_item;
+  int64_t disp;
+  void *load_addr;
+} *MIR_ref_data_t;
+typedef struct MIR_lref_data {
+  const char *name;
+  MIR_label_t label;
+  MIR_label_t label2;
+  MIR_label_t orig_label, orig_label2;
+  int64_t disp;
+  void *load_addr;
+  struct MIR_lref_data *next;
+} *MIR_lref_data_t;
+typedef struct MIR_expr_data {
+  const char *name;
+  MIR_item_t expr_item;
+  void *load_addr;
+} *MIR_expr_data_t;
+typedef struct MIR_bss {
+  const char *name;
+  uint64_t len;
+} *MIR_bss_t;
+typedef enum {
+  REP8 (ITEM_EL, func, proto, import, export, forward, data, ref_data, lref_data),
+  REP2 (ITEM_EL, expr_data, bss),
+} MIR_item_type_t;
+struct MIR_item {
+  void *data;
+  MIR_module_t module;
+  DLIST_LINK (MIR_item_t) item_link;
+  MIR_item_type_t item_type;
+  MIR_item_t ref_def;
+  void *addr;
+  char export_p;
+  char section_head_p;
+  union {
+    MIR_func_t func;
+    MIR_proto_t proto;
+    MIR_name_t import_id;
+    MIR_name_t export_id;
+    MIR_name_t forward_id;
+    MIR_data_t data;
+    MIR_ref_data_t ref_data;
+    MIR_lref_data_t lref_data;
+    MIR_expr_data_t expr_data;
+    MIR_bss_t bss;
+  } u;
+};
+struct MIR_module {
+  void *data;
+  const char *name;
+  DLIST (MIR_item_t) items;
+  DLIST_LINK (MIR_module_t) module_link;
+  uint32_t last_temp_item_num;
+};
+typedef union {
+  MIR_insn_code_t ic;
+  void *a;
+  int64_t i;
+  uint64_t u;
+  float f;
+  double d;
+  long double ld;
+} MIR_val_t;
+struct MIR_code_reloc {
+  size_t offset;
+  const void *value;
+};
+typedef struct {
+  MIR_type_t type;
+  size_t size;
+} _MIR_arg_desc_t;

@@ -1,0 +1,22 @@
+#!/bin/sh
+# tools/mir-abi <mir.h>: print the parts of mir.h a consumer compiles into its
+# own object code: every enum, struct and union definition (MIR_insn_code_t,
+# MIR_type_t, MIR_op_mode_t, MIR_op_t and the structs it holds, ...). The C API
+# table's MIR ABI number (design D21) must change whenever this output does;
+# tools/vendor.sh compares it across a MIR update. Comments and blank lines
+# are dropped, so a reworded comment is not an ABI change.
+set -eu
+sed -e 's|/\*.*\*/||g' -e 's|//.*$||' "$1" | awk '
+  # A multi-line comment (start without end on one line) is skipped.
+  incomment { if (index($0, "*/")) { incomment = 0; sub(/.*\*\//, "") } else next }
+  /\/\*/ { incomment = 1; sub(/\/\*.*/, "") }
+  !inblock && /^[ \t]*(typedef[ \t]+)?(enum|struct|union)[ \t]+[A-Za-z_0-9]*[ \t]*\{/ { inblock = 1; depth = 0 }
+  !inblock && /^[ \t]*typedef[ \t]+(enum|struct|union)[ \t]*\{/ { inblock = 1; depth = 0 }
+  inblock {
+    line = $0; gsub(/[ \t]+$/, "", line)
+    if (line != "") print line
+    o = gsub(/\{/, "{", line); c = gsub(/\}/, "}", line)
+    depth += o - c
+    if (depth <= 0 && $0 ~ /;[ \t]*$/) inblock = 0
+  }
+'

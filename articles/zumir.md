@@ -99,9 +99,11 @@ f(1, 2)
 ## Native code or the interpreter
 
 Where MIR has no code generator for the CPU, zumir falls back to MIR’s
-interpreter. Results are the same, only slower. `zumir_tier()` says
-which tier this session uses, and `zumir_info()` says why. You can also
-ask for the interpreter yourself.
+interpreter. Results are the same, only slower.
+[`zumir_tier()`](https://pedrobtz.github.io/zumir/reference/zumir_info.md)
+says which tier this session uses, and
+[`zumir_info()`](https://pedrobtz.github.io/zumir/reference/zumir_info.md)
+says why. You can also ask for the interpreter yourself.
 
 ``` r
 

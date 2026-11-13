@@ -152,12 +152,12 @@ hand.</p>
 </h2>
 <p>Where MIR has no code generator for the CPU, zumir falls back to
 MIR’s interpreter. Results are the same, only slower.
-<code>zumir_tier()</code> says which tier this session uses, and
-<code>zumir_info()</code> says why. You can also ask for the interpreter
+<code><a href="../reference/zumir_info.html">zumir_tier()</a></code> says which tier this session uses, and
+<code><a href="../reference/zumir_info.html">zumir_info()</a></code> says why. You can also ask for the interpreter
 yourself.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu">zumir_tier</span><span class="op">(</span><span class="op">)</span></span>
-<span><span class="fu">zumir_info</span><span class="op">(</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/zumir_info.html">zumir_tier</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="fu"><a href="../reference/zumir_info.html">zumir_info</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu">rfunction</span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
 </div>

@@ -331,6 +331,24 @@ status directly. `zumir_ctx_new()` and `zumir_ctx_free()` are recovery
 points too: a failure inside `MIR_init2` returns `NULL` with a status.
 Freeing a context twice, or freeing `NULL`, does nothing.
 
+**Built in Stage 5 (2026-11-13).** `zumir_api_v1` holds its four fixed
+fields, six `zumir_` entries and 41 `MIR_` shims (`inst/include/zumir.h`,
+`src/zumir_api.c`); the header maps MIR's names onto the table with
+macros, so consumer code reads as MIR code, and ships the vendored MIR
+headers it needs under `inst/include/zumir/`, kept identical by
+`tools/verify-vendor`. MIR's variadic constructors (`MIR_new_insn`,
+`MIR_new_call_insn`, `MIR_new_ret_insn`, `MIR_new_func`, `MIR_new_proto`
+and the jcall form) are variadic shims that read the operands into a
+bounded array (64) and call MIR's array form. On a failed context a shim
+returns zero for a register or operand and a static zeroed placeholder
+for an item, module, function or instruction, never NULL, so
+`fi->u.func` in consumer code cannot crash. A failed context is released
+from its arena and never finished by `MIR_finish`: a link failure on a
+context whose generator had started crashed it. The table's MIR ABI
+number starts at 1, and `tools/mir-abi.txt` records the number its text
+was taken at; `tools/vendor.sh` refuses a changed text until the number
+in `zumir.h` has gone up.
+
 **Helpers for lowering.** `zumir.h` also carries a small emitter for
 straight-line `double` code (D13): new registers, loads and stores at an
 offset from a pointer argument (`y[i]`, `par[k]`), the four operations,
@@ -598,6 +616,14 @@ f <- mir_function("
      endfunc
      endmodule", "add")
 f(1, 2)                      # 3
+# Built in Stage 5 (2026-11-13): the function must be exported by its
+# module and take and return numbers only (i8 to u64, f, d; at most one
+# result). A second module holds a wrapper of one fixed C signature that
+# converts each 8-byte argument slot to the parameter's type and widens the
+# result, so R calls every function the same way on either tier.
+# 8- to 32-bit results are R integers, 64-bit and u32 doubles; a value R
+# cannot hold exactly (an i32 of INT_MIN, a 64-bit integer past 2^53) is
+# an error, not a rounding. A tier that does not run is a zumir_tier_error.
 
 ss <- rfunction(function(x) {
   s <- 0
@@ -817,7 +843,15 @@ decides it and the maintainer may overturn it.
 - **D6 (C).** The import resolver resolves a fixed list: the C math
   library, `memcpy`, `memmove`, `memset`, `memcmp`, `strlen`. Any other
   external name is a link error, so a function behaves the same on
-  every platform and cannot reach into R's internals by name.
+  every platform and cannot reach into R's internals by name. The list
+  as built in Stage 5 (`src/zumir_imports.c`, 2026-11-13): the double
+  functions of `math.h` (trigonometric, hyperbolic, exponential and
+  logarithmic, `pow`, `sqrt`, `cbrt`, `hypot`, `erf`, `erfc`, `lgamma`,
+  `tgamma`, rounding, `fmod`, `remainder`, `copysign`, `nextafter`,
+  `fdim`, `fmax`, `fmin`, `fma`, `ldexp`, `frexp`, `modf`) and the five
+  string functions; no float variants. Names are loaded with
+  `MIR_load_external` just before linking, with no import resolver
+  behind them.
 - **D7 (C).** x86-64 and aarch64 are the tested targets; the other three
   MIR targets are built when the host matches and are not promised.
 - **D8 (M), 2026-11-12.** The name is `zumir`: `zu` and the library's
@@ -889,7 +923,11 @@ decides it and the maintainer may overturn it.
   no contradiction: this lowering is zumir's own code, and no user
   source names an import. The import resolver, with D6's list,
   consumer imports (D14) and this one, is built with the C API, before
-  `rfunction()` and `c2mir` need it.
+  `rfunction()` and `c2mir` need it. Built in Stage 5 (2026-11-13): the
+  ports are R's `myfmod`, `myfloor` and the `do_summary` combine step for
+  doubles, and they use `long double` only when R does, which R's headers
+  do not say: `.onLoad` passes `capabilities("long.double")` in, so a
+  `noLD` R gets the double version, as R itself computes.
 - **D19 (C), 2026-11-13.** `c2mir` stays the front end of `cfunction()`.
   If, in its stage, it fails the `c-tests` subset that `cfunction()`'s
   numeric functions need, or the fuzz target finds crashes upstream does

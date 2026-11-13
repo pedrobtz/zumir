@@ -65,7 +65,21 @@ struct zumir_arena {
   size_t bytes, blocks;
   int failed;    /* an allocation failed: never MIR_finish */
   int map_errno; /* errno of the last code mapping refused, or 0 */
+  void *owner;   /* the zumir context this MIR context belongs to */
 };
+
+void zumir_arena_mark_failed(zumir_arena *a) {
+  if (a != NULL) a->failed = 1;
+}
+
+void zumir_arena_set_owner(zumir_arena *a, void *owner) {
+  a->owner = owner;
+}
+
+void *zumir_mir_owner(MIR_context_t ctx) {
+  /* alloc is the arena's first member, and zumir_mir_new() gave MIR it. */
+  return ((zumir_arena *) (void *) MIR_get_alloc(ctx))->owner;
+}
 
 int zumir_arena_map_errno(const zumir_arena *a) {
   return a->map_errno;

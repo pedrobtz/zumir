@@ -201,7 +201,7 @@ static compiled compile_model(const model_t *m, int tier) {
   zumir_trap_push(&t);
   if (setjmp(t.env) == 0) {
     ctx = zumir_mir_new(&arena);
-    if (tier == ZUMIR_TIER_NATIVE) {
+    if (tier == ZUMIR_ITIER_NATIVE) {
       MIR_gen_init(ctx);
       gen = 1;
       MIR_gen_set_optimize_level(ctx, 2);
@@ -211,7 +211,7 @@ static compiled compile_model(const model_t *m, int tier) {
     MIR_finish_module(ctx);
     MIR_module_t mod = DLIST_TAIL(MIR_module_t, *MIR_get_module_list(ctx));
     MIR_load_module(ctx, mod);
-    MIR_link(ctx, tier == ZUMIR_TIER_NATIVE ? MIR_set_gen_interface : MIR_set_interp_interface,
+    MIR_link(ctx, tier == ZUMIR_ITIER_NATIVE ? MIR_set_gen_interface : MIR_set_interp_interface,
              NULL);
     for (MIR_item_t it = DLIST_HEAD(MIR_item_t, mod->items); it != NULL;
          it = DLIST_NEXT(MIR_item_t, it))
@@ -289,8 +289,8 @@ SEXP zumir_test_threads(SEXP model, SEXP s_nthreads, SEXP s_nsub, SEXP s_nsteps,
       nsteps = Rf_asInteger(s_nsteps);
   const char *mode = CHAR(STRING_ELT(s_mode, 0));
   if (nth < 1 || nth > 64 || nsub < 1 || nsteps < 1) Rf_error("bad sizes");
-  int tier = strcmp(mode, "native") == 0 ? ZUMIR_TIER_NATIVE : ZUMIR_TIER_INTERP;
-  int own = strcmp(mode, "interp_per_thread") == 0 ? ZUMIR_TIER_INTERP : -1;
+  int tier = strcmp(mode, "native") == 0 ? ZUMIR_ITIER_NATIVE : ZUMIR_ITIER_INTERP;
+  int own = strcmp(mode, "interp_per_thread") == 0 ? ZUMIR_ITIER_INTERP : -1;
   double *pars = (double *) R_alloc((size_t) nsub * m->npar, sizeof(double));
   double *serial = (double *) R_alloc((size_t) nsub * m->neq, sizeof(double));
   double *par = (double *) R_alloc((size_t) nsub * m->neq, sizeof(double));

@@ -12,22 +12,62 @@
 
 #include "zumir_mir.h"
 
+#include "zumir_imports.h"
+
+/* zumir_rctx_compile()'s statuses: inst/include/zumir.h's ZUMIR_OK and
+ * ZUMIR_E_*. */
+enum {
+  ZUMIR_ST_OK = 0,
+  ZUMIR_ST_MIR = 1,
+  ZUMIR_ST_FAILED = 2,
+  ZUMIR_ST_NO_TIER = 3,
+  ZUMIR_ST_NOT_FOUND = 4,
+  ZUMIR_ST_ARG = 5,
+  ZUMIR_ST_NO_MEMORY = 6
+};
+
 #if ZUMIR_HAVE_MIR
 #include "zumir_mir_api.h"
 
-enum { ZUMIR_TIER_NATIVE = 0, ZUMIR_TIER_INTERP = 1 };
+/* Tiers inside zumir; the C API's ZUMIR_TIER_AUTO/NATIVE/INTERP are 0/1/2
+ * and are mapped at the table. */
+enum { ZUMIR_ITIER_NATIVE = 0, ZUMIR_ITIER_INTERP = 1 };
 
 typedef struct zumir_rctx {
   MIR_context_t ctx;
   zumir_arena *arena;
-  int tier;   /* ZUMIR_TIER_NATIVE or ZUMIR_TIER_INTERP */
+  int tier;   /* ZUMIR_ITIER_NATIVE or ZUMIR_ITIER_INTERP; -1 not chosen yet */
   int gen;    /* MIR_gen_init was called */
   int failed; /* MIR raised: only freeing does anything now */
   int type;   /* the error's MIR_error_type_t */
   char message[1024];
   int map_errno; /* errno of a refused code mapping, if any */
   void *fn;      /* the linked function, once linked */
+  int imports;   /* ZUMIR_IMPORTS_* */
+  zumir_import_entry *extra; /* the consumer's imports (D14) */
+  size_t nextra, cap_extra;
+  /* mir_function()'s signature, once built */
+  int nargs, nres;
+  int *arg_types, res_type;
 } zumir_rctx;
+
+/* A new zumir context with its MIR context, outside R: for the C API.
+ * Returns NULL with *status set. tier is -1 (chosen at compile) or a
+ * ZUMIR_ITIER_*. */
+zumir_rctx *zumir_rctx_new(int tier, int imports, int *status);
+void zumir_rctx_free(zumir_rctx *z);
+/* Records the trap's error in z: z is failed from now on. */
+void zumir_rctx_fail(zumir_rctx *z, const void *trap);
+/* Loads `module`, links it on `tier` (ZUMIR_ITIER_*, or -1 for the session's
+ * default) with the context's imports, and returns the address of function
+ * `name` in it, or NULL with *status set. */
+void *zumir_rctx_compile(zumir_rctx *z, MIR_module_t module, const char *name, int tier,
+                         int *tier_out, int *status);
+/* 1 when every capability of `tier` held in the load-time probe. */
+int zumir_probe_tier_ok(int tier);
+/* An external pointer of class zumir_context owning a new context on
+ * `tier` with import set `imports`, or a zumir_status. */
+SEXP zumir_rctx_new_sexp(int tier, int imports);
 
 typedef void (*zumir_body)(zumir_rctx *z, void *arg);
 

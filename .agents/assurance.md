@@ -44,9 +44,9 @@ call to r-actions.
 | fuzz-reach    | gap #8  |                    |
 
 Stage 1 (#3) wires `native-checks.yaml`; Stage 3 (#5) wires
-`alloc-failure`, with the error trap it exercises; Stage 7 (#8) wires
+`alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
-Stage 10 (#11) schedules `mutation` over the C tests.
+Stage 11 (#11) schedules `mutation` over the C tests.
 
 ## Boundaries
 
@@ -77,11 +77,13 @@ One row per boundary the package crosses. An oracle knows the answer:
 | `mir_function()`: MIR text in | MIR's `run-test` round trip (text read, written back, compared) on `mir-tests/*.mir`, and hand-written expected results for the ones that return a value | gap #19 |
 | c2mir: C source to MIR | the `c-tests` corpus by its own rules (272 `.expect` outputs, exit status for the rest), with a test-only import list for printf, abort and exit | gap #20 |
 | c2mir diagnostics | an error planted at a known line and column is reported there, in the user's source, not the prelude | gap #8: tests/testthat/test-c2mir-errors.R |
-| Prelude and import resolver (D6) | R's own exp, log, sqrt and the rest on the same inputs; a name outside D6 is a link error | gap #8: tests/testthat/test-prelude.R |
+| Import resolver (D6, D14, D18) | R's own exp, log, sqrt and the rest on the same inputs, bitwise; the C ports of R's %%, %/%, min and max against R; a name outside a context's list is a link error | gap #7: tests/testthat/test-imports.R |
+| c2mir prelude | every declared name links and returns what R's function returns; a test-only import is invisible to `cfunction()` | gap #8: tests/testthat/test-prelude.R |
 | `cfunction()` marshalling | a reference written in R for every example and every argument and return type | gap #9: tests/testthat/test-cfunction.R |
 | `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)` and a sign-of-zero check | gap #21 |
 | `rfunction()`, random functions | R on generated functions within the subset, on random inputs, seed printed | gap #17: tests/testthat/test-rfunction-random.R |
 | `rfunction()`, refusals | each construct outside §4.6 refused with its name | gap #17: tests/testthat/test-rfunction-refuse.R |
+| `rfunction()` through the emitter | the MIR-text route: the same module printed with `MIR_output`, and the same results | gap #26: tests/testthat/test-rfunction-routes.R |
 <!-- markdownlint-enable MD013 -->
 
 ## Objects
@@ -111,5 +113,6 @@ One row per limit the package enforces. "Straddled by" is the test of
 | `cfunction()` length argument against `length(x)` | elements | gap #9: tests/testthat/test-cfunction.R |
 | Vector length against C `int` (`.Machine$integer.max`) | elements | gap #24 |
 | `rfunction()` index range, 1 to `length(x)` | elements | gap #17: tests/testthat/test-rfunction-errors.R |
-| `rfunction()` `numeric()` size, a whole number from 0 | elements | gap #17: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` `numeric()` size and `seq_len()` argument, a whole number from 0 | elements | gap #17: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` integer counter arithmetic, `.Machine$integer.max` | integer value | gap #17: tests/testthat/test-rfunction-errors.R |
 <!-- markdownlint-enable MD013 -->

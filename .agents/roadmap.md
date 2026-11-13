@@ -5,11 +5,12 @@ Target: v0.1.0, the first CRAN release.
 Tracking: [v0.1.0 (#1)](https://github.com/pedrobtz/zumir/issues/1), with one
 sub-issue per stage; [CRAN-submission (#15)](https://github.com/pedrobtz/zumir/issues/15).
 
-Moved here from the design's §10 on 2026-11-13. The design's six stages
-become Stages 0, 2 to 5 and 7 to 9 below, with the portfolio's identity, assurance
-and closing stages around them. The spike's findings split the design's
-old Stage 2 (error trap, allocators, tier detection) in two, and
-`rfunction()` (design D15) adds Stage 6.
+Moved here from the design's §10 on 2026-11-13, with the portfolio's
+identity, assurance and closing stages around it. The spike's findings
+split the design's error trap from its contexts and tiers; `rfunction()`
+(D15, D17) adds Stages 6 and 7; the import resolver moved into Stage 5
+(D18). Revised 2026-11-13 after an independent review of both files and
+the assurance inventory (`.agents/assurance.md`, issues #18 to #24).
 
 ## Stages
 
@@ -20,15 +21,16 @@ old Stage 2 (error trap, allocators, tier detection) in two, and
 | 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | | |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | | |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | | |
-| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | quick | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
+| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
 | 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
-| 7 | [c2mir, prelude and import resolver](#stage-7--c2mir-prelude-and-import-resolver) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
-| 8 | [cfunction()](#stage-8--cfunction) | quick | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
-| 9 | [Benchmarks and README](#stage-9--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
-| 10 | [Assurance](#stage-10--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
-| 11 | [Full CI](#stage-11--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
-| 12 | [v0.1.0 readiness](#stage-12--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
-| 13 | [Review](#stage-13--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
+| 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | | |
+| 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
+| 9 | [cfunction()](#stage-9--cfunction) | quick | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
+| 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
+| 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
+| 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
+| 13 | [v0.1.0 readiness](#stage-13--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
+| 14 | [Review](#stage-14--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
 
 Oracles, chosen here for every boundary:
 
@@ -158,11 +160,19 @@ pass on each.
 - The patch queue in `tools/patches/`, each offered upstream (D12): the
   Windows warnings and `VirtualFree` (#496), the stray semicolons,
   `MIR_DIRECT_DISPATCH`, `-fsigned-char` removed, hidden visibility for
-  every `MIR_`/`_MIR_` symbol. Check first whether upstream #490 is in
-  the pinned commit.
-- `tools/ci/platform.sh` runs MIR's own c2mir-free tests on the vendored,
-  patched copy, built standalone without R, on every runner; a container
-  job does the same in the r-devel images.
+  every `MIR_`/`_MIR_` symbol. Upstream pull request #490 ("Make mir.h
+  self-contained in strict ISO C", merged 2026-10-23) may already cover
+  part of the `-pedantic` work: check whether the pinned commit has it
+  before writing that patch.
+- The build on a CPU MIR does not target: MIR left out (§4.2 "Other
+  CPUs"), so the package installs and reports no target.
+- `tools/ci/platform.sh` runs MIR's own tests on the vendored, patched
+  copy, built standalone without R, on every runner of `platforms.yml`
+  (macOS arm64 and x86-64, Windows, Linux x86-64 and aarch64): `adt-test
+  simplify-test io-test scan-test interp-test readme-example-test` and
+  the `gen-test` targets except `inline-test`, which builds `c2mir`
+  (Stage 8). No job of its own: the r-devel containers are covered by
+  R CMD check's `containers` job running the package's tests.
 - An `nm -u` guard in CI that fails on `exit`, `abort`, `printf`, `puts`,
   `stderr`, `stdout`, `sprintf`, `rand`. It is expected to fail until
   Stage 3; it is wired here with an allow-list that Stage 3 empties.
@@ -175,13 +185,17 @@ pass on each.
   plus exactly the queue), in CI.
 - Symbol hiding: `nm` on the shared object shows no `MIR_` export, in
   `tools/ci/platform.sh`.
+- No target: the package built with MIR forced out (an environment
+  variable read by the build) installs, and `zumir_info()` and every
+  entry report no target with a classed error, in
+  `tests/testthat/test-no-target.R`, on one Linux leg.
 
 **Exit criteria.**
 
 - R CMD check on the full profile has no compiler-diagnostic WARNING on
   any leg, including Windows (Rtools) and gcc 16 with `-pedantic`; the
   only allowed warning is "checking compiled code", which Stage 3 removes.
-- MIR's own tests pass on every runner and container.
+- MIR's own tests pass on every runner.
 - `verify-vendor` passes; every patch has an upstream issue or pull request
   linked in `PROVENANCE`.
 
@@ -210,11 +224,14 @@ account.
   that called MIR, thread-local.
 - The `nm -u` guard's allow-list emptied.
 - `alloc-failure.yml` wired.
+- An internal test entry point, `.Call(zumir_test_invalid, kind, n)`,
+  that builds and fails a module of each kind through the trap; no R API
+  for modules exists until Stages 4 and 5.
 
 **Tests.**
 
 - Three invalid modules (a syntax error, an operand type error, an
-  undefined import), each 10³ times through the entry points: a
+  undefined import), each 10³ times through the internal entry point: a
   `zumir_error` condition each time, the session alive, RSS flat, in
   `tests/testthat/test-error-trap.R` (run in a child R process through
   `system2()`, so a crash fails the test rather than the run).
@@ -246,14 +263,20 @@ detected without crashing, and the session's tier is known and reported.
 
 **Work.**
 
+- First, Q5 decided by the maintainer and written into the design. If it
+  chooses the dual-mapped allocator (a), split this stage in the roadmap
+  before starting: that patch touches every code write in `mir.c` and is
+  a pull request of its own.
 - Contexts created with `MIR_init2` and counting allocators; finalizers
   free contexts and their code.
 - The code-memory patch (D11): every `mem_map`/`mem_protect` result
   checked.
 - Q5's answer implemented: a dual-mapped code allocator if (a) is
   chosen.
-- The tier probe (§4.4); `zumir_info()` (MIR commit, targets, tier and
-  why, patches, memory); `zumir_tier()`.
+- The tier probe (§4.4), in `.onLoad` before anything else maps code,
+  and able to tell a missing `MAP_JIT` entitlement on macOS;
+  `zumir_info()` (MIR commit, targets, tier and why, patches, memory);
+  `zumir_tier()`.
 
 **Tests.**
 
@@ -268,6 +291,10 @@ detected without crashing, and the session's tier is known and reported.
 - Threads: native code compiled once on 8 threads, and the interpreter with
   a context per thread (D10), both against the serial result bitwise, in
   `tests/testthat/test-threads.R`.
+- Contexts out of order: free twice, use after the finalizer, `readRDS`
+  of a saved one, use in a forked child, an R error between two MIR calls;
+  each ends in its documented state ([#22](https://github.com/pedrobtz/zumir/issues/22)), in
+  `tests/testthat/test-context-sequences.R`.
 
 **Exit criteria.**
 
@@ -285,7 +312,8 @@ D10, D11, Q5.
 **Issue.** [#7](https://github.com/pedrobtz/zumir/issues/7), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
 
-**CI.** `quick`.
+**CI.** `full — the first R_RegisterCCallable table and a consumer
+package built against it on every platform leg`.
 
 **Goal.** A consumer package can link `zumir`, build MIR through the API
 table and call the result; R users can run MIR text.
@@ -297,16 +325,26 @@ table and call the result; R users can run MIR text.
 - `mir_function()`.
 - The double-expression emitter in `zumir.h` (D13), moved from the
   spike's emitter; `zumir_import()` for consumer imports (D14).
+- The import resolver, moved here from c2mir's stage because
+  `rfunction()` needs it first (D18): D6's list for `cfunction()`,
+  consumer imports, and `rfunction()`'s internal list with `R_pow` and
+  the C ports of R's `%%`, `%/%`, `min` and `max`.
 - A consumer test package under `tests/consumer/`, built in CI against the
   installed `zumir`, that emits the three spike right-hand sides.
 
 **Tests.**
 
-- The consumer's three right-hand sides against the same functions in C,
-  bitwise on x86-64 and to one ulp on aarch64, in the consumer's tests.
-- `mir_function()` on the design's `add` example and on MIR's own
-  `mir-tests/*.mir` that return a value, against their expected results, in
-  `tests/testthat/test-mir-function.R`.
+- The consumer's three right-hand sides against the same functions in C
+  built with `-ffp-contract=off`, bitwise on every leg ([#18](https://github.com/pedrobtz/zumir/issues/18)), in
+  the consumer's tests.
+- `mir_function()` on the design's `add` example, and on MIR's own
+  `mir-tests/*.mir` by `run-test`'s round trip plus hand-written expected
+  results ([#19](https://github.com/pedrobtz/zumir/issues/19)), in `tests/testthat/test-mir-function.R`.
+- The resolver: each D6 math function returns what R's own function
+  returns on the same inputs, bitwise; a name outside a context's list is
+  a link error with class `zumir_error`; the C ports of `%%`, `%/%`,
+  `min` and `max` against R on negative, zero, non-finite and `NA`
+  operands, in `tests/testthat/test-imports.R`.
 - The header compiles alone as C99 with `-pedantic`, in CI.
 - The table only grows: a test that the version field is first and `1`, in
   the consumer package.
@@ -322,64 +360,118 @@ table and call the result; R users can run MIR text.
 - Every Tests line exists and was seen to fail.
 
 **Design.** [§4.3](design.md#43-the-c-api), [§5](design.md#5-public-r-api-complete-v010-surface)
-(`mir_function()`), D3, D13, D14.
+(`mir_function()`), D3, D6, D13, D14, D18.
 
 ## Stage 6 — rfunction()
 
 **Issue.** [#17](https://github.com/pedrobtz/zumir/issues/17), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
 
-**CI.** `quick`: R code over Stage 5's emitter, no new native boundary.
+**CI.** `quick`: R code that emits MIR text, compiled by Stage 5's
+`mir_function()` path and resolver; no new native code.
 
 **Goal.** A numeric R function in §4.6's subset compiles to native code
-and returns exactly what R returns.
+through MIR text, and returns exactly what R returns.
 
 **Work.**
 
-- The R walker: the subset check, argument shapes (Q6), locals and
-  `numeric()` sizes; compile errors naming the construct and its
-  position.
-- Lowering through the emitter, with the status the generated code
-  returns for run-time errors (`if (NA)`, an index out of range).
-- The wrapper: `as.double()` at the boundary, sizes evaluated in R,
-  outputs allocated, one `.Call`; `tier =`.
+- The R walker: the subset check, argument shapes (Q6, including
+  `seq_along()`), logical and integer locals, `numeric()` sizes; compile
+  errors naming the construct and its position.
+- Lowering to MIR text, with the status word the generated code returns
+  for run-time errors and warnings (§4.6).
+- The wrapper: `double` arguments checked, sizes evaluated in R, outputs
+  allocated, one call, errors and warnings raised from the status;
+  `tier =`.
 - A generator of random functions within the subset, for the
-  differential test.
+  differential test, with a size and count that fit CRAN's time budget
+  under `skip_on_cran()` for the large run.
 
-**Tests.**
+**Tests.** Every comparison with R uses the [#21](https://github.com/pedrobtz/zumir/issues/21) helper:
+`identical(num.eq = FALSE)`, a sign-of-zero check, and only the NA-or-NaN
+case §4.6 allows.
 
-- Each construct of §4.6 (operators, `%%` and `%/%` on negative and
-  non-finite operands, `^`, `min`/`max` with `NA` and `NaN`, `&&`/`||`
-  with `NA`, every loop form, `break`/`next`) against R on chosen inputs
-  (`NA`, `NaN`, `±Inf`, `-0`, subnormals, empty vectors), `identical()`,
-  in `tests/testthat/test-rfunction-ops.R`.
-- Random functions from the generator, on random inputs, against R,
-  `identical()`, with the seed printed on failure, in
-  `tests/testthat/test-rfunction-random.R`.
-- Run-time errors: `if (NA)`, `while (NA)`, `NA && x` give R's message
-  with class `zumir_error`, in `tests/testthat/test-rfunction-errors.R`.
-- D16's deviations: an index at `0`, `length + 1`, `NA` and `1.5`, and a
-  size of `-1`, `NA` and `2.5`, each an error rather than R's answer, in
+- Each construct against R on chosen inputs (`NA`, `NaN`, `±Inf`, `-0`,
+  subnormals, empty vectors): the operators; `^`; `%%` and `%/%` on
+  negative, zero and non-finite operands; two-argument `min`/`max` with
+  `NA` and `NaN`; `&&`/`||` with `NA` (`NA && FALSE` is `FALSE`); every
+  loop form, `1:0` counting down, `break`/`next`; logical locals in
+  arithmetic; in `tests/testthat/test-rfunction-ops.R`.
+- Random functions against R, on random inputs, seed printed on
+  failure: at least 10⁴ functions per leg in CI, a few hundred on CRAN,
+  in `tests/testthat/test-rfunction-random.R`.
+- Run-time errors: `if (NA)` and `while (NA)` with R's message, `if
+  (NaN)` with R's other message, both of class `zumir_error`, in
+  `tests/testthat/test-rfunction-errors.R`.
+- Warnings: `log(-1)`, `sqrt(-1)` and `%%`'s loss of accuracy give R's
+  warning once per call, in the same file.
+- D16's errors where R would answer differently, each straddled: an
+  index at `0`, `1`, `length`, `length + 1`, `NA` and `1.5`; a `numeric()`
+  size and a `seq_len()` argument at `-1`, `0`, `NA` and `2.5`; `a:b` with
+  an `NA` or fractional bound; integer counter overflow at
+  `46340L * 46340L` and `46341L * 46341L`; a non-`double` argument; in
   the same file.
-- Refusals: every construct outside the subset (a call to another R
-  function, `<<-`, a list, a data frame, `repeat`, string values)
-  refused with its name, in
+- A vector argument longer than `.Machine$integer.max`, refused before
+  any data pointer is taken, with an ALTREP sequence ([#24](https://github.com/pedrobtz/zumir/issues/24)), in
+  the same file.
+- Refusals at compile time: a call to another R function, `<<-`, a list,
+  a data frame, `repeat`, string values, a result R would type as
+  integer or logical, each with its name, in
   `tests/testthat/test-rfunction-refuse.R`.
 - Native against interpreter: identical on the random functions, in
   `tests/testthat/test-rfunction-random.R`.
 - Under a hostile session (`OutDec = ","`, `digits = 3`, `LC_ALL=C`):
-  results unchanged.
+  results unchanged, in `tests/testthat/test-rfunction-ops.R`.
 
 **Exit criteria.**
 
-- Every Tests line exists, compares with R, and was seen to fail.
-- The random differential runs at least 10⁴ functions per CI leg on the
-  quick profile without a difference.
+- Every Tests line exists, compares with R through the #21 helper, and
+  was seen to fail.
+- The random differential runs 10⁴ functions per leg on the quick
+  profile without a difference.
 
 **Design.** [§4.6](design.md#46-rfunction), [§5](design.md#5-public-r-api-complete-v010-surface),
-[§6](design.md#6-errors), D15, D16, Q6.
+[§6](design.md#6-errors), D15, D16, D17, D18, Q6.
 
-## Stage 7 — c2mir, prelude and import resolver
+## Stage 7 — rfunction() through the emitter
+
+**Issue.** [#26](https://github.com/pedrobtz/zumir/issues/26), sub-issue of
+[v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
+
+**CI.** `full — a new .Call bridge that builds MIR from R values,
+holding R objects and native state across MIR calls: valgrind, ASan,
+rchk`.
+
+**Goal.** `rfunction()` builds MIR through the §4.3 emitter, without
+text, and the text route proves it right (D17).
+
+**Work.**
+
+- The `.Call` bridge: the walker's lowering drives the emitter's helpers
+  instead of writing text; the text route kept, selectable, as the
+  oracle.
+- Compile-time benchmark of both routes into `.agents/benchmarks.md`.
+
+**Tests.**
+
+- Same module: for every random function of Stage 6's generator and
+  every construct test, the module the bridge builds, printed with
+  `MIR_output`, equals the text route's module, in
+  `tests/testthat/test-rfunction-routes.R`.
+- Same results: both routes against R through the #21 helper, in the
+  same file.
+- The bridge under an R error raised mid-lowering (an interrupt, an
+  allocation failure under `alloc-failure`): no leak, the context freed,
+  in the same file.
+
+**Exit criteria.**
+
+- Every Tests line holds on the full profile; the bridge is the default
+  route; the benchmark row is recorded.
+
+**Design.** [§4.6](design.md#46-rfunction), D13, D17.
+
+## Stage 8 — c2mir and the prelude
 
 **Issue.** [#8](https://github.com/pedrobtz/zumir/issues/8), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -392,24 +484,30 @@ system header, with only the allowed library names resolving.
 
 **Work.**
 
-- `c2mir/` vendored with its per-target headers; its patches queued (the
-  same no-exit treatment).
-- The prelude and the built-in headers (§4.5, D5); the import resolver
-  with the fixed list (D6).
+- `c2mir/` vendored with its per-target headers; its patches queued: the
+  no-exit treatment, its seven `abort ()` calls, and a message callback
+  in place of `message_file` (§4.2).
+- The prelude and the built-in headers (§4.5, D5), over Stage 5's
+  resolver with D6's list.
+- The `c-tests` runner by the corpus's own rules, with a test-only
+  import list for `printf`, `abort` and `exit` ([#20]({I}20)).
 - Diagnostics mapped back to the user's line and column.
 - A standalone fuzz target over `cfunction()`'s compile path, built
   without R, and `fuzz.yml` wired with a corpus.
 
 **Tests.**
 
-- The prelude's functions resolve and return what R's own `exp`, `log`,
-  `sqrt`, … return, on every leg, in `tests/testthat/test-prelude.R`.
-- A name outside D6's list is a link error with class `zumir_error`, in the
-  same file.
+- The prelude's declarations match the resolver's list: every declared
+  name links, and a C call to it returns what R's own function returns,
+  in `tests/testthat/test-prelude.R`.
+- A name outside D6's list is a link error with class `zumir_error`, and
+  a test-only import is not visible to `cfunction()`, in the same file.
 - Diagnostics: a syntax error on line 3 of the user's source is reported
   at line 3, in `tests/testthat/test-c2mir-errors.R`.
-- A subset of MIR's `c-tests` that needs no system header: their expected
-  outputs, run through the vendored `c2mir`, in `tools/ci/platform.sh`.
+- The `c-tests` corpus through the vendored `c2mir` on both tiers: the
+  272 `.expect` outputs compared, the rest by exit status; the passing
+  subset and the reason for each exclusion recorded, in
+  `tools/ci/platform.sh` ([#20]({I}20)).
 - Fuzzing: no crash, and each crash input filed upstream with a
   reproducer. This proves robustness only; correctness is the line
   above.
@@ -418,10 +516,13 @@ system header, with only the allowed library names resolving.
 
 - Every Tests line holds on the full profile.
 - The fuzz target runs in CI and its findings are fixed or filed.
+- D19 settled: either `c2mir` passes the `c-tests` subset that
+  `cfunction()`'s numeric functions need and has no open crash, or the
+  TinyCC alternative is written up in the design for the maintainer.
 
-**Design.** [§4.5](design.md#45-cfunction) steps 1 to 4, D5, D6, D9.
+**Design.** [§4.5](design.md#45-cfunction) steps 1 to 4, D5, D6, D9, D19.
 
-## Stage 8 — cfunction()
+## Stage 9 — cfunction()
 
 **Issue.** [#9](https://github.com/pedrobtz/zumir/issues/9), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -443,8 +544,15 @@ system header, with only the allowed library names resolving.
   reference written in R, in `tests/testthat/test-cfunction.R`.
 - Refusals: wrong type, wrong length, a missing `n`, an unsupported
   signature, each with its condition class, in the same file.
-- Lengths at the limit: `n` equal to `length(x)`, one less, one more, and
-  a vector longer than `.Machine$integer.max` refused, in the same file.
+- Lengths at the limit: `n` equal to `length(x)`, one less, one more; and
+  a vector longer than `.Machine$integer.max` refused before any data
+  pointer is taken, with an ALTREP sequence ([#24](https://github.com/pedrobtz/zumir/issues/24)), in the same
+  file.
+- The returned closure keeps its context alive through `rm()` and
+  `gc()`, fails with a classed error after `readRDS`, and gives the
+  parent's answer in a forked child ([#23](https://github.com/pedrobtz/zumir/issues/23)); the same for
+  `rfunction()` and `mir_function()` closures, in
+  `tests/testthat/test-closures.R`.
 - `tier = "interp"` and native give identical results, in the same file.
 - Values under a hostile session (`LC_ALL=C`, `OutDec = ","`), unchanged.
 
@@ -455,7 +563,7 @@ system header, with only the allowed library names resolving.
 **Design.** [§4.5](design.md#45-cfunction) step 5, [§5](design.md#5-public-r-api-complete-v010-surface),
 [§6](design.md#6-errors), Q2.
 
-## Stage 9 — Benchmarks and README
+## Stage 10 — Benchmarks and README
 
 **Issue.** [#10](https://github.com/pedrobtz/zumir/issues/10), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -469,6 +577,8 @@ system header, with only the allowed library names resolving.
 - `tools/run-benchmarks` and `.agents/benchmarks.md` for every §9 row.
 - One look at the macOS Intel runner's slow interpreter (34 to 60× in the
   spike), recorded with what it found.
+- The interpreter's cost under `MIR_DIRECT_DISPATCH` against the spike's
+  computed-goto figures, on every leg (§9).
 - README written with `pkg-readme`; `cran-comments.md`'s explanation of
   run-time code generation (the `luajr` precedent).
 
@@ -483,7 +593,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§9](design.md#9-performance-targets).
 
-## Stage 10 — Assurance
+## Stage 11 — Assurance
 
 **Issue.** [#11](https://github.com/pedrobtz/zumir/issues/11), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -511,7 +621,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§8](design.md#8-testing).
 
-## Stage 11 — Full CI
+## Stage 12 — Full CI
 
 **Issue.** [#12](https://github.com/pedrobtz/zumir/issues/12), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -533,7 +643,7 @@ system header, with only the allowed library names resolving.
   the merge commit, and a step-20 gctorture run green on the pull
   request's last commit.
 
-## Stage 12 — v0.1.0 readiness
+## Stage 13 — v0.1.0 readiness
 
 **Issue.** [#13](https://github.com/pedrobtz/zumir/issues/13), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
@@ -556,7 +666,7 @@ system header, with only the allowed library names resolving.
 
 **Design.** [§11](design.md#11-acceptance-criteria-for-v010).
 
-## Stage 13 — Review
+## Stage 14 — Review
 
 **Issue.** [#14](https://github.com/pedrobtz/zumir/issues/14), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1). No pull request closes it.
@@ -589,9 +699,10 @@ system header, with only the allowed library names resolving.
 
 - [Q6](design.md#14-open-questions) is settled by Stage 6 (inference,
   with `types =` only if needed); it does not block it.
-- [Q5](design.md#14-open-questions) blocks Stage 4: what runs where W+X
-  memory is refused. Stage 4 implements the answer.
-- [Q2](design.md#14-open-questions) blocks Stage 8: one function per
+- [Q5](design.md#14-open-questions): what runs where W+X memory is
+  refused. The maintainer decides it as Stage 4's first task; Stage 4
+  can start, but not finish, before then.
+- [Q2](design.md#14-open-questions) blocks Stage 9: one function per
   `cfunction()` source, or several.
-- [Q4](design.md#14-open-questions) decides whether Stage 12 ends in a
+- [Q4](design.md#14-open-questions) decides whether Stage 13 ends in a
   CRAN submission; the board's `CRAN intent` answers it.

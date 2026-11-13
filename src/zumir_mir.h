@@ -28,7 +28,8 @@
   "4c27a18f Return NULL from MIR_init2 and _MIR_init instead of exiting",\
   "5803194c Load unaligned hash and reduce keys with memcpy",\
   "1c4b1cca Declare MIR_insn's operands as a flexible array member",\
-  "c65e7044 Report code-memory failures through the error function"
+  "c65e7044 Report code-memory failures through the error function",\
+  "3e643e83 Spill float arguments in the Win64 interpreter shim"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

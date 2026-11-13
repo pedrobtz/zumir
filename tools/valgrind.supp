@@ -1,0 +1,18 @@
+# Valgrind suppressions for valgrind.yaml (native-checks.yaml). Each one is
+# not zumir's, says whose it is, and is as narrow as the stack allows.
+
+# testthat's progress reporting starts a thread in cli; its thread-local
+# storage is still allocated when R exits, which memcheck counts as
+# "possibly lost" (seen in Stage 5's full run, PR #34). The stack runs
+# through cli.so, not zumir.so.
+{
+   cli-ticker-thread-tls
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:_dl_allocate_tls
+   ...
+   fun:pthread_create*
+   obj:*/cli/libs/cli.so
+}

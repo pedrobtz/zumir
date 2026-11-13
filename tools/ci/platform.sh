@@ -181,10 +181,12 @@ endgroup
 group "C API header"
 rinc=$("$Rscript" -e 'cat(R.home("include"))')
 printf '#include <zumir.h>\nint zumir_header_ok;\n' > "$tmp/h.c"
-$cc_cmd -std=c99 -pedantic -Wall -Wextra -Werror -fsyntax-only -I"$rinc" -Iinst/include "$tmp/h.c"
+# R's own headers go in as system headers: R 4.6's R_ext/Boolean.h uses a
+# C23 enum, which is R's business, and the check is of zumir.h.
+$cc_cmd -std=c99 -pedantic -Wall -Wextra -Werror -fsyntax-only -isystem "$rinc" -Iinst/include "$tmp/h.c"
 cxx_cmd=$("$R" CMD config CXX)
 cp "$tmp/h.c" "$tmp/h.cpp"
-$cxx_cmd -std=c++11 -pedantic -Wall -Wextra -Werror -fsyntax-only -I"$rinc" -Iinst/include "$tmp/h.cpp"
+$cxx_cmd -std=c++11 -pedantic -Wall -Wextra -Werror -fsyntax-only -isystem "$rinc" -Iinst/include "$tmp/h.cpp"
 echo "ok: zumir.h compiles alone as C99 and C++11, -pedantic -Werror"
 endgroup
 

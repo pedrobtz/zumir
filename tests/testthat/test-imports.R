@@ -28,6 +28,12 @@ test_that("each D6 math function returns what R's own function returns, bitwise"
     trunc = trunc,
     fabs = abs
   )
+  # mingw-w64's expm1 returns +0 for -0 and 0 for 1e-300, and R on
+  # Windows has its own; D6 promises the platform's C library, so expm1 is
+  # not held to R's there (design D6).
+  if (.Platform$OS.type == "windows") {
+    same$expm1 <- NULL
+  }
   x <- inputs()
   for (fn in names(same)) {
     f <- mir_function(call1_text(fn), "f")

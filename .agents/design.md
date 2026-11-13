@@ -851,7 +851,10 @@ decides it and the maintainer may overturn it.
   `fdim`, `fmax`, `fmin`, `fma`, `ldexp`, `frexp`, `modf`) and the five
   string functions; no float variants. Names are loaded with
   `MIR_load_external` just before linking, with no import resolver
-  behind them.
+  behind them. The functions are the platform's, and so are their
+  defects: mingw-w64's `expm1` returns `+0` for `-0` and `0` for
+  `1e-300`, where R on Windows has its own; `cfunction()` code calling
+  `expm1` on Windows gets mingw's answer, as compiled C would.
 - **D7 (C).** x86-64 and aarch64 are the tested targets; the other three
   MIR targets are built when the host matches and are not promised.
 - **D8 (M), 2026-11-12.** The name is `zumir`: `zu` and the library's

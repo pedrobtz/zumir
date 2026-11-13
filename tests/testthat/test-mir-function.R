@@ -81,8 +81,15 @@ test_that("functions that cannot be called from R are refused when compiled", {
   expect_error(mir_function(ptr, "f"), class = "zumir_argument_error")
   two <- "m: module\n export f\nf: func i64, i64, i64:a\n ret a, a\n endfunc\nendmodule"
   expect_error(mir_function(two, "f"), class = "zumir_argument_error")
+  # ld is a long double where MIR has one; where long double is a double
+  # (Windows, macOS on arm64), MIR reads it as d, and it is a number.
   ld <- "m: module\n export f\nf: func ld, ld:a\n ret a\n endfunc\nendmodule"
-  expect_error(mir_function(ld, "f"), class = "zumir_argument_error")
+  ld_is_d <- .Platform$OS.type == "windows" || .Machine$sizeof.longdouble <= 8
+  if (ld_is_d) {
+    expect_identical(mir_function(ld, "f")(1.5), 1.5)
+  } else {
+    expect_error(mir_function(ld, "f"), class = "zumir_argument_error")
+  }
 })
 
 test_that("bad text and bad arguments to mir_function() are classed errors", {

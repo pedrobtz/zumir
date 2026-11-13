@@ -89,9 +89,10 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Import resolver (D6, D14, D18) | R's own exp, log, sqrt and 18 more on the same inputs, bitwise; the C ports of R's %%, %/%, min and max against R on a 22 x 22 grid of signs, zeros, non-finite values and NA, directly and through MIR; a name outside a context's list is a link error | tests/testthat/test-imports.R |
 | c2mir prelude | every declared name links and returns what R's function returns; a test-only import is invisible to `cfunction()` | gap #8: tests/testthat/test-prelude.R |
 | `cfunction()` marshalling | a reference written in R for every example and every argument and return type | gap #9: tests/testthat/test-cfunction.R |
-| `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)`, which already tells `0` from `-0` and `NA` from `NaN`; value, attributes, warnings and error class asserted separately | gap #21 |
-| `rfunction()`, random functions | R on generated functions within the subset, on random inputs, seed printed | gap #17: tests/testthat/test-rfunction-random.R |
-| `rfunction()`, refusals | each construct outside §4.6 refused with its name | gap #17: tests/testthat/test-rfunction-refuse.R |
+| `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)`, which already tells `0` from `-0` and `NA` from `NaN`; value, attributes, warnings and error class asserted separately; R's side in R's AST evaluator with the JIT off (R 4.6's byte compiler can turn `-0` into `0`) | tests/testthat/helper-rfunction.R (`compare_with_r()`), used by every rfunction() test file |
+| `rfunction()`, constructs | each operator, math function, loop form and logical rule against R on signed zeros, subnormals, `±Inf`, `NA`, `NaN` and empty vectors, and under a hostile session | tests/testthat/test-rfunction-ops.R |
+| `rfunction()`, random functions | R on generated functions within the subset, on random inputs, seed printed and the function saved; 10² per leg, 10⁴ on the full profile; native against interpreter bitwise | tests/testthat/test-rfunction-random.R |
+| `rfunction()`, refusals | each construct outside §4.6 refused with its name; each D22 rule beside R running the same function | tests/testthat/test-rfunction-refuse.R |
 | `rfunction()` through the emitter | the MIR-text route: the same module printed with `MIR_output`, and the same results | gap #26: tests/testthat/test-rfunction-routes.R |
 <!-- markdownlint-enable MD013 -->
 
@@ -106,7 +107,7 @@ cannot apply.
 | Object | Sequences | Fork | Unwind | Owner |
 | --- | --- | --- | --- | --- |
 | MIR context held by R (external pointer) | free twice, use after free, `readRDS` of a saved one, an R error between two MIR calls, a MIR error then more calls (each a `zumir_context_error`, free still works): tests/testthat/test-context-sequences.R | a forked child gets the parent's answer (`parallel::mcparallel`): same file | an R error between two MIR calls leaves the context usable: same file; MIR errors never longjmp past the entry's trap (D4) | the finalizer frees the context and its arena: `zumir_info()$memory` back to baseline after `gc()`, under gctorture too: tests/testthat/test-finalizer.R |
-| Compiled function from `cfunction()`, `rfunction()` or `mir_function()` | gap #23 | gap #23 | `rfunction()`: gap #17, an endless `while` stopped by `setTimeLimit()` (D23); `cfunction()` and `mir_function()`: n/a, user code as in `.Call()`; errors return a status | gap #23 |
+| Compiled function from `cfunction()`, `rfunction()` or `mir_function()` | gap #23 | gap #23 | `rfunction()`: an endless `while` and a 10⁹-iteration `for` stopped by `setTimeLimit()` with R's message in a child process, which then runs the function again (D23): tests/testthat/test-rfunction-errors.R; `cfunction()` and `mir_function()`: n/a, user code as in `.Call()`; errors return a status | gap #23 |
 | `zumir_ctx` owned by a consumer through the C API | an error then more calls (placeholders, no crash) then compile (NULL, `ZUMIR_E_FAILED`, the message) then free, 10^3 times with RSS flat; free `NULL`; in C++ a destructor across failing calls runs once each time: tests/consumer | n/a: the consumer owns fork policy | n/a: every entry, `MIR_` shims included, returns and never longjmps (D20) | the consumer frees it with `zumir_ctx_free`; a failed one is released from its arena, never walked by `MIR_finish`: tests/consumer |
 | Interpreter contexts, one per thread (D10) | 8 threads, a context each, against the serial run bitwise: tests/testthat/test-threads.R | n/a: created and freed inside one parallel region | n/a: no R call inside the region | each thread frees its own; no arena left: tests/testthat/test-threads.R |
 <!-- markdownlint-enable MD013 -->
@@ -120,10 +121,10 @@ One row per limit the package enforces. "Straddled by" is the test of
 | Limit | Unit | Straddled by |
 | --- | --- | --- |
 | `cfunction()` length argument against `length(x)` | elements | gap #9: tests/testthat/test-cfunction.R |
-| Vector length against C `int` (`.Machine$integer.max`) | elements | gap #24 |
-| `rfunction()` index range, 1 to `length(x)` | elements | gap #17: tests/testthat/test-rfunction-errors.R |
-| `rfunction()` `numeric()` size and `seq_len()` argument, a whole number from 0 | elements | gap #17: tests/testthat/test-rfunction-errors.R |
-| `rfunction()` integer counter arithmetic, `.Machine$integer.max` | integer value | gap #17: tests/testthat/test-rfunction-errors.R |
-| `rfunction()` interrupt poll, every 2¹⁶ loop iterations (D23) | iterations | gap #17: tests/testthat/test-rfunction-errors.R |
+| Vector length against C `int` (`.Machine$integer.max`) | elements | `rfunction()`: `limit + 1` (an ALTREP `1:2^31`) refused before any data pointer: tests/testthat/test-rfunction-errors.R; `limit - 1` and `limit` without 16 GB, and `cfunction()`: gap #24 |
+| `rfunction()` index range, 1 to `length(x)` | elements | 0, 1, `length`, `length + 1`, `NA`, `1.5`, reading and writing: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` `numeric()` size and `seq_len()` argument, a whole number from 0 | elements | -1, 0, 1, `NA`, 2.5 and `Inf`: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` integer counter arithmetic, `.Machine$integer.max` | integer value | `limit - 1`, `limit`, `limit + 1` upward and downward, and `46340L * 46340L` against `46341L * 46341L`: tests/testthat/test-rfunction-errors.R |
+| `rfunction()` interrupt poll, every 2¹⁶ loop iterations (D23) | iterations | `2^16 - 1`, `2^16` and `2^16 + 1` iterations of `for` and `while`: tests/testthat/test-rfunction-errors.R |
 | C API table size, read before any appended field (D21) | bytes; table version | the table's size is the header's `sizeof`; versions 0, 1 and 2 refused, served, refused: tests/consumer |
 <!-- markdownlint-enable MD013 -->

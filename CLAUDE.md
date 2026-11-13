@@ -18,8 +18,9 @@ file and a shared file disagree, this file wins for this package.
 `zumir` brings MIR, Vladimir Makarov’s lightweight JIT compiler, to R in
 three ways. First, as a provider: family packages (`zupmxode` first) use
 `LinkingTo: zumir` and a versioned C API table to build MIR functions
-and get back native function pointers, or the interpreter where native
-code can’t be made. Second, as `cfunction()`: R users compile a short
+and get back native function pointers, or MIR’s interpreter where MIR
+has no code generator for the CPU. Both tiers need executable memory
+(design §4.4, Q5). Second, as `cfunction()`: R users compile a short
 numeric C function with MIR’s own `c2mir` compiler, with no Rtools,
 Xcode tools or `gcc` needed. Third, as `rfunction()`: a numeric R
 function, in the subset of design §4.6, compiled to native code that
@@ -81,33 +82,46 @@ These are fixed by the design before any code exists:
 - **No `exit`, `abort`, `stdout` or `stderr` in the shared object**
   (§11). MIR’s output goes to a buffer that becomes the R condition’s
   message.
+- **The interpreter is not shareable across threads** (D10): one
+  interpreted function called from eight threads gave wrong answers in
+  the spike. On that tier each thread compiles in its own context;
+  native code is shared.
+- **`rfunction()` answers as R does or errors** (D16): every non-NaN
+  result equals R’s bit for bit, and where matching R is not cheap it
+  refuses. Its tests compare with R through `identical(num.eq = FALSE)`
+  (#21).
 - **`cfunction()` reads no system header** (D5), and its import resolver
   resolves only the fixed list in D6. Anything else is a link error, so
   the same source behaves the same everywhere and can’t reach R’s
   internals.
-- **MIR’s symbols are hidden** from Stage 1, so they can’t clash with
+- **MIR’s symbols are hidden** from Stage 2, so they can’t clash with
   another package that vendors MIR.
 
 ## Testing
 
 None yet: no conformance suite, no helpers, no runtime to report. Design
-§8 plans a subset of MIR’s own `c-tests` and `mir-tests` on both tiers.
+§8 plans MIR’s own tests, `mir-tests` through `mir_function()`, and
+`c-tests` through `c2mir` by the corpus’s own rules, on both tiers;
+`.agents/assurance.md` lists every oracle and its gap.
 
 ## Continuous integration
 
 The package calls `pedrobtz/r-actions` for `R-CMD-check.yaml` (profile
 `auto`) and `coverage.yaml`. `pkgdown.yaml` builds the site with
-`r-lib/actions`. The roadmap marks Stage 6 `full`.
+`r-lib/actions`, and `assurance.yaml` calls r-actions’ `assurance.yml`.
+The roadmap marks Stages 2 to 5, 7 and 8 `full`, with the closing three.
 
 ## Vendored native code
 
-MIR (MIT), from `vnmakarov/mir` at `master` commit `dc2c763`
-(2026-10-23). **Deviation from `native-code.md`:** that file says to pin
-a stable release, never `master`. D2 pins `master` on purpose, because
-the only tag (v1.0.0, May 2024) misses two and a half years of fixes. A
-bump re-runs Stage 0’s checks. MIR goes under `src/vendor/mir/`, kept as
-upstream plus a numbered patch queue in `tools/patches/`, never a fork
-(D12). `tools/vendor.sh` records the commit, the file list and the
-patches (§4.1, §4.2). Not vendored yet: fill in the file list and every
-local patch when Stage 2 lands. The README’s Mozilla Public License
-mention is about NanoJIT, not any MIR file (spike question 7).
+MIR (MIT), from `vnmakarov/mir` at commit
+`dc2c763f1c8bc746102ce87933d866335f9e6c06` (`master`, 2026-10-23),
+always named by its full hash. **Deviation from `native-code.md`:** that
+file says to pin a stable release. D2 (the maintainer’s decision) pins
+this commit on purpose, because the only tag (v1.0.0, May 2024) misses
+two and a half years of fixes. A bump re-runs the spike’s checks. MIR
+goes under `src/vendor/mir/`, kept as upstream plus a numbered patch
+queue in `tools/patches/`, never a fork (D12). `tools/vendor.sh` records
+the commit, the file list and the patches (§4.1, §4.2). Not vendored
+yet: fill in the file list and every local patch when Stage 2 lands. The
+README’s Mozilla Public License mention is about NanoJIT, not any MIR
+file (spike question 7).

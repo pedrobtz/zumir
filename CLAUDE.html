@@ -43,7 +43,7 @@
 </div>
 <div class="section level2">
 <h2 id="what-this-is">What this is<a class="anchor" aria-label="anchor" href="#what-this-is"></a></h2>
-<p><code>zumir</code> brings MIR, Vladimir Makarov’s lightweight JIT compiler, to R in three ways. First, as a provider: family packages (<code>zupmxode</code> first) use <code>LinkingTo: zumir</code> and a versioned C API table to build MIR functions and get back native function pointers, or the interpreter where native code can’t be made. Second, as <code>cfunction()</code>: R users compile a short numeric C function with MIR’s own <code>c2mir</code> compiler, with no Rtools, Xcode tools or <code>gcc</code> needed. Third, as <code>rfunction()</code>: a numeric R function, in the subset of design §4.6, compiled to native code that returns exactly what R returns. There are no <code>Imports</code>, only <code>Suggests: testthat</code>. MIR is vendored, and the whole package is one shared object. It is not a full C compiler, not a sandbox (user code runs with <code><a href="https://rdrr.io/r/base/CallExternal.html" class="external-link">.Call()</a></code>’s rights), and not a wrapper around the system toolchain the way <code>inline</code> and <code>Rcpp</code> are.</p>
+<p><code>zumir</code> brings MIR, Vladimir Makarov’s lightweight JIT compiler, to R in three ways. First, as a provider: family packages (<code>zupmxode</code> first) use <code>LinkingTo: zumir</code> and a versioned C API table to build MIR functions and get back native function pointers, or MIR’s interpreter where MIR has no code generator for the CPU. Both tiers need executable memory (design §4.4, Q5). Second, as <code>cfunction()</code>: R users compile a short numeric C function with MIR’s own <code>c2mir</code> compiler, with no Rtools, Xcode tools or <code>gcc</code> needed. Third, as <code>rfunction()</code>: a numeric R function, in the subset of design §4.6, compiled to native code that returns exactly what R returns. There are no <code>Imports</code>, only <code>Suggests: testthat</code>. MIR is vendored, and the whole package is one shared object. It is not a full C compiler, not a sandbox (user code runs with <code><a href="https://rdrr.io/r/base/CallExternal.html" class="external-link">.Call()</a></code>’s rights), and not a wrapper around the system toolchain the way <code>inline</code> and <code>Rcpp</code> are.</p>
 <p>The specification is <a href=".agents/design.html"><code>.agents/design.md</code></a>, adopted from RFC 0073. It outranks this file: <code>CLAUDE.md</code> orients, the design decides.</p>
 </div>
 <div class="section level2">
@@ -75,21 +75,25 @@
 <li>
 <strong>No <code>exit</code>, <code>abort</code>, <code>stdout</code> or <code>stderr</code> in the shared object</strong> (§11). MIR’s output goes to a buffer that becomes the R condition’s message.</li>
 <li>
+<strong>The interpreter is not shareable across threads</strong> (D10): one interpreted function called from eight threads gave wrong answers in the spike. On that tier each thread compiles in its own context; native code is shared.</li>
+<li>
+<strong><code>rfunction()</code> answers as R does or errors</strong> (D16): every non-NaN result equals R’s bit for bit, and where matching R is not cheap it refuses. Its tests compare with R through <code>identical(num.eq = FALSE)</code> (#21).</li>
+<li>
 <strong><code>cfunction()</code> reads no system header</strong> (D5), and its import resolver resolves only the fixed list in D6. Anything else is a link error, so the same source behaves the same everywhere and can’t reach R’s internals.</li>
 <li>
-<strong>MIR’s symbols are hidden</strong> from Stage 1, so they can’t clash with another package that vendors MIR.</li>
+<strong>MIR’s symbols are hidden</strong> from Stage 2, so they can’t clash with another package that vendors MIR.</li>
 </ul></div>
 <div class="section level2">
 <h2 id="testing">Testing<a class="anchor" aria-label="anchor" href="#testing"></a></h2>
-<p>None yet: no conformance suite, no helpers, no runtime to report. Design §8 plans a subset of MIR’s own <code>c-tests</code> and <code>mir-tests</code> on both tiers.</p>
+<p>None yet: no conformance suite, no helpers, no runtime to report. Design §8 plans MIR’s own tests, <code>mir-tests</code> through <code>mir_function()</code>, and <code>c-tests</code> through <code>c2mir</code> by the corpus’s own rules, on both tiers; <code>.agents/assurance.md</code> lists every oracle and its gap.</p>
 </div>
 <div class="section level2">
 <h2 id="continuous-integration">Continuous integration<a class="anchor" aria-label="anchor" href="#continuous-integration"></a></h2>
-<p>The package calls <code>pedrobtz/r-actions</code> for <code>R-CMD-check.yaml</code> (profile <code>auto</code>) and <code>coverage.yaml</code>. <code>pkgdown.yaml</code> builds the site with <code>r-lib/actions</code>. The roadmap marks Stage 6 <code>full</code>.</p>
+<p>The package calls <code>pedrobtz/r-actions</code> for <code>R-CMD-check.yaml</code> (profile <code>auto</code>) and <code>coverage.yaml</code>. <code>pkgdown.yaml</code> builds the site with <code>r-lib/actions</code>, and <code>assurance.yaml</code> calls r-actions’ <code>assurance.yml</code>. The roadmap marks Stages 2 to 5, 7 and 8 <code>full</code>, with the closing three.</p>
 </div>
 <div class="section level2">
 <h2 id="vendored-native-code">Vendored native code<a class="anchor" aria-label="anchor" href="#vendored-native-code"></a></h2>
-<p>MIR (MIT), from <code>vnmakarov/mir</code> at <code>master</code> commit <code>dc2c763</code> (2026-10-23). <strong>Deviation from <code>native-code.md</code>:</strong> that file says to pin a stable release, never <code>master</code>. D2 pins <code>master</code> on purpose, because the only tag (v1.0.0, May 2024) misses two and a half years of fixes. A bump re-runs Stage 0’s checks. MIR goes under <code>src/vendor/mir/</code>, kept as upstream plus a numbered patch queue in <code>tools/patches/</code>, never a fork (D12). <code>tools/vendor.sh</code> records the commit, the file list and the patches (§4.1, §4.2). Not vendored yet: fill in the file list and every local patch when Stage 2 lands. The README’s Mozilla Public License mention is about NanoJIT, not any MIR file (spike question 7).</p>
+<p>MIR (MIT), from <code>vnmakarov/mir</code> at commit <code>dc2c763f1c8bc746102ce87933d866335f9e6c06</code> (<code>master</code>, 2026-10-23), always named by its full hash. <strong>Deviation from <code>native-code.md</code>:</strong> that file says to pin a stable release. D2 (the maintainer’s decision) pins this commit on purpose, because the only tag (v1.0.0, May 2024) misses two and a half years of fixes. A bump re-runs the spike’s checks. MIR goes under <code>src/vendor/mir/</code>, kept as upstream plus a numbered patch queue in <code>tools/patches/</code>, never a fork (D12). <code>tools/vendor.sh</code> records the commit, the file list and the patches (§4.1, §4.2). Not vendored yet: fill in the file list and every local patch when Stage 2 lands. The README’s Mozilla Public License mention is about NanoJIT, not any MIR file (spike question 7).</p>
 </div>
 </div>
 

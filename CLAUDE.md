@@ -100,7 +100,8 @@ MIR (MIT), from `vnmakarov/mir` at `master` commit `dc2c763` (2026-10-23).
 never `master`. D2 pins `master` on purpose, because the only tag (v1.0.0,
 May 2024) misses two and a half years of fixes. A bump re-runs Stage 0's
 checks. MIR goes under `src/vendor/mir/`, kept as upstream plus a numbered
-patch queue in `tools/patches/`, never a fork (D12). `tools/vendor.sh` records the commit, the file list and the patches (§4.1,
-§4.2). Not vendored yet: fill in the file list and every local patch
-when Stage 2 lands. The README mentions the Mozilla Public License, and the
-file it covers must not be among the vendored ones (§10.1, question 7).
+patch queue in `tools/patches/`, never a fork (D12). `tools/vendor.sh`
+records the commit, the file list and the patches (§4.1, §4.2). Not
+vendored yet: fill in the file list and every local patch when Stage 2
+lands. The README's Mozilla Public License mention is about NanoJIT, not
+any MIR file (spike question 7).

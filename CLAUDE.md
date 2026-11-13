@@ -125,8 +125,8 @@ which holds a write token and is pinned to a commit:
 
 - `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
   R-devel row added to `runners` (full profile only).
-- `native-checks.yaml`: sanitizers (with ASan), valgrind, lto, rchk,
-  analyzers and cran-special.
+- `native-checks.yaml`: valgrind, lto, rchk, analyzers and cran-special;
+  sanitizers (with ASan) joins in Stage 2, once there is C to instrument.
 - `gctorture.yaml`: the wide step on pull requests under a 10-minute
   budget; step 20 daily (while the roadmap is implemented) and on dispatch.
 - `platforms.yaml`: `tools/ci/platform.sh` once per macOS and Windows

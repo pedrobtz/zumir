@@ -121,6 +121,11 @@ CI and assurance wiring, and no MIR yet.
   `schedule:` slot.
 - `native-checks.yaml` calling sanitizers, valgrind, rchk, gctorture,
   analyzers, lto and cran-special, as zuexact does.
+  **Deviation (2026-11-13):** `sanitizers` moved to Stage 2. Its guard
+  fails any build with no `__ubsan` symbols, and the scaffold's C is
+  routine registration only, which UBSan does not instrument; the first
+  pull request's UBSan legs failed on that alone (run 43458099197).
+  gctorture has its own caller, `gctorture.yaml`.
 - `platforms.yaml` calling `platforms.yml@v1` with `tools/ci/platform.sh`,
   which runs nothing yet; `containers` stays r-cmd-check's job.
 - `.agents/assurance.md` from `templates/assurance.md`, with the kinds
@@ -188,6 +193,8 @@ pass on each.
   the `gen-test` targets except `inline-test`, which builds `c2mir`
   (Stage 8). No job of its own: the r-devel containers are covered by
   R CMD check's `containers` job running the package's tests.
+- `sanitizers` added to `native-checks.yaml` (moved from Stage 1, where
+  there was no C for UBSan to instrument), and its assurance row `done`.
 - An `nm -u` guard in CI that fails on `exit`, `abort`, `printf`, `puts`,
   `stderr`, `stdout`, `sprintf`, `rand`. It is expected to fail until
   Stage 3; it is wired here with an allow-list that Stage 3 empties.

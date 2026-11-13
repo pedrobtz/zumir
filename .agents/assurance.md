@@ -33,7 +33,7 @@ call to r-actions.
 
 | Check         | Status  | Where              |
 | ------------- | ------- | ------------------ |
-| sanitizers    | done    | native-checks.yaml |
+| sanitizers    | gap #4  |                    |
 | valgrind      | done    | native-checks.yaml |
 | rchk          | done    | native-checks.yaml |
 | gctorture     | done    | gctorture.yaml     |
@@ -44,7 +44,9 @@ call to r-actions.
 | fuzz-reach    | gap #8  |                    |
 
 Stage 1 (#3) wired `native-checks.yaml` and `gctorture.yaml` on
-2026-11-13; Stage 3 (#5) wires
+2026-11-13, without `sanitizers`: its instrumentation guard fails a build
+with nothing to instrument, so it joins with MIR in Stage 2 (#4). Stage 3
+(#5) wires
 `alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
 Stage 11 (#11) schedules `mutation` over the C tests.

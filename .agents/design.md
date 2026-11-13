@@ -214,6 +214,25 @@ where it is not R-specific; `src/vendor/PROVENANCE` lists them.
   reports are left: R CMD check excludes "ISO C forbids … function
   pointer" by name (2026-11-13). Upstream's #490, "make `mir.h`
   self-contained in strict ISO C", is in the pinned commit.
+  Decided 2026-11-13, in Stage 2 (moved there from Stage 3 by the
+  maintainer, because the sanitizer, valgrind and rcnst checks run
+  R CMD check with no allowed warning): MIR's `exit`, `abort` and writes
+  to `stderr` are redirected by macros in `src/zumir_mir_stdio.h`, which
+  the two wrapper files include just before MIR's sources, not by
+  patches. `exit` and `abort` call one zumir hook, and `stderr` is a sink
+  whose text goes to a per-thread buffer. MIR's ten `sprintf` calls are
+  `snprintf` with the array's size, a patch fit for upstream. Stage 3
+  turns the hook into the trap and makes `MIR_init2` and `_MIR_init`
+  return `NULL`.
+- **gcc's `-ftree-sra`.** With R's flags, Rtools gcc 14 miscompiles the
+  interpreter: MIR's own `interp-test8`, `readme-example` and
+  `gen-test-sieve` crash on Windows, and pass with `-fno-tree-sra` added
+  and nothing else changed (2026-11-13). Upstream's makefile has given
+  gcc `-fno-tree-sra` since 2019, with no reason recorded. zumir sets it
+  for MIR's sources alone with `#pragma GCC optimize`
+  (`src/zumir_mir_gcc.h`), since R CMD check reports `-f` flags in
+  `Makevars` as non-portable. The root cause, undefined behaviour in the
+  interpreter or a gcc bug, is to be reported upstream (#30).
 - **Code-memory failures are errors.** `_MIR_set_code` ignores the result
   of `mem_protect` and writes into a page that may still be execute-only:
   where writable-and-executable memory is refused, the process dies with

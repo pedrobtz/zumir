@@ -7,7 +7,7 @@
 #   1. MIR's own tests on the vendored, patched copy, built without R, with
 #      R's compiler and flags (design D2: the checks every MIR bump re-runs).
 #   2. The package built, then its symbols: nothing of MIR's exported, and
-#      no CRAN-flagged library symbol beyond the allow-list Stage 3 empties.
+#      no CRAN-flagged library symbol linked.
 #   3. Linux: the package built with MIR forced out installs, loads and
 #      reports no target (tests/testthat/test-no-target.R).
 #
@@ -40,14 +40,19 @@ endgroup
 # src/vendor/mir/, so what is tested is what the package compiles. Built with
 # R's compiler and flags, not upstream's: no -fsigned-char (on Linux aarch64
 # char is unsigned, so this is where that is shown), -DNDEBUG as R builds,
-# and the interpreter's MIR_DIRECT_DISPATCH, as src/zumir_mir.c sets it.
+# the interpreter's MIR_DIRECT_DISPATCH, as src/zumir_mir.c sets it, and
+# gcc's -fno-tree-sra below. The exit and stderr redirection is not built
+# in: MIR's tests read their own stderr and exit status.
 # inline-test is left out: it builds c2mir (Stage 8).
 group "MIR's own tests"
 fork_url=$(awk '/^  Fork:/ {print $2}' src/vendor/PROVENANCE)
 fork_pin=$(awk '/^  Fork commit:/ {print $3}' src/vendor/PROVENANCE)
 mir="$tmp/mir"
 # No CRLF: run-test compares the .mir files it reads with what it writes.
+# The setting goes into the clone's config: `git -c` on the clone alone
+# does not reach the checkout below, and Windows runners set autocrlf=true.
 git -c core.autocrlf=false clone -q --no-checkout "$fork_url" "$mir"
+git -C "$mir" config core.autocrlf false
 git -C "$mir" -c advice.detachedHead=false checkout -q "$fork_pin"
 grep -v '^#' tools/mir-files.txt | grep -v '^[[:space:]]*$' | while read -r f; do
   cp "src/vendor/mir/$f" "$mir/$f"
@@ -57,6 +62,11 @@ done
 cc_bin=${cc_cmd%% *}
 cc_rest=${cc_cmd#"$cc_bin"}
 mir_cflags="$cc_rest $r_cflags -fPIC -DNDEBUG -DMIR_DIRECT_DISPATCH=1 -DGITCOMMIT=$fork_pin"
+# gcc gets -fno-tree-sra, as src/zumir_mir_gcc.h gives MIR's sources in the
+# package: without it Rtools gcc miscompiles the interpreter.
+if ! $cc_cmd --version 2>&1 | grep -qi clang; then
+  mir_cflags="$mir_cflags -fno-tree-sra"
+fi
 targets="adt-test simplify-test io-test scan-test interp-test readme-example-test
   gen-test-loop gen-test-sieve gen-test-get-thunk-addr gen-issue219-test
   gen-inlay-test gen-test1 gen-test2 gen-test3 gen-test4 gen-test5 gen-test6
@@ -125,10 +135,10 @@ imports "$so" | sort -u | tee "$tmp/imports"
 endgroup
 # The library symbols CRAN's "checking compiled code" flags, by base name:
 # a leading underscore, a _chk suffix and the platform's spelling of stderr
-# and stdout stripped. ALLOWED is what vendored MIR links before Stage 3
-# routes its errors and output through zumir; Stage 3 empties it (design §11:
-# no exit, abort, stdout or stderr in the shared object).
-ALLOWED="abort exit printf sprintf stderr stdout"
+# and stdout stripped. None may be linked (design §11: no exit, abort,
+# stdout or stderr in the shared object): MIR's go through
+# src/zumir_mir_stdio.h, and its sprintf calls are snprintf on the fork.
+ALLOWED=""
 sed -e 's/^_*//' -e 's/_chk$//' \
   -e 's/^stderrp$/stderr/' -e 's/^stdoutp$/stdout/' \
   -e 's/^acrt_iob_func$/stderr/' -e 's/^stdio_common_vsprintf$/sprintf/' \
@@ -141,8 +151,8 @@ bad=""
 for s in $flagged; do
   case " $ALLOWED " in *" $s "*) ;; *) bad="$bad $s" ;; esac
 done
-[ -z "$bad" ] || { echo "FAIL: links CRAN-flagged symbols outside the allow-list:$bad" >&2; exit 1; }
-echo "ok: nothing flagged beyond the allow-list ($ALLOWED)"
+[ -z "$bad" ] || { echo "FAIL: links CRAN-flagged symbols:$bad" >&2; exit 1; }
+echo "ok: no CRAN-flagged symbol linked"
 
 # ---------------------------------------------------------------------------
 # 3. No target (Stage 2): MIR forced out, as on a CPU it does not target.

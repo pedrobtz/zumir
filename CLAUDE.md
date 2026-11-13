@@ -113,7 +113,10 @@ These are fixed by the design before any code exists:
 
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
-`test-no-target.R`: MIR is compiled in exactly where `helper-target.R`'s
+`test-mir-stdio.R`: writes to MIR's `stderr` reach the buffer, other
+`FILE`s are untouched, and `exit` becomes an R error, through an internal
+entry compiled under the same macros. `test-no-target.R`: MIR is compiled
+in exactly where `helper-target.R`'s
 platform table says; `platform.sh` runs the suite again on a build with
 `ZUMIR_NO_MIR=1`, with `ZUMIR_EXPECT_NO_MIR=1`. `helper-child.R` holds the
 child-process helpers (`installed_lib()`, `run_child()`); Stage 3's
@@ -177,15 +180,19 @@ file edited in place, a series that differs from the list, or a changed
 `native-code.md`:** the fork's commits, not `tools/patches/`, are the patch
 record.
 
-The five patches (`src/vendor/PROVENANCE` has the reasons): two Rtools gcc
+The six patches (`src/vendor/PROVENANCE` has the reasons): two Rtools gcc
 warnings, `VirtualFree` on Windows (upstream #496), unused variables under
-clang `-Wall`, 97 stray `;` under `-pedantic`, and one missing prototype.
+clang `-Wall`, 97 stray `;` under `-pedantic`, one missing prototype, and
+`snprintf` for `sprintf`.
 Built differently instead of patched: `MIR_DIRECT_DISPATCH`, no
 `-fsigned-char` (MIR's tests pass with unsigned `char`), and symbol hiding
 by `$(C_VISIBILITY)` and `src/zumir-win.def`.
 
-Until Stage 3, MIR links `exit`, `stderr` and `sprintf`: R CMD check's
-"compiled code" WARNING is allowed by name in `R-CMD-check.yaml`, and
-`tools/ci/platform.sh`'s symbol guard allows those names alone. Stage 3
-removes both allowances. The README's Mozilla Public License mention is about NanoJIT, not
+MIR's `exit`, `abort` and writes to `stderr` are redirected by macros in
+`src/zumir_mir_stdio.h`, which the wrappers include just before MIR's
+sources, to `src/zumir_mir_stdio.c`: a per-thread message buffer and one
+exit hook, an R error until Stage 3 makes it the trap. Its sprintf calls
+are snprintf on the fork. `src/zumir_mir_gcc.h` gives MIR's sources gcc's
+`-fno-tree-sra` by pragma: without it Rtools gcc miscompiles the
+interpreter. `platform.sh` fails on any CRAN-flagged import. The README's Mozilla Public License mention is about NanoJIT, not
 any MIR file (spike question 7).

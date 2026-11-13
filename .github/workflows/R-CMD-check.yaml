@@ -44,8 +44,3 @@ jobs:
          {"os": "windows-latest", "r": "devel"},
          {"os": "ubuntu-latest", "r": "release"},
          {"os": "ubuntu-latest", "r": "oldrel-1"}]
-      # Vendored MIR links exit and writes to stderr until Stage 3 routes
-      # them through zumir (#5), which removes this line. Any other warning,
-      # a compiler diagnostic included, still fails the leg.
-      allowed-warnings: |
-        compiled code

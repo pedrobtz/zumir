@@ -168,6 +168,17 @@ pass on each.
 
 **Work.**
 
+**Deviation (2026-11-13), the maintainer's:** MIR's `exit`, `abort`,
+`stderr` and `sprintf` are gone from the shared object in this stage, not
+Stage 3. `sanitizers.yml`, `valgrind.yml` and `cran-special.yml` run
+R CMD check with no allowed warning, so their legs could not pass with
+the planned "compiled code" WARNING (run 43465009770). The redirection is
+macros in the wrapper files (design §4.2), with a test entry; the `nm -u`
+allow-list is empty from here. Stage 3 keeps the trap, `MIR_init2`'s
+paths, the `curr_func` patch, `alloc-failure` and the error-loop tests.
+Also found here: Rtools gcc miscompiles the interpreter without
+`-fno-tree-sra` (design §4.2), set for MIR's sources by a pragma.
+
 **Deviation (2026-11-13), the maintainer's:** the patches are commits on
 the fork `pedrobtz/mir` (D12, revised), not files in `tools/patches/`,
 and filing them upstream is deferred to #30; each has its own `fix/`
@@ -206,6 +217,7 @@ one function without a prototype under clang `-pedantic`.
 - An `nm -u` guard in CI that fails on `exit`, `abort`, `printf`, `puts`,
   `stderr`, `stdout`, `sprintf`, `rand`. It is expected to fail until
   Stage 3; it is wired here with an allow-list that Stage 3 empties.
+  (Emptied here instead; see the deviation above.)
 
 **Tests.**
 
@@ -227,6 +239,7 @@ one function without a prototype under clang `-pedantic`.
 - R CMD check on the full profile has no compiler-diagnostic WARNING on
   any leg, including Windows (Rtools) and gcc 16 with `-pedantic`; the
   only allowed warning is "checking compiled code", which Stage 3 removes.
+  (After the deviation above: no allowed warning at all.)
 - MIR's own tests pass on every runner.
 - `verify-vendor` passes; every patch has an upstream issue or pull request
   linked in `PROVENANCE`, or (the deviation above) a `fix/` branch on the
@@ -248,14 +261,13 @@ account.
 
 **Work.**
 
-- Patches: every `exit`, `abort`, `fprintf(stderr, …)` and `sprintf` in the
-  vendored files routed through the context's error function or a
-  `MIR_FATAL` hook; `MIR_init2`'s version check and `_MIR_init`'s first
+- Patches: `MIR_init2`'s version check and `_MIR_init`'s first
   allocation return NULL; `MIR_finish` clears `curr_func`/`curr_module`
-  (mirspike patch 0001).
+  (mirspike patch 0001). Routing `exit`, `abort`, `stderr` and `sprintf`
+  away from the process moved to Stage 2 (its deviation of 2026-11-13):
+  here `zumir_mir_exit()`, the hook they reach, becomes the trap.
 - `zumir`'s handler: formats into a buffer, `longjmp`s to the entry point
   that called MIR, thread-local.
-- The `nm -u` guard's allow-list emptied.
 - `alloc-failure.yml` wired.
 - An internal test entry point, `.Call(zumir_test_invalid, kind, n)`,
   that builds and fails a module of each kind through the trap; no R API
@@ -276,8 +288,8 @@ account.
 
 **Exit criteria.**
 
-- "checking compiled code" is clean on every leg; no allowed warnings
-  remain.
+- "checking compiled code" is clean on every leg (from Stage 2); no
+  allowed warnings remain.
 - The error-recovery loop passes under valgrind and ASan.
 - `alloc-failure` runs and its findings are fixed or filed.
 

@@ -1,0 +1,35 @@
+# src/vendor/mir/ must be the fork commit pinned in src/vendor/PROVENANCE,
+# that commit the upstream pin plus exactly the listed patches
+# (tools/verify-vendor), and a pull request that changes the vendored tree
+# must change PROVENANCE too.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  schedule:
+    - cron: "48 9 * * 6"
+  workflow_dispatch:
+
+name: vendor
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  vendor:
+    # Decided without a runner (ci.md, Labels).
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:vendor'))
+    uses: pedrobtz/r-actions/.github/workflows/vendor.yml@v1
+    with:
+      vendor-dir: src/vendor/mir
+      verify: tools/verify-vendor
+      must-update: |
+        src/vendor/PROVENANCE

@@ -153,7 +153,8 @@ which holds a write token and is pinned to a commit:
   Linux x86-64 and aarch64 (macOS x86-64 too on the schedule and on
   dispatch): MIR's own tests on the vendored copy, the symbol guards, and
   on Linux the build with MIR forced out.
-- `alloc-failure.yaml`: weekly and on dispatch, fails each allocation in
+- `alloc-failure.yaml`: weekly, on dispatch and on `full-ci` pull
+  requests, fails each allocation in
   turn while `tools/alloc-exercise.R` runs the error trap's three invalid
   modules.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes

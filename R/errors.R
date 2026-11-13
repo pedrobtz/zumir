@@ -48,8 +48,13 @@ zumir_check <- function(res, call = sys.call(-1)) {
       call = call
     ))
   }
+  class <- if (identical(res$kind, "argument")) {
+    "zumir_argument_error"
+  } else {
+    "zumir_context_error"
+  }
   stop(structure(
-    class = c("zumir_context_error", "zumir_error", "error", "condition"),
+    class = c(class, "zumir_error", "error", "condition"),
     list(message = res$message, call = call, mir_type = res$type)
   ))
 }

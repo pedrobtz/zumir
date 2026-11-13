@@ -30,6 +30,13 @@ int zumir_mir_free(MIR_context_t ctx, zumir_arena *arena, int gen);
 size_t zumir_arena_bytes(const zumir_arena *arena);
 /* errno of the last code mapping or protection change refused, or 0. */
 int zumir_arena_map_errno(const zumir_arena *arena);
+/* The owner recorded on a context's arena (a zumir_rctx), from the MIR
+ * context alone: how a MIR_ shim finds the zumir context it acts on. */
+void zumir_arena_set_owner(zumir_arena *arena, void *owner);
+/* From now on zumir_mir_free() releases the arena directly, without
+ * MIR_finish: for a context MIR raised on, whose state is not trusted. */
+void zumir_arena_mark_failed(zumir_arena *arena);
+void *zumir_mir_owner(MIR_context_t ctx);
 /* Bytes held by all live arenas. */
 double zumir_mir_live_bytes(void);
 /* Arenas not yet freed, across the process: 0 when nothing leaked. */

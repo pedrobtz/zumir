@@ -8,8 +8,10 @@
 #      R's compiler and flags (design D2: the checks every MIR bump re-runs).
 #   2. The package built, then its symbols: nothing of MIR's exported, and
 #      no CRAN-flagged library symbol linked.
-#   3. The error trap on two threads at once (tests/c); on Linux, the R
-#      suite against the package built in step 2.
+#   3. The error trap on two threads at once (tests/c); the C API header
+#      alone as C99 and C++11, and the consumer package under
+#      tests/consumer; on Linux, the R suite against the package built in
+#      step 2.
 #   4. Linux: the package built with MIR forced out installs, loads and
 #      reports no target (tests/testthat/test-no-target.R).
 #
@@ -169,6 +171,38 @@ if [ "$os" = ubuntu ]; then
     $trap_srcs -o "$tmp/test-trap-threads-asan" -lpthread -lm
   "$tmp/test-trap-threads-asan"
 fi
+endgroup
+
+# ---------------------------------------------------------------------------
+# The C API (Stage 5): inst/include/zumir.h compiles alone as C99 and as
+# C++11 with -pedantic -Werror, and the consumer package under
+# tests/consumer builds against the installed zumir, passes its tests, and
+# links nothing CRAN flags (the header's inline code included).
+group "C API header"
+rinc=$("$Rscript" -e 'cat(R.home("include"))')
+printf '#include <zumir.h>\nint zumir_header_ok;\n' > "$tmp/h.c"
+# R's own headers go in as system headers: R 4.6's R_ext/Boolean.h uses a
+# C23 enum, which is R's business, and the check is of zumir.h.
+$cc_cmd -std=c99 -pedantic -Wall -Wextra -Werror -fsyntax-only -isystem "$rinc" -Iinst/include "$tmp/h.c"
+cxx_cmd=$("$R" CMD config CXX)
+cp "$tmp/h.c" "$tmp/h.cpp"
+$cxx_cmd -std=c++11 -pedantic -Wall -Wextra -Werror -fsyntax-only -isystem "$rinc" -Iinst/include "$tmp/h.cpp"
+echo "ok: zumir.h compiles alone as C99 and C++11, -pedantic -Werror"
+endgroup
+
+group "Consumer package"
+R_LIBS="$lib${R_LIBS:+:$R_LIBS}" "$R" CMD INSTALL --preclean --library="$lib" tests/consumer > "$tmp/consumer.log" 2>&1 ||
+  { cat "$tmp/consumer.log"; exit 1; }
+R_LIBS="$lib${R_LIBS:+:$R_LIBS}" "$Rscript" -e 'testthat::test_dir("tests/consumer/tests/testthat", package = "zumirconsumer", load_package = "installed", reporter = "summary", stop_on_failure = TRUE)'
+cso=$(ls "$lib"/zumirconsumer/libs/zumirconsumer.so "$lib"/zumirconsumer/libs/*/zumirconsumer.dll "$lib"/zumirconsumer/libs/zumirconsumer.dll 2>/dev/null | head -1)
+imports "$cso" | sed -e 's/^_*//' -e 's/_chk$//' -e 's/^stderrp$/stderr/' -e 's/^acrt_iob_func$/stderr/' |
+  grep -xE 'exit|abort|printf|vprintf|puts|putchar|sprintf|vsprintf|stderr|stdout' > "$tmp/cflagged" || true
+if [ -s "$tmp/cflagged" ]; then
+  echo "FAIL: the consumer links CRAN-flagged symbols through zumir.h:" >&2
+  cat "$tmp/cflagged" >&2
+  exit 1
+fi
+echo "ok: the consumer links no CRAN-flagged symbol"
 endgroup
 
 # ---------------------------------------------------------------------------

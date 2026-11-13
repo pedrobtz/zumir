@@ -42,7 +42,10 @@ and the CI and assurance wiring. Stage 2 vendored MIR, clean on every
 leg; Stage 3 added the error trap; Stage 4 contexts held by R, the
 load-time tier probe, and the first exports, `zumir_info()` and
 `zumir_tier()`. Q5 is decided (c): where W+X memory is refused, no tier
-runs and `zumir_tier()` is `"none"`. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+runs and `zumir_tier()` is `"none"`. Stage 5 added the C API table
+(`inst/include/zumir.h`, `src/zumir_api.c`), the import resolver with
+zumir's ports of R's arithmetic (`src/zumir_imports.c`), and
+`mir_function()` (`src/zumir_mirf.c`). The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -63,6 +66,9 @@ The shared commands, plus:
 
 ```sh
 R CMD INSTALL . && Rscript tools/ci-run-tests.R   # the suite as CI runs it
+R CMD INSTALL tests/consumer                      # the stand-in C API consumer
+Rscript -e 'testthat::test_dir("tests/consumer/tests/testthat",
+  package = "zumirconsumer", load_package = "installed")'
 ZUMIR_TEST_SEED=<n> Rscript tools/ci-run-tests.R  # replay a shuffled order
 bash tools/ci/platform.sh <macos|windows|ubuntu>  # the per-OS checks
 ```
@@ -109,6 +115,10 @@ These are fixed by the design before any code exists:
 - **A MIR update can break consumers' binaries.** The table carries a MIR
   ABI number; bump it whenever an exposed `mir.h` enum or struct changes
   (D21).
+- **`zumir_api_v1`'s layout is frozen** in
+  `tests/consumer/src/frozen/zumir_v1.h`; the consumer builds a unit
+  against it on every runner. Never edit that file: append fields to the
+  table, and add `zumir_v2.h` beside it when v2 ships.
 - **The C API table only grows.** Its first field is the version, and later
   versions only append fields. Consumers compiled against an older header
   must keep working.

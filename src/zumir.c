@@ -49,6 +49,14 @@ SEXP zumir_test_emit_model(SEXP x, SEXP model);
 SEXP zumir_test_call_rhs(SEXP x, SEXP model, SEXP y, SEXP par);
 SEXP zumir_test_threads(SEXP model, SEXP nthreads, SEXP nsub, SEXP nsteps, SEXP mode);
 SEXP zumir_test_deny_wx(void);
+SEXP zumir_set_long_double(SEXP on);
+SEXP zumir_test_port(SEXP which, SEXP x, SEXP y);
+SEXP zumir_test_import_names(SEXP kind);
+SEXP zumir_test_api_get(SEXP version, SEXP mir_abi);
+SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports);
+SEXP zumir_mirf_call(SEXP x, SEXP args);
+SEXP zumir_mir_roundtrip(SEXP text, SEXP path);
+void zumir_api_register(void);
 
 static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_has_target", (DL_FUNC) &zumir_has_target, 0},
@@ -74,6 +82,13 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_test_call_rhs", (DL_FUNC) &zumir_test_call_rhs, 4},
   {"zumir_test_threads", (DL_FUNC) &zumir_test_threads, 5},
   {"zumir_test_deny_wx", (DL_FUNC) &zumir_test_deny_wx, 0},
+  {"zumir_set_long_double", (DL_FUNC) &zumir_set_long_double, 1},
+  {"zumir_test_port", (DL_FUNC) &zumir_test_port, 3},
+  {"zumir_test_import_names", (DL_FUNC) &zumir_test_import_names, 1},
+  {"zumir_test_api_get", (DL_FUNC) &zumir_test_api_get, 2},
+  {"zumir_mirf_new", (DL_FUNC) &zumir_mirf_new, 4},
+  {"zumir_mirf_call", (DL_FUNC) &zumir_mirf_call, 2},
+  {"zumir_mir_roundtrip", (DL_FUNC) &zumir_mir_roundtrip, 2},
   {NULL, NULL, 0}
 };
 
@@ -95,4 +110,6 @@ void attribute_visible R_init_zumir(DllInfo *dll) {
   R_useDynamicSymbols(dll, FALSE);
   R_forceSymbols(dll, TRUE);
   zumir_trap_unhandled = zumir_unhandled;
+  /* The C API table, for packages with LinkingTo: zumir (design §4.3). */
+  zumir_api_register();
 }

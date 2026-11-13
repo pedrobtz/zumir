@@ -72,10 +72,23 @@ for local in src/vendor/mir/*; do
   grep -qx "$b" "$WORK/paths" || fail "src/vendor/mir/$b is not in tools/mir-files.txt"
 done
 
-# 4. The consumer-visible part of mir.h is the one recorded (D21).
+# 4. The consumer-visible part of mir.h is the one recorded (D21), at the
+# ZUMIR_MIR_ABI inst/include/zumir.h declares; consumers get exactly the
+# vendored headers.
 tools/mir-abi src/vendor/mir/mir.h > "$WORK/abi.txt"
-cmp -s "$WORK/abi.txt" tools/mir-abi.txt ||
+tail -n +2 tools/mir-abi.txt | cmp -s "$WORK/abi.txt" - ||
   fail "the enums and structs of mir.h differ from tools/mir-abi.txt"
+abi_now=$(sed -n 's/^#define ZUMIR_MIR_ABI \([0-9]*\).*/\1/p' inst/include/zumir.h)
+[ "$(sed -n '1s/^# ZUMIR_MIR_ABI //p' tools/mir-abi.txt)" = "$abi_now" ] ||
+  fail "tools/mir-abi.txt was not recorded at ZUMIR_MIR_ABI $abi_now (inst/include/zumir.h)"
+for f in $(grep -v '^#' tools/mir-headers.txt); do
+  cmp -s "src/vendor/mir/$f" "inst/include/zumir/$f" ||
+    fail "inst/include/zumir/$f differs from src/vendor/mir/$f"
+done
+for local in inst/include/zumir/*; do
+  grep -qx "$(basename "$local")" tools/mir-headers.txt ||
+    fail "inst/include/zumir/$(basename "$local") is not in tools/mir-headers.txt"
+done
 
 # 5. The build reports the pinned upstream commit.
 grep -q "#define ZUMIR_MIR_COMMIT \"$up_pin\"" src/zumir_mir.h ||

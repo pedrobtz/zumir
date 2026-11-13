@@ -89,7 +89,7 @@ static void probe_tier(int tier) {
   zumir_trap_push(&t);
   if (setjmp(t.env) == 0) {
     ctx = zumir_mir_new(&arena);
-    if (tier == ZUMIR_TIER_NATIVE) {
+    if (tier == ZUMIR_ITIER_NATIVE) {
       MIR_gen_init(ctx);
       gen = 1;
       MIR_gen_set_optimize_level(ctx, 2);
@@ -98,7 +98,7 @@ static void probe_tier(int tier) {
     MIR_module_t mod = DLIST_TAIL(MIR_module_t, *MIR_get_module_list(ctx));
     MIR_load_module(ctx, mod);
     MIR_load_external(ctx, "exp", (void *) exp);
-    MIR_link(ctx, tier == ZUMIR_TIER_NATIVE ? MIR_set_gen_interface : MIR_set_interp_interface,
+    MIR_link(ctx, tier == ZUMIR_ITIER_NATIVE ? MIR_set_gen_interface : MIR_set_interp_interface,
              NULL);
     for (MIR_item_t it = DLIST_HEAD(MIR_item_t, mod->items); it != NULL;
          it = DLIST_NEXT(MIR_item_t, it)) {
@@ -135,11 +135,31 @@ static void probe_tier(int tier) {
 }
 #endif
 
+/* 1 when every capability of `tier` (0 native, 1 interpreter) held in the
+ * last probe. */
+int zumir_probe_tier_ok(int tier) {
+  if (!probe.done || tier < 0 || tier > 1) return 0;
+  for (int k = 0; k < NCAP; k++)
+    if (!probe.ok[tier][k]) return 0;
+  return 1;
+}
+
+/* The capability flags of inst/include/zumir.h: bit k native, 4 + k
+ * interpreter. */
+unsigned zumir_probe_flags(void) {
+  unsigned flags = 0;
+  if (!probe.done) return 0;
+  for (int t = 0; t < 2; t++)
+    for (int k = 0; k < NCAP; k++)
+      if (probe.ok[t][k]) flags |= 1u << (4 * t + k);
+  return flags;
+}
+
 /* Runs the probe now and keeps the result for zumir_probe_result(). */
 SEXP zumir_probe_run(void) {
 #if ZUMIR_HAVE_MIR
-  probe_tier(ZUMIR_TIER_NATIVE);
-  probe_tier(ZUMIR_TIER_INTERP);
+  probe_tier(ZUMIR_ITIER_NATIVE);
+  probe_tier(ZUMIR_ITIER_INTERP);
 #else
   for (int tier = 0; tier < 2; tier++)
     for (int k = 0; k < NCAP; k++) {

@@ -51,6 +51,8 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/valgrind.yml@v1
     with:
       profile: auto
+      # Other packages' findings only, each with its reason.
+      suppressions: tools/valgrind.supp
 
   lto:
     # Decided without a runner (ci.md, Labels); the gate inside repeats it.

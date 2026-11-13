@@ -17,6 +17,12 @@
 MIR_code_alloc_t zumir_mir_default_code_alloc(void) {
   return &default_code_alloc;
 }
+
+/* How many operands MIR_new_insn reads for `code` (0 for calls): static in
+ * mir.c, needed by the variadic MIR_new_insn shim (zumir_api.c). */
+size_t zumir_mir_code_nops(MIR_context_t ctx, MIR_insn_code_t code) {
+  return insn_code_nops(ctx, code);
+}
 #else
 /* ISO C forbids an empty translation unit. */
 typedef int zumir_mir_c_unused;

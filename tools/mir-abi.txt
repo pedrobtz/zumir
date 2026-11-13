@@ -1,3 +1,4 @@
+# ZUMIR_MIR_ABI 1
 typedef enum MIR_error_type {
   REP8 (ERR_EL, no, syntax, binary_io, alloc, finish, no_module, nested_module, no_func),
   REP5 (ERR_EL, func, vararg_func, nested_func, wrong_param_value, hard_reg),

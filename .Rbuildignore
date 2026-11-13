@@ -19,3 +19,4 @@
 ^tools/ci-run-tests\.R$
 ^\.gitattributes$
 ^tests/c$
+^tests/consumer$

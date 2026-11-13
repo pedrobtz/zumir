@@ -27,7 +27,7 @@ between pull requests and the full profile.
 | 2 | [Vendored MIR, clean on every leg](#stage-2--vendored-mir-clean-on-every-leg) | full | [#4](https://github.com/pedrobtz/zumir/issues/4) | [#31](https://github.com/pedrobtz/zumir/pull/31) | 2026-11-13 |
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | [#32](https://github.com/pedrobtz/zumir/pull/32) | 2026-11-13 |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | [#33](https://github.com/pedrobtz/zumir/pull/33) | 2026-11-13 |
-| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | | |
+| 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | [#34](https://github.com/pedrobtz/zumir/pull/34) | 2026-11-13 |
 | 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | | |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
@@ -391,6 +391,11 @@ table and call the result; R users can run MIR text.
 - A consumer test package under `tests/consumer/`, built in CI against the
   installed `zumir`, that emits the three spike right-hand sides, with a
   C++ source file beside its C.
+- **Deviation (2026-11-13), the maintainer's:** `pedrobtz/zupmxode` does
+  not exist yet, so the stand-in consumer under `tests/consumer/` takes
+  its place here (the three right-hand sides through the table and the
+  emitter, both tiers, C and C++), and the real trial moves to Stage 13,
+  where §11 already requires `zupmxode` to build against zumir.
 - `zupmxode` tried against the table before Stage 6 starts: its lowering
   prototype, or its Stage 2 if that exists, builds against this stage's
   header and runs one model end to end on both tiers, with compile time
@@ -433,7 +438,8 @@ table and call the result; R users can run MIR text.
 **Exit criteria.**
 
 - The consumer package builds and passes on the full profile.
-- `zupmxode` ran one model against the table, on both tiers.
+- `zupmxode` ran one model against the table, on both tiers. (Moved to
+  Stage 13; see the deviation above.)
 - Every Tests line exists and was seen to fail.
 
 **Design.** [§4.3](design.md#43-the-c-api), [§5](design.md#5-public-r-api-complete-v010-surface)
@@ -775,7 +781,10 @@ pointers for user code, with copies for outputs: valgrind (with
 - `Version: 0.1.0` and its `NEWS.md` heading.
 - `cran-comments.md` listing the r-actions legs as test environments.
 - `urlchecker::url_check()` and `spelling::spell_check_package()` clean.
-- `zupmxode` builds and passes its Stage 2 against this package (§11).
+- `zupmxode` builds and passes its Stage 2 against this package (§11),
+  and runs one model end to end on both tiers, with compile time against
+  call count recorded in `.agents/benchmarks.md` (moved here from Stage 5,
+  2026-11-13). A table change it needs lands before v0.1.0.
 
 **Exit criteria.**
 

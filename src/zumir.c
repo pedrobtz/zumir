@@ -18,6 +18,8 @@ SEXP zumir_test_sink(SEXP text, SEXP path);
 SEXP zumir_test_exit(SEXP text, SEXP trapped);
 SEXP zumir_test_invalid(SEXP kind, SEXP finish);
 SEXP zumir_test_rss(void);
+SEXP zumir_test_fail_alloc(SEXP n);
+SEXP zumir_test_live_arenas(void);
 
 static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_has_target", (DL_FUNC) &zumir_has_target, 0},
@@ -25,6 +27,8 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_test_exit", (DL_FUNC) &zumir_test_exit, 2},
   {"zumir_test_invalid", (DL_FUNC) &zumir_test_invalid, 2},
   {"zumir_test_rss", (DL_FUNC) &zumir_test_rss, 0},
+  {"zumir_test_fail_alloc", (DL_FUNC) &zumir_test_fail_alloc, 1},
+  {"zumir_test_live_arenas", (DL_FUNC) &zumir_test_live_arenas, 0},
   {NULL, NULL, 0}
 };
 

@@ -793,10 +793,18 @@ decides it and the maintainer may overturn it.
   MIR's `MIR_error_type_t` as `mir_type`. The trap files use no R API, so
   the C tests under `tests/c/` link them without R. Every context comes
   from `zumir_mir_new()` (`src/zumir_mir_glue.c`), under a trap, with
-  zumir's error function and an allocator that raises the trap instead of
-  returning NULL: MIR leaves many of its allocations unchecked, and the
-  first `alloc-failure` sweep found 128 NULL dereferences inside MIR that
-  way (2026-11-13). Stage 4's counting allocators build on this one.
+  zumir's error function and its own arena: a heap allocator that raises
+  the trap instead of returning NULL, and links and counts every block,
+  and a code allocator wrapping MIR's that records every mapping. MIR
+  leaves many allocations unchecked (the first `alloc-failure` sweep found
+  128 NULL dereferences), and publishes objects before it has finished
+  allocating them (`new_func_arr` adds the function before its
+  variables), so after a failed allocation `MIR_finish` would walk a
+  half-built object; the second sweep found 60 such crashes.
+  `zumir_mir_free()` therefore finishes a context with `MIR_finish` only
+  when no allocation failed, and otherwise frees the arena's blocks and
+  mappings directly (2026-11-13). The arena's byte count is Stage 4's
+  per-context memory.
 - **D5 (C).** `cfunction()` reads no system header. Machines without a
   toolchain have none, and the prelude is what makes the same source
   compile on every platform.

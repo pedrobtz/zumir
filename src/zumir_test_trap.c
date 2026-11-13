@@ -54,9 +54,10 @@ static void build_invalid(MIR_context_t ctx, const char *kind) {
 
 /* Builds and fails a module of `kind` ("syntax", "operand" or "import")
  in a fresh context under a trap, then finishes the context under
- * a second trap when `finish` is TRUE. Returns NULL if MIR reported
+ * zumir_mir_free() when `finish` is TRUE. Returns NULL if MIR reported
  * nothing, else list(type, status, message, finished, depth): finished is
- * FALSE if MIR_finish itself raised, and depth is this thread's trap depth
+ * FALSE when the context was released without MIR_finish (an allocation
+ * failed, or MIR_finish raised), and depth is this thread's trap depth
  * afterwards, which must be 0. */
 SEXP zumir_test_invalid(SEXP s_kind, SEXP s_finish) {
 #if ZUMIR_HAVE_MIR
@@ -66,29 +67,23 @@ SEXP zumir_test_invalid(SEXP s_kind, SEXP s_finish) {
     Rf_error("unknown kind '%s'", kind);
 
   MIR_context_t volatile ctx = NULL;
-  volatile int raised = 0, finished = 1;
-  zumir_trap t, t2;
+  zumir_arena *volatile arena = NULL;
+  volatile int raised = 0;
+  int finished = 1;
+  zumir_trap t;
 
   zumir_mir_message_clear();
   zumir_trap_push(&t);
   if (setjmp(t.env) == 0) {
-    ctx = zumir_mir_new();
+    ctx = zumir_mir_new(&arena);
     build_invalid(ctx, kind);
     zumir_trap_pop(&t);
   } else {
     raised = 1;
   }
-  /* A context the trap left: finish it under a trap of its own. With none,
-   * MIR raised while creating it, and there is nothing to finish. */
-  if (finish && ctx != NULL) {
-    zumir_trap_push(&t2);
-    if (setjmp(t2.env) == 0) {
-      MIR_finish(ctx);
-      zumir_trap_pop(&t2);
-    } else {
-      finished = 0;
-    }
-  }
+  /* With `finish` FALSE the context is leaked on purpose, for the RSS
+   * test's own check that a leak shows. */
+  if (finish) finished = zumir_mir_free(ctx, arena);
 
   if (!raised) return R_NilValue;
   const char *names[] = {"type", "status", "message", "finished", "depth", ""};
@@ -104,6 +99,26 @@ SEXP zumir_test_invalid(SEXP s_kind, SEXP s_finish) {
   (void) s_kind;
   (void) s_finish;
   Rf_error("zumir was built without MIR");
+#endif
+}
+
+/* Fails the n-th allocation zumir's MIR allocator makes from now on (0:
+ * none), so a test can fail each of MIR's allocations in turn. */
+SEXP zumir_test_fail_alloc(SEXP n) {
+#if ZUMIR_HAVE_MIR
+  zumir_mir_fail_alloc_at((long) Rf_asReal(n));
+#else
+  (void) n;
+#endif
+  return R_NilValue;
+}
+
+/* Arenas not yet freed: 0 when no context leaked. */
+SEXP zumir_test_live_arenas(void) {
+#if ZUMIR_HAVE_MIR
+  return Rf_ScalarReal((double) zumir_mir_live_arenas());
+#else
+  return Rf_ScalarReal(0);
 #endif
 }
 

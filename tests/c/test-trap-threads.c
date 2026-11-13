@@ -69,10 +69,11 @@ static void *run(void *arg) {
   gate_wait();
   for (int i = 0; i < N; i++) {
     MIR_context_t volatile ctx = NULL;
+    zumir_arena *volatile arena = NULL;
     zumir_trap t;
     zumir_trap_push(&t);
     if (setjmp(t.env) == 0) {
-      ctx = zumir_mir_new();
+      ctx = zumir_mir_new(&arena);
       fail(ctx, j->kind);
       zumir_trap_pop(&t);
     } else {
@@ -83,14 +84,7 @@ static void *run(void *arg) {
       else
         j->wrong++;
     }
-    zumir_trap t2;
-    zumir_trap_push(&t2);
-    if (setjmp(t2.env) == 0) {
-      MIR_finish(ctx);
-      zumir_trap_pop(&t2);
-    } else {
-      j->wrong++;
-    }
+    if (!zumir_mir_free(ctx, arena)) j->wrong++;
   }
   j->depth = zumir_trap_depth();
   return NULL;
@@ -107,6 +101,8 @@ int main(void) {
            jobs[k].wrong, jobs[k].depth);
     ok = ok && jobs[k].caught == N && jobs[k].wrong == 0 && jobs[k].depth == 0;
   }
+  printf("live arenas %ld\n", zumir_mir_live_arenas());
+  ok = ok && zumir_mir_live_arenas() == 0;
   printf("%s\n", ok ? "ok" : "FAIL");
   return ok ? 0 : 1;
 }

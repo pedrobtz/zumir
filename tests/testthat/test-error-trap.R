@@ -79,3 +79,28 @@ test_that("10^3 failures of each kind: every one caught, session alive, RSS flat
     if (!is.na(growth)) expect_lt(growth, 16 * 1024^2, label = line)
   }
 })
+
+test_that("failing each of MIR's allocations in turn: an error, never a crash", {
+  skip_if_not(.Call(zumir_has_target), "built without MIR")
+  # zumir's allocator fails its n-th allocation; past the last one MIR
+  # makes, the module's own error comes back. Each run is an error of one
+  # of those two types, and every context's arena is freed.
+  types <- c(syntax = 1L, operand = 26L, import = 20L)
+  alloc_error <- 3L # MIR_alloc_error
+  on.exit(.Call(zumir_test_fail_alloc, 0))
+  for (kind in names(types)) {
+    seen <- integer()
+    for (n in 1:260) {
+      .Call(zumir_test_fail_alloc, n)
+      cnd <- tryCatch(test_invalid_module(kind), zumir_error = identity)
+      .Call(zumir_test_fail_alloc, 0)
+      expect_s3_class(cnd, "zumir_mir_error")
+      seen <- c(seen, cnd$mir_type)
+    }
+    expect_setequal(unique(seen), c(alloc_error, types[[kind]]))
+    # The sweep passed MIR's last allocation, so the run ends on the
+    # module's own error.
+    expect_identical(seen[[260]], types[[kind]], info = kind)
+  }
+  expect_identical(.Call(zumir_test_live_arenas), 0)
+})

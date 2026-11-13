@@ -90,9 +90,11 @@ These are fixed by the design before any code exists:
   context that raised may only be finished, under a trap of its own.
 - **`mir.h` only through `src/zumir_mir_api.h`.** Its inline
   `MIR_init2` writes to `stderr`; the header puts the redirection first.
-- **Contexts only from `zumir_mir_new()`**, under a trap: it installs
-  zumir's error function and the allocator that raises instead of
-  returning NULL, which MIR does not always check.
+- **Contexts only from `zumir_mir_new(&arena)`**, under a trap, and freed
+  only by `zumir_mir_free(ctx, arena)`: the arena's allocator raises
+  instead of returning NULL (MIR does not always check), and after a
+  failed allocation the arena is freed directly, never by `MIR_finish`,
+  which would walk half-built objects. Never call `MIR_finish` yourself.
 - **No `longjmp` crosses a consumer's frames.** Every `zumir_` entry in the
   C API returns a status code, and every `MIR_` entry is a shim that traps
   and records the error in its context, which can then only be freed
@@ -125,7 +127,9 @@ dynamic symbol lookup off, and unloading it removes its DLL.
 `test-error-trap.R`: MIR's errors as `zumir_mir_error` conditions through
 an internal entry (`test_invalid_module()`), an error inside
 `MIR_finish_func` then `MIR_finish`, and in a child process 10³ failures of
-each kind with RSS flat. `tests/c/test-trap-threads.c` (built without R by
+each kind with RSS flat, and every one of MIR's first 260 allocations
+failed in turn (`.Call(zumir_test_fail_alloc, n)`) with no crash and no
+arena left. `tests/c/test-trap-threads.c` (built without R by
 `platform.sh`): the trap on two threads at once. `test-mir-stdio.R`: writes
 to MIR's `stderr` reach the buffer, other
 `FILE`s are untouched, and `exit` becomes an R error, through an internal

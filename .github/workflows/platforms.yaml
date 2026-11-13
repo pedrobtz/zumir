@@ -1,6 +1,11 @@
-# zumir's own per-OS checks, one job per OS: tools/ci/platform.sh runs once
-# on each runner. Stage 2 adds MIR's own tests on the vendored copy, and
-# Stages 3 to 5 add theirs (roadmap).
+# zumir's own per-OS checks, one job per runner: tools/ci/platform.sh runs
+# MIR's own tests on the vendored copy, the symbol checks, and on Linux the
+# build without MIR (Stage 2); Stages 3 to 5 add theirs (roadmap).
+#
+# macOS arm64, Windows, and Linux x86-64 and aarch64 on every pull request;
+# macOS x86-64 too on the schedule and on a dispatch, so a pull request takes
+# one macOS runner (ci.md). Dispatch it on a branch to see that leg:
+# `gh workflow run platforms.yaml --ref <branch>`.
 on:
   # No `push:`. A pull request already checks its merge with main, so the
   # push after merge would check the same tree again, in every package at
@@ -35,6 +40,11 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/platforms.yml@v1
     with:
       profile: auto
-      # The script builds MIR without R and never reads R/, man/ or
-      # tests/testthat, so an R-only change skips it.
-      skip-r-only: true
+      # The script installs the package and runs its tests (the no-target
+      # build), so R-only changes run it too, and it needs testthat.
+      r-dependencies: true
+      timeout-minutes: 30
+      os: >-
+        ${{ github.event_name == 'pull_request'
+          && '["macos-latest", "windows-latest", "ubuntu-latest", "ubuntu-24.04-arm"]'
+          || '["macos-latest", "macos-15-intel", "windows-latest", "ubuntu-latest", "ubuntu-24.04-arm"]' }}

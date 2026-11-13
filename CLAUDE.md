@@ -38,8 +38,8 @@ RFC 0073. It outranks this file: `CLAUDE.md` orients, the design decides.
 
 Scaffolded 2026-11-13 with `create-pkg.sh`. Stage 1 (package identity)
 gave it its `DESCRIPTION`, routine registration with dynamic lookup off,
-and the CI and assurance wiring; there is no MIR and no exported function
-yet. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+and the CI and assurance wiring. Stage 2 vendored MIR, clean on every
+leg. There is no exported function yet. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -105,15 +105,22 @@ These are fixed by the design before any code exists:
 - **`cfunction()` reads no system header** (D5), and its import resolver
   resolves only the fixed list in D6. Anything else is a link error, so the
   same source behaves the same everywhere and can't reach R's internals.
-- **MIR's symbols are hidden** from Stage 2, so they can't clash with another
-  package that vendors MIR.
+- **MIR's symbols are hidden**, so they can't clash with another package
+  that vendors MIR. `R_init_zumir` is the only export; `platform.sh` checks
+  it on every runner. A new source file gets `$(C_VISIBILITY)` too.
 
 ## Testing
 
-One test so far, `test-load.R`: the installed package loads in a child R
-process with dynamic symbol lookup off, and unloading it removes its DLL.
-`helper-child.R` holds the child-process helpers (`installed_lib()`,
-`run_child()`); Stage 3's error-trap loop uses them too. Design §8
+`test-load.R`: the installed package loads in a child R process with
+dynamic symbol lookup off, and unloading it removes its DLL.
+`test-mir-stdio.R`: writes to MIR's `stderr` reach the buffer, other
+`FILE`s are untouched, and `exit` becomes an R error, through an internal
+entry compiled under the same macros. `test-no-target.R`: MIR is compiled
+in exactly where `helper-target.R`'s
+platform table says; `platform.sh` runs the suite again on a build with
+`ZUMIR_NO_MIR=1`, with `ZUMIR_EXPECT_NO_MIR=1`. `helper-child.R` holds the
+child-process helpers (`installed_lib()`, `run_child()`); Stage 3's
+error-trap loop uses them too. Design §8
 plans MIR's own tests, `mir-tests` through `mir_function()`, and `c-tests`
 through `c2mir` by the corpus's own rules, on both tiers; `.agents/assurance.md`
 lists every oracle and its gap.
@@ -125,14 +132,24 @@ which holds a write token and is pinned to a commit:
 
 - `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
   R-devel row added to `runners` (full profile only).
-- `native-checks.yaml`: valgrind, lto, rchk, analyzers and cran-special;
-  sanitizers (with ASan) joins in Stage 2, once there is C to instrument.
+- `native-checks.yaml`: sanitizers (with ASan), valgrind, lto, rchk,
+  analyzers and cran-special. `analyzers` runs off pull requests only, with
+  180 minutes: `-fanalyzer` on vendored MIR outran the 45-minute default,
+  and `exclude` does not skip the analysis (pedrobtz/r-actions#113).
 - `gctorture.yaml`: the wide step on pull requests under a 10-minute
   budget; step 20 daily (while the roadmap is implemented) and on dispatch.
-- `platforms.yaml`: `tools/ci/platform.sh` once per macOS and Windows
-  runner, skipped on R-only changes. Empty until Stage 2.
+- `platforms.yaml`: `tools/ci/platform.sh` on macOS arm64, Windows and
+  Linux x86-64 and aarch64 (macOS x86-64 too on the schedule and on
+  dispatch): MIR's own tests on the vendored copy, the symbol guards, and
+  on Linux the build with MIR forced out.
+- `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
+  `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`
   with `ungated-jobs: fail`.
+
+`vendor-upstream.yml` is not called: it compares release tags, and MIR is
+pinned to a commit past the only one (D2), so it would always report a
+difference.
 
 Every job tests the labels in its `if:` (`ci.md`, Labels). The scheduled
 slot is Saturday 08:00 to 09:59 UTC, a different minute per workflow;
@@ -146,9 +163,38 @@ MIR (MIT), from `vnmakarov/mir` at commit
 named by its full hash. **Deviation from `native-code.md`:** that file says
 to pin a stable release. D2 (the maintainer's decision) pins this commit on
 purpose, because the only tag (v1.0.0, May 2024) misses two and a half years
-of fixes. A bump re-runs the spike's checks. MIR goes under `src/vendor/mir/`, kept as upstream plus a numbered
-patch queue in `tools/patches/`, never a fork (D12). `tools/vendor.sh`
-records the commit, the file list and the patches (§4.1, §4.2). Not
-vendored yet: fill in the file list and every local patch when Stage 2
-lands. The README's Mozilla Public License mention is about NanoJIT, not
+of fixes. A bump re-runs the spike's checks.
+
+MIR's core, generator and interpreter are under `src/vendor/mir/`: the 32
+files in `tools/mir-files.txt` (c2mir comes in Stage 8). They are compiled
+only through `src/zumir_mir.c` and `src/zumir_mir_gen.c`, which include
+`mir.c` and `mir-gen.c` behind the target guard in `src/zumir_mir.h`.
+
+**Never edit `src/vendor/mir/` in place.** It is copied from the fork
+[`pedrobtz/mir`](https://github.com/pedrobtz/mir) (D12, as `qio` vendors
+carquet): the fork's `master` mirrors upstream, its `zumir` branch is the
+upstream pin plus one commit per patch, and each patch also sits alone on
+a `fix/` branch for upstreaming (#30). Change the `zumir` branch, push,
+update `Fork commit:` and the patch list in `src/vendor/PROVENANCE`, and
+run `tools/vendor.sh`. `tools/verify-vendor` (in `vendor.yaml`) fails on a
+file edited in place, a series that differs from the list, or a changed
+`mir.h` ABI (`tools/mir-abi.txt`, D21). **Deviation from
+`native-code.md`:** the fork's commits, not `tools/patches/`, are the patch
+record.
+
+The six patches (`src/vendor/PROVENANCE` has the reasons): two Rtools gcc
+warnings, `VirtualFree` on Windows (upstream #496), unused variables under
+clang `-Wall`, 97 stray `;` under `-pedantic`, one missing prototype, and
+`snprintf` for `sprintf`.
+Built differently instead of patched: `MIR_DIRECT_DISPATCH`, no
+`-fsigned-char` (MIR's tests pass with unsigned `char`), and symbol hiding
+by `$(C_VISIBILITY)` and `src/zumir-win.def`.
+
+MIR's `exit`, `abort` and writes to `stderr` are redirected by macros in
+`src/zumir_mir_stdio.h`, which the wrappers include just before MIR's
+sources, to `src/zumir_mir_stdio.c`: a per-thread message buffer and one
+exit hook, an R error until Stage 3 makes it the trap. Its sprintf calls
+are snprintf on the fork. `src/zumir_mir_gcc.h` gives MIR's sources gcc's
+`-fno-tree-sra` by pragma: without it Rtools gcc miscompiles the
+interpreter. `platform.sh` fails on any CRAN-flagged import. The README's Mozilla Public License mention is about NanoJIT, not
 any MIR file (spike question 7).

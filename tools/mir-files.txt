@@ -1,0 +1,35 @@
+# Files vendored from vnmakarov/mir into src/vendor/mir/, by upstream path.
+# Core, generator and interpreter, for the five targets MIR has. c2mir comes
+# with Stage 8. Not vendored: tests, benchmarks, llvm2mir, mir2c, drivers.
+LICENSE
+mir.c
+mir.h
+mir-alloc.h
+mir-alloc-default.c
+mir-code-alloc.h
+mir-code-alloc-default.c
+mir-bitmap.h
+mir-dlist.h
+mir-hash.h
+mir-htab.h
+mir-reduce.h
+mir-varr.h
+mir-interp.c
+mir-gen.c
+mir-gen.h
+real-time.h
+mir-x86_64.c
+mir-x86_64.h
+mir-gen-x86_64.c
+mir-aarch64.c
+mir-aarch64.h
+mir-gen-aarch64.c
+mir-ppc64.c
+mir-ppc64.h
+mir-gen-ppc64.c
+mir-s390x.c
+mir-s390x.h
+mir-gen-s390x.c
+mir-riscv64.c
+mir-riscv64.h
+mir-gen-riscv64.c

@@ -22,15 +22,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
-# `sanitizers` joins in Stage 2 (#4): its guard fails a build with no
-# `__ubsan` symbols, and until MIR is vendored zumir has no C for UBSan to
-# instrument (roadmap, Stage 1 deviation of 2026-11-13).
-#
-# `profile` goes to the workflows it changes: quick skips valgrind and
-# cran-special. lto, rchk and analyzers take minutes
-# either way and run on every push. gctorture has its own caller,
+# `profile` goes to the three workflows it changes: quick skips the asan
+# containers, valgrind and cran-special. lto and rchk take minutes either
+# way and run on every push; analyzers runs off pull requests only. gctorture has its own caller,
 # gctorture.yaml, with step 20 on a schedule.
 jobs:
+  sanitizers:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:sanitizers'))
+    uses: pedrobtz/r-actions/.github/workflows/sanitizers.yml@v1
+    with:
+      asan: true
+      profile: auto
+
   valgrind:
     # Decided without a runner (ci.md, Labels); the gate inside repeats it.
     if: >-
@@ -64,14 +73,16 @@ jobs:
     uses: pedrobtz/r-actions/.github/workflows/rchk.yml@v1
 
   analyzers:
-    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
-    if: >-
-      github.event_name != 'pull_request'
-      || contains(github.event.pull_request.labels.*.name, 'full-ci')
-      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
-        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
-        || contains(github.event.pull_request.labels.*.name, 'skip-ci:analyzers'))
+    # Off pull requests: -fanalyzer ran past its 45 minutes on vendored MIR
+    # (about 23,000 lines through two wrapper files) in Stage 2's first full
+    # run, and `exclude` only stops findings gating, not the analysis
+    # (pedrobtz/r-actions#113). Weekly and on dispatch, with time to finish.
+    if: github.event_name != 'pull_request'
     uses: pedrobtz/r-actions/.github/workflows/analyzers.yml@v1
+    with:
+      exclude: |
+        src/vendor
+      timeout-minutes: 180
 
   cran-special:
     # Decided without a runner (ci.md, Labels); the gate inside repeats it.

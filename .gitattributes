@@ -1,0 +1,4 @@
+# Vendored MIR stays byte for byte what the fork holds (tools/verify-vendor),
+# whatever core.autocrlf a checkout uses.
+src/vendor/mir/** -text
+tools/mir-abi.txt -text

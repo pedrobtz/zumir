@@ -172,16 +172,17 @@ unchanged except for the patches in
 `mir-<target>.c`, `mir-<target>.h` and `mir-gen-<target>.c` for the five
 targets, the default allocators, and `c2mir/` with its per-target
 directories. Not vendored: the test and benchmark trees, `llvm2mir`,
-`mir2c`, the drivers and utilities. `tools/vendor.sh` records the
-commit, the file list and the patches, and re-applies them.
+`mir2c`, the drivers and utilities. `tools/mir-files.txt` is the file
+list, `src/vendor/PROVENANCE` the upstream commit, the fork commit and
+the patches (D12), and `tools/vendor.sh` copies the tree from the fork.
 
 Sizes from the README: about 23,000 lines for the core and generator,
 11,000 for the core and interpreter, and `c2mir.c` at 550 KB of source.
 
 ### 4.2 Patches
 
-Each is a numbered patch file, offered upstream where it is not
-R-specific.
+Each is one commit on the fork's `zumir` branch (D12), offered upstream
+where it is not R-specific; `src/vendor/PROVENANCE` lists them.
 
 - **No exit, no abort, no printing.** MIR's default error handler prints
   and calls `exit (1)`, and `MIR_init` can reach it before a handler is
@@ -196,12 +197,42 @@ R-specific.
   warnings R CMD check counts as significant (`-Wreturn-type` in
   `item_name_ptr`, `-Wuninitialized` in `mir-varr.h`), and
   `default_mem_unmap` passes a size to `VirtualFree(…, MEM_RELEASE)`, so
-  every unmap fails and code pages leak (#496). All three are patched.
+  every unmap fails and code pages leak (#496). All three are patched;
+  the uninitialised field was one of three hash probes that set only part
+  of a `reg_desc_t`, and all three are fixed (2026-11-13).
+- **`-Wall` on macOS.** clang reports an unused variable in `mir-gen.c`
+  and, on Apple aarch64, two set-but-unused ones; R CMD check counts both
+  kinds. Patched (2026-11-13).
 - **Strict ISO C.** Under `-pedantic`, gcc 16 reports about 90 stray `;`
   after the `DEF_VARR`/`DEF_DLIST`/`DEF_HTAB` macro invocations and the
   interpreter's computed `goto *`, as significant install warnings. The
-  semicolons are removed; the interpreter is built with
-  `MIR_DIRECT_DISPATCH`.
+  semicolons are removed (97 lines, the other targets' generators
+  included); the interpreter is built with `MIR_DIRECT_DISPATCH`, defined
+  in the wrapper that compiles `mir.c`, not by a patch. clang
+  `-pedantic` also reports `mem_page_size ()` without a prototype, which
+  R counts; patched. The function-pointer and `void *` conversions it
+  reports are left: R CMD check excludes "ISO C forbids … function
+  pointer" by name (2026-11-13). Upstream's #490, "make `mir.h`
+  self-contained in strict ISO C", is in the pinned commit.
+  Decided 2026-11-13, in Stage 2 (moved there from Stage 3 by the
+  maintainer, because the sanitizer, valgrind and rcnst checks run
+  R CMD check with no allowed warning): MIR's `exit`, `abort` and writes
+  to `stderr` are redirected by macros in `src/zumir_mir_stdio.h`, which
+  the two wrapper files include just before MIR's sources, not by
+  patches. `exit` and `abort` call one zumir hook, and `stderr` is a sink
+  whose text goes to a per-thread buffer. MIR's ten `sprintf` calls are
+  `snprintf` with the array's size, a patch fit for upstream. Stage 3
+  turns the hook into the trap and makes `MIR_init2` and `_MIR_init`
+  return `NULL`.
+- **gcc's `-ftree-sra`.** With R's flags, Rtools gcc 14 miscompiles the
+  interpreter: MIR's own `interp-test8`, `readme-example` and
+  `gen-test-sieve` crash on Windows, and pass with `-fno-tree-sra` added
+  and nothing else changed (2026-11-13). Upstream's makefile has given
+  gcc `-fno-tree-sra` since 2019, with no reason recorded. zumir sets it
+  for MIR's sources alone with `#pragma GCC optimize`
+  (`src/zumir_mir_gcc.h`), since R CMD check reports `-f` flags in
+  `Makevars` as non-portable. The root cause, undefined behaviour in the
+  interpreter or a gcc bug, is to be reported upstream (#30).
 - **Code-memory failures are errors.** `_MIR_set_code` ignores the result
   of `mem_protect` and writes into a page that may still be execute-only:
   where writable-and-executable memory is refused, the process dies with
@@ -216,15 +247,26 @@ R-specific.
   message, and the aborts go through the error function.
 - **Other CPUs.** `mir.c` and `mir-gen.c` stop with `#error "undefined or
   unsupported generation target"` on a CPU MIR does not target. The build
-  leaves MIR out there (a `configure` test, or a preprocessor guard in a
-  wrapper file), so the package still installs and every entry reports
-  that there is no target (§7). The same guard leaves MIR out on Windows
-  aarch64 (D25).
+  leaves MIR out there, so the package still installs and every entry
+  reports that there is no target (§7). The same guard leaves MIR out on
+  Windows aarch64 (D25). Decided 2026-11-13: a preprocessor guard
+  (`src/zumir_mir.h`) in the two wrapper files that include `mir.c` and
+  `mir-gen.c`, not a `configure` test, so no `configure` script is
+  needed; `ZUMIR_NO_MIR=1` at build time forces the same path, which a
+  Linux leg tests.
 - **No `-fsigned-char`.** Upstream builds with it; R CMD check flags it as
-  a non-portable flag. Replaced by a source fix or a `configure` test.
+  a non-portable flag. Decided 2026-11-13: dropped, with no source fix.
+  The flag dates from a blanket 2020 change to upstream's makefile, and
+  MIR's own tests pass with `-funsigned-char` on x86-64 and on Linux
+  aarch64, where `char` is unsigned (`tools/ci/platform.sh`). `c2mir`
+  (Stage 8) is checked again when it is vendored.
 - **Symbol hiding.** MIR's external symbols are given hidden visibility
   so they cannot clash with another package that vendors MIR, or with a
-  future version of this one loaded beside it.
+  future version of this one loaded beside it. Decided 2026-11-13: by the
+  build, not a patch: `$(C_VISIBILITY)` on every object with
+  `R_init_zumir` marked visible, and `src/zumir-win.def` exporting that
+  one name on Windows. `tools/ci/platform.sh` fails if the shared object
+  exports any other zumir or MIR name.
 
 ### 4.3 The C API
 
@@ -763,11 +805,22 @@ decides it and the maintainer may overturn it.
 - **D11 (C), 2026-11-13.** A code-memory failure (`mem_map`,
   `mem_protect`) is an error through the context's error function, never
   a write into protected memory. Patched in MIR and offered upstream.
-- **D12 (C), 2026-11-13.** MIR is kept as upstream plus a numbered patch
-  queue, not a fork. Upstream merged 56 of its last 60 outside pull
-  requests, in bursts months apart; each patch is offered upstream and
-  dropped from the queue when a pinned commit contains it. A fork is
-  reconsidered if a needed patch is refused or the queue stops rebasing.
+- **D12 (M), revised 2026-11-13.** MIR's local patches live on a fork,
+  [`pedrobtz/mir`](https://github.com/pedrobtz/mir), as `qio` keeps
+  carquet's: its `master` mirrors upstream, its `zumir` branch is the
+  pinned upstream commit plus one commit per patch, and each patch also
+  sits alone on a `fix/` branch cut from `master`, ready to become an
+  upstream pull request. `src/vendor/mir/` is copied from the `zumir`
+  branch at a pinned commit, and `tools/verify-vendor` checks that commit
+  against the upstream pin and the patch list in `src/vendor/PROVENANCE`.
+  The maintainer chose this over a patch queue in `tools/patches/` when
+  Stage 2 vendored MIR: a re-vendor is a rebase that reports conflicts
+  instead of a patch that fails to apply, and every patch is a reviewable
+  commit with its reason. Upstream merged 56 of its last 60 outside pull
+  requests, in bursts months apart; each patch is still offered upstream
+  (#30) and dropped from the branch when a pinned commit contains it.
+  First version, 2026-11-13: upstream plus a numbered patch queue, not a
+  fork.
 - **D13 (C), 2026-11-13.** `zumir.h` carries a straight-line `double`
   emitter (§4.3). Lowering is the same work for every consumer. The
   spike's emitter covered loads, stores and the five arithmetic

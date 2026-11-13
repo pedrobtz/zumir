@@ -1,0 +1,75 @@
+Vendored dependency: MIR, a lightweight JIT compiler (core, generator and
+interpreter)
+
+  Upstream:      https://github.com/vnmakarov/mir
+  Commit:        dc2c763f1c8bc746102ce87933d866335f9e6c06
+  Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
+  Fork:          https://github.com/pedrobtz/mir
+  Fork branch:   zumir
+  Fork commit:   1571f1340f0eeb524ed127fa4e5c6ed6c4b377a6
+  Imported:      2026-11-13
+  License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
+                 Vladimir Makarov
+  Local patches: one commit each on the fork's zumir branch, in this order
+                 ea7f1643 Fix two warnings Rtools gcc 14 reports
+                 773a4834 Release code memory with a zero size on Windows
+                 dafb8e1b Remove variables clang -Wall reports as unused
+                 f35a0021 Drop the semicolons after DEF_* macros at file scope
+                 6edb5ce2 Give mem_page_size a prototype
+                 1571f134 Use snprintf with the buffer's size instead of sprintf
+
+src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
+fork at the fork commit above. That commit is the upstream commit plus
+exactly the patches listed, one commit each (design D12): the fork's master
+mirrors upstream, its zumir branch carries the series on the upstream pin,
+and each patch also sits alone on a fix/ branch cut from master, to become
+an upstream pull request. tools/vendor.sh copies the tree; tools/verify-vendor
+re-derives it and fails on any other difference (vendor.yaml runs it).
+tools/mir-abi.txt holds the enums and structs of the vendored mir.h, the
+part a consumer of the C API compiles in (design D21).
+
+A commit, not a release, is pinned on purpose (design D2): the only tag
+misses two and a half years of fixes. Every bump re-runs the spike's checks.
+
+The patches, with the fork branch that carries each one alone:
+
+  ea7f1643  item_name_ptr() returns after mir_assert (FALSE); three hash
+            probes initialise every reg_desc_t field. Rtools gcc 14
+            -Wreturn-type and -Wuninitialized. fix/rtools-gcc-warnings;
+            upstream: not filed yet (#30).
+  773a4834  VirtualFree (addr, 0, MEM_RELEASE). fix/windows-virtualfree;
+            upstream issue https://github.com/vnmakarov/mir/issues/496.
+  dafb8e1b  An unused variable in mir-gen.c; two set-but-unused ones on Apple
+            aarch64. clang -Wall on macOS. fix/unused-variables; upstream:
+            not filed yet (#30).
+  f35a0021  No `;` after the DEF_* macro invocations at file scope (97
+            lines). gcc -pedantic. fix/no-extra-semicolons; upstream: not
+            filed yet (#30).
+  6edb5ce2  mem_page_size (void), the only empty parameter list. clang
+            -pedantic -Wstrict-prototypes. fix/strict-prototypes; upstream:
+            not filed yet (#30).
+  1571f134  snprintf with the destination array's size for all ten sprintf
+            calls. R's compiled-code check rejects sprintf.
+            fix/snprintf; upstream: not filed yet (#30).
+
+Not patched, built differently instead (design §4.2):
+
+  - exit, abort and writes to stderr are redirected to zumir by macros in
+    src/zumir_mir_stdio.h, defined in the wrapper files just before MIR's
+    sources; MIR's code is unchanged for it.
+  - MIR's sources are compiled with gcc's -fno-tree-sra
+    (src/zumir_mir_gcc.h), as upstream's makefile does: without it Rtools
+    gcc miscompiles the interpreter.
+  - The interpreter is compiled with MIR_DIRECT_DISPATCH (src/zumir_mir.c),
+    a switch instead of computed `goto *`, which -pedantic reports.
+  - No -fsigned-char: MIR's own tests pass with -funsigned-char on x86-64
+    (2026-11-13) and on Linux aarch64, where char is unsigned, in
+    tools/ci/platform.sh, so the core does not depend on it.
+  - Symbols are hidden by $(C_VISIBILITY) and src/zumir-win.def; MIR's
+    sources are unchanged for it.
+  - On a CPU MIR does not target, and on Windows aarch64 (D25), the wrapper
+    files compile nothing (src/zumir_mir.h).
+
+Not vendored: c2mir (Stage 8), the tests, benchmarks, llvm2mir, mir2c, the
+drivers and utilities. The README's Mozilla Public License mention is about
+NanoJIT, not any MIR file.

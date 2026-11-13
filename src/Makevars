@@ -1,0 +1,10 @@
+# MIR is compiled through two wrapper files that include its sources
+# (zumir_mir.h decides whether it is compiled at all), so the vendored tree
+# under vendor/mir/ is never compiled on its own.
+#
+# $(C_VISIBILITY) hides every symbol but R_init_zumir, which is marked
+# visible. ZUMIR_NO_MIR=1 in the environment builds without MIR, as on a CPU
+# MIR does not target (tests/testthat/test-no-target.R).
+PKG_CPPFLAGS = $(ZUMIR_NO_MIR:1=-DZUMIR_NO_MIR)
+PKG_CFLAGS = $(C_VISIBILITY)
+OBJECTS = zumir.o zumir_mir.o zumir_mir_gen.o

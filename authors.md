@@ -7,6 +7,9 @@
 - **Vladimir Makarov**. Copyright holder.  
   Author of the vendored 'MIR' library
 
+- **logzero**. Copyright holder.  
+  Co-author of the vendored 'MIR' file real-time.h
+
 ## Citation
 
 Source:

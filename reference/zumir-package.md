@@ -29,3 +29,6 @@ Other contributors:
 
 - Vladimir Makarov (Author of the vendored 'MIR' library) \[copyright
   holder\]
+
+- logzero (Co-author of the vendored 'MIR' file real-time.h) \[copyright
+  holder\]

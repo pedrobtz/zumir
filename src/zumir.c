@@ -14,12 +14,41 @@ static SEXP zumir_has_target(void) {
   return Rf_ScalarLogical(ZUMIR_HAVE_MIR ? TRUE : FALSE);
 }
 
+/* list(commit, patches) for zumir_info(). */
+static SEXP zumir_mir_build(void) {
+  static const char *patches[] = {ZUMIR_MIR_PATCHES};
+  int n = (int) (sizeof(patches) / sizeof(patches[0]));
+  const char *names[] = {"commit", "patches", ""};
+  SEXP res = PROTECT(Rf_mkNamed(VECSXP, names));
+  SET_VECTOR_ELT(res, 0, Rf_mkString(ZUMIR_MIR_COMMIT));
+  SEXP p = PROTECT(Rf_allocVector(STRSXP, n));
+  for (int i = 0; i < n; i++) SET_STRING_ELT(p, i, Rf_mkChar(patches[i]));
+  SET_VECTOR_ELT(res, 1, p);
+  UNPROTECT(2);
+  return res;
+}
+
 SEXP zumir_test_sink(SEXP text, SEXP path);
 SEXP zumir_test_exit(SEXP text, SEXP trapped);
 SEXP zumir_test_invalid(SEXP kind, SEXP finish);
 SEXP zumir_test_rss(void);
 SEXP zumir_test_fail_alloc(SEXP n);
 SEXP zumir_test_live_arenas(void);
+SEXP zumir_ctx_new(SEXP tier);
+SEXP zumir_ctx_free(SEXP x);
+SEXP zumir_ctx_state(SEXP x);
+SEXP zumir_ctx_begin(SEXP x, SEXP name);
+SEXP zumir_ctx_end(SEXP x);
+SEXP zumir_ctx_scan(SEXP x, SEXP text);
+SEXP zumir_ctx_link(SEXP x, SEXP name);
+SEXP zumir_ctx_call_d(SEXP x, SEXP arg);
+SEXP zumir_memory(void);
+SEXP zumir_probe_run(void);
+SEXP zumir_probe_result(void);
+SEXP zumir_test_emit_model(SEXP x, SEXP model);
+SEXP zumir_test_call_rhs(SEXP x, SEXP model, SEXP y, SEXP par);
+SEXP zumir_test_threads(SEXP model, SEXP nthreads, SEXP nsub, SEXP nsteps, SEXP mode);
+SEXP zumir_test_deny_wx(void);
 
 static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_has_target", (DL_FUNC) &zumir_has_target, 0},
@@ -29,6 +58,22 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_test_rss", (DL_FUNC) &zumir_test_rss, 0},
   {"zumir_test_fail_alloc", (DL_FUNC) &zumir_test_fail_alloc, 1},
   {"zumir_test_live_arenas", (DL_FUNC) &zumir_test_live_arenas, 0},
+  {"zumir_mir_build", (DL_FUNC) &zumir_mir_build, 0},
+  {"zumir_ctx_new", (DL_FUNC) &zumir_ctx_new, 1},
+  {"zumir_ctx_free", (DL_FUNC) &zumir_ctx_free, 1},
+  {"zumir_ctx_state", (DL_FUNC) &zumir_ctx_state, 1},
+  {"zumir_ctx_begin", (DL_FUNC) &zumir_ctx_begin, 2},
+  {"zumir_ctx_end", (DL_FUNC) &zumir_ctx_end, 1},
+  {"zumir_ctx_scan", (DL_FUNC) &zumir_ctx_scan, 2},
+  {"zumir_ctx_link", (DL_FUNC) &zumir_ctx_link, 2},
+  {"zumir_ctx_call_d", (DL_FUNC) &zumir_ctx_call_d, 2},
+  {"zumir_memory", (DL_FUNC) &zumir_memory, 0},
+  {"zumir_probe_run", (DL_FUNC) &zumir_probe_run, 0},
+  {"zumir_probe_result", (DL_FUNC) &zumir_probe_result, 0},
+  {"zumir_test_emit_model", (DL_FUNC) &zumir_test_emit_model, 2},
+  {"zumir_test_call_rhs", (DL_FUNC) &zumir_test_call_rhs, 4},
+  {"zumir_test_threads", (DL_FUNC) &zumir_test_threads, 5},
+  {"zumir_test_deny_wx", (DL_FUNC) &zumir_test_deny_wx, 0},
   {NULL, NULL, 0}
 };
 

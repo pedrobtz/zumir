@@ -791,7 +791,12 @@ decides it and the maintainer may overturn it.
   A trapped error reaches R as a condition of class
   `c("zumir_mir_error", "zumir_error", "error", "condition")` carrying
   MIR's `MIR_error_type_t` as `mir_type`. The trap files use no R API, so
-  the C tests under `tests/c/` link them without R.
+  the C tests under `tests/c/` link them without R. Every context comes
+  from `zumir_mir_new()` (`src/zumir_mir_glue.c`), under a trap, with
+  zumir's error function and an allocator that raises the trap instead of
+  returning NULL: MIR leaves many of its allocations unchecked, and the
+  first `alloc-failure` sweep found 128 NULL dereferences inside MIR that
+  way (2026-11-13). Stage 4's counting allocators build on this one.
 - **D5 (C).** `cfunction()` reads no system header. Machines without a
   toolchain have none, and the prelude is what makes the same source
   compile on every platform.

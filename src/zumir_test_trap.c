@@ -70,32 +70,17 @@ SEXP zumir_test_invalid(SEXP s_kind, SEXP s_finish) {
   zumir_trap t, t2;
 
   zumir_mir_message_clear();
-  ctx = MIR_init();
-  if (ctx == NULL) {
-    /* The fork's patch: MIR_init returns NULL when it cannot allocate the
-     * context, before any error function exists. */
-    const char *names[] = {"type", "status", "message", "finished", "depth", ""};
-    SEXP res = PROTECT(Rf_mkNamed(VECSXP, names));
-    SET_VECTOR_ELT(res, 0, Rf_ScalarInteger(MIR_alloc_error));
-    SET_VECTOR_ELT(res, 1, Rf_ScalarInteger(0));
-    SET_VECTOR_ELT(res, 2, Rf_mkString("MIR_init failed: not enough memory for a context"));
-    SET_VECTOR_ELT(res, 3, Rf_ScalarLogical(TRUE));
-    SET_VECTOR_ELT(res, 4, Rf_ScalarInteger(zumir_trap_depth()));
-    UNPROTECT(1);
-    return res;
-  }
-  MIR_set_error_func(ctx, (MIR_error_func_t) zumir_mir_error_func);
-
   zumir_trap_push(&t);
   if (setjmp(t.env) == 0) {
+    ctx = zumir_mir_new();
     build_invalid(ctx, kind);
     zumir_trap_pop(&t);
   } else {
     raised = 1;
   }
-
-  if (finish) {
-    MIR_set_error_func(ctx, (MIR_error_func_t) zumir_mir_error_func);
+  /* A context the trap left: finish it under a trap of its own. With none,
+   * MIR raised while creating it, and there is nothing to finish. */
+  if (finish && ctx != NULL) {
     zumir_trap_push(&t2);
     if (setjmp(t2.env) == 0) {
       MIR_finish(ctx);

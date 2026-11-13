@@ -160,7 +160,7 @@ echo "ok: no CRAN-flagged symbol linked"
 # from MIR and zumir's R-free trap files, with R's compiler and flags; on
 # Linux also under ASan and UBSan.
 group "Trap on two threads"
-trap_srcs="tests/c/test-trap-threads.c src/zumir_mir.c src/zumir_mir_stdio.c src/zumir_trap.c"
+trap_srcs="tests/c/test-trap-threads.c src/zumir_mir.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c"
 $cc_cmd $r_cflags -Isrc -DNDEBUG $trap_srcs -o "$tmp/test-trap-threads" -lpthread -lm
 "$tmp/test-trap-threads"
 if [ "$os" = ubuntu ]; then

@@ -90,6 +90,9 @@ These are fixed by the design before any code exists:
   context that raised may only be finished, under a trap of its own.
 - **`mir.h` only through `src/zumir_mir_api.h`.** Its inline
   `MIR_init2` writes to `stderr`; the header puts the redirection first.
+- **Contexts only from `zumir_mir_new()`**, under a trap: it installs
+  zumir's error function and the allocator that raises instead of
+  returning NULL, which MIR does not always check.
 - **No `longjmp` crosses a consumer's frames.** Every `zumir_` entry in the
   C API returns a status code, and every `MIR_` entry is a shim that traps
   and records the error in its context, which can then only be freed

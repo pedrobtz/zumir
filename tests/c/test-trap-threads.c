@@ -5,7 +5,8 @@
  * src/zumir_mir.c) and zumir's R-free trap files:
  *
  *   cc -Isrc -DNDEBUG tests/c/test-trap-threads.c src/zumir_mir.c \
- *     src/zumir_mir_stdio.c src/zumir_trap.c -lpthread -lm
+ *     src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c \
+ *     -lpthread -lm
  *
  * Exit status 0 when every check holds. */
 #include <pthread.h>
@@ -67,15 +68,11 @@ static void *run(void *arg) {
   job *j = arg;
   gate_wait();
   for (int i = 0; i < N; i++) {
-    MIR_context_t volatile ctx = MIR_init();
-    if (ctx == NULL) {
-      j->wrong++;
-      continue;
-    }
-    MIR_set_error_func(ctx, (MIR_error_func_t) zumir_mir_error_func);
+    MIR_context_t volatile ctx = NULL;
     zumir_trap t;
     zumir_trap_push(&t);
     if (setjmp(t.env) == 0) {
+      ctx = zumir_mir_new();
       fail(ctx, j->kind);
       zumir_trap_pop(&t);
     } else {

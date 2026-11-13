@@ -71,9 +71,11 @@ test_that("10^3 failures of each kind: every one caught, session alive, RSS flat
   for (line in lines) {
     f <- strsplit(line, " +")[[1]]
     expect_identical(f[3:4], c("1000", "1000"), info = line)
-    # A context leaked per failure is at least 50 KB, so 10^3 of them would
-    # be 50 MB; the spike measured 0 to 16 KB of growth for the second 10^3.
+    # A context leaked per failure is about 97 KB, so 10^3 of them would be
+    # 97 MB (measured by not finishing them). Finished, the second 10^3
+    # grew by 24 to 504 KB, and by 5.9 MB under ASan, whose quarantine holds
+    # freed memory; 16 MB keeps a factor of six from a leak.
     growth <- as.numeric(f[5])
-    if (!is.na(growth)) expect_lt(growth, 4 * 1024^2, label = line)
+    if (!is.na(growth)) expect_lt(growth, 16 * 1024^2, label = line)
   }
 })

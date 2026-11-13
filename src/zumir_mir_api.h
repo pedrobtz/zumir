@@ -9,4 +9,11 @@
 #include "zumir_mir_stdio.h"
 #include "vendor/mir/mir.h"
 
+/* zumir_mir_glue.c. Both raise the trap, so call them under one. */
+void zumir_mir_error_func(MIR_error_type_t type, const char *format, ...) ZUMIR_NORETURN;
+/* A new context with zumir's error function and trapping allocator. If it
+ * raises, there is no context to finish: what MIR had allocated is lost,
+ * which happens only when an allocation fails. */
+MIR_context_t zumir_mir_new(void);
+
 #endif

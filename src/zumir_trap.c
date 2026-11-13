@@ -1,6 +1,5 @@
 /* The error trap; see zumir_trap.h. No R API here. */
 #include <stdio.h>
-#include <string.h>
 
 #include "zumir_trap.h"
 
@@ -42,14 +41,4 @@ void zumir_trap_raise(int type, int status, const char *message) {
   snprintf(t->message, sizeof(t->message), "%s", message == NULL ? "" : message);
   top = t->prev;
   longjmp(t->env, 1);
-}
-
-void zumir_mir_error_func(int type, const char *format, ...) {
-  char buf[1024];
-  va_list ap;
-  va_start(ap, format);
-  vsnprintf(buf, sizeof(buf), format, ap);
-  va_end(ap);
-  zumir_mir_message_clear();
-  zumir_trap_raise(type, 0, buf);
 }

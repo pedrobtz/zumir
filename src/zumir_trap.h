@@ -16,8 +16,8 @@
  *     finished, under a trap of its own ...
  *   }
  *
- * MIR's error function (zumir_mir_error_func, installed on every context
- * with MIR_set_error_func) and MIR's exit and abort (zumir_mir_exit, by the
+ * MIR's error function (zumir_mir_error_func in zumir_mir_glue.c, installed
+ * on every context by zumir_mir_new()) and MIR's exit and abort (zumir_mir_exit, by the
  * macros in zumir_mir_stdio.h) end in zumir_trap_raise(), which copies the
  * message into the innermost trap, pops it and longjmps there. The stack is
  * thread-local, so an error on one thread lands in that thread's trap.
@@ -57,9 +57,5 @@ int zumir_trap_depth(void);
  * return. */
 void zumir_trap_raise(int type, int status, const char *message) ZUMIR_NORETURN;
 extern void (*zumir_trap_unhandled)(int type, int status, const char *message);
-
-/* MIR's error function, for MIR_set_error_func: MIR_error_func_t's shape,
- * with the type as an int so this header needs no mir.h. */
-void zumir_mir_error_func(int type, const char *format, ...) ZUMIR_NORETURN;
 
 #endif

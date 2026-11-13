@@ -18,9 +18,9 @@ test_that("a FILE that is not stderr is written as stdio writes it", {
   expect_identical(readBin(path, "raw", 100), charToRaw("héllo %d!"))
 })
 
-test_that("exit becomes an R error carrying what MIR wrote", {
+test_that("exit with no trap is an R error carrying what MIR wrote", {
   expect_error(
-    .Call(zumir_test_exit, "bad module"),
+    .Call(zumir_test_exit, "bad module", FALSE),
     "MIR stopped (status 3): bad module",
     fixed = TRUE
   )
@@ -28,4 +28,9 @@ test_that("exit becomes an R error carrying what MIR wrote", {
   path <- tempfile()
   on.exit(unlink(path))
   expect_false(grepl("bad module", .Call(zumir_test_sink, "x", path)))
+})
+
+test_that("exit and abort under a trap land in it, with what MIR wrote", {
+  # abort() is exit status 134; the trailing newline is dropped.
+  expect_identical(.Call(zumir_test_exit, "boom", TRUE), c("134", "boom"))
 })

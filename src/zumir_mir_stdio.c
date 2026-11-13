@@ -1,19 +1,13 @@
 /* The other end of zumir_mir_stdio.h: what MIR writes to stderr is kept in
- * a per-thread buffer, and MIR's exit and abort become an R error carrying
- * it. This file uses the real stdio and never sees the redirecting macros.
- *
- * Stage 2 has no R entry that calls MIR, so zumir_mir_exit() is not yet
- * reachable from R. Stage 3 (#5) replaces its body with the error trap,
- * which longjmps back to the zumir entry that called MIR (D4, D20): an R
- * error raised here would skip MIR's own cleanup, and from a thread other
- * than R's main thread it must not be raised at all. */
-#define R_NO_REMAP
+ * a per-thread buffer, and MIR's exit and abort go to the error trap
+ * (zumir_trap.h) with it as the message. This file uses the real stdio,
+ * never sees the redirecting macros, and uses no R API. */
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
-#include <R.h>
-#include <Rinternals.h>
 
 #include "zumir_mir_sink.h"
+#include "zumir_trap.h"
 
 char zumir_mir_stderr_sink;
 
@@ -73,5 +67,11 @@ void zumir_mir_perror(const char *s) {
 }
 
 void zumir_mir_exit(int status) {
-  Rf_error("MIR stopped (status %d): %s", status, zumir_mir_message());
+  char buf[ZUMIR_MIR_MESSAGE_MAX];
+  snprintf(buf, sizeof(buf), "%s", zumir_mir_message());
+  /* Drop a trailing newline: the message becomes an R condition's. */
+  size_t n = strlen(buf);
+  while (n > 0 && buf[n - 1] == '\n') buf[--n] = '\0';
+  zumir_mir_message_clear();
+  zumir_trap_raise(ZUMIR_TRAP_EXIT, status, buf);
 }

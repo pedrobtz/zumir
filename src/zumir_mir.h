@@ -29,7 +29,8 @@
   "5803194c Load unaligned hash and reduce keys with memcpy",\
   "1c4b1cca Declare MIR_insn's operands as a flexible array member",\
   "c65e7044 Report code-memory failures through the error function",\
-  "3e643e83 Spill float arguments in the Win64 interpreter shim"
+  "3e643e83 Spill float arguments in the Win64 interpreter shim",\
+  "ca84f3e4 End MIR_output_item's expr data case"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

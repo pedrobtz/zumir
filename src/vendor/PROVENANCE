@@ -6,7 +6,7 @@ interpreter)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   3e643e832b01f0214687c37eaf2c695072219e04
+  Fork commit:   ca84f3e447afc16975c14d4b605cf3df2b60c692
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -23,6 +23,7 @@ interpreter)
                  1c4b1cca Declare MIR_insn's operands as a flexible array member
                  c65e7044 Report code-memory failures through the error function
                  3e643e83 Spill float arguments in the Win64 interpreter shim
+                 ca84f3e4 End MIR_output_item's expr data case
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -82,6 +83,9 @@ The patches, with the fork branch that carries each one alone:
             caller's double argument read as a stale slot (x * 2 + 1 gave 1
             for every x). fix/win64-interp-float-args; upstream: not filed
             yet (#30).
+  ca84f3e4  MIR_output_item's expr data case returns instead of falling
+            into the function case (heap overflow writing out test13.mir).
+            fix/output-expr-data; upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

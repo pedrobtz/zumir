@@ -1,0 +1,9 @@
+# The vendored MIR headers consumers compile against, copied by
+# tools/vendor.sh into inst/include/zumir/ (inst/include/zumir.h includes
+# zumir/mir.h). tools/verify-vendor checks they are identical.
+mir.h
+mir-alloc.h
+mir-code-alloc.h
+mir-dlist.h
+mir-htab.h
+mir-varr.h

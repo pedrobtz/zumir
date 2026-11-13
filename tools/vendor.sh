@@ -37,22 +37,28 @@ git -C "$src" -c core.autocrlf=false -c advice.detachedHead=false checkout -q "$
 
 files=$(grep -v '^#' tools/mir-files.txt | grep -v '^[[:space:]]*$')
 
-# The consumer-visible part of mir.h (D21), against the last import's.
+# The consumer-visible part of mir.h (D21), against the last import's. The
+# first line of tools/mir-abi.txt is the ZUMIR_MIR_ABI it was recorded at.
+abi_now=$(sed -n 's/^#define ZUMIR_MIR_ABI \([0-9]*\).*/\1/p' inst/include/zumir.h)
+abi_was=$(sed -n '1s/^# ZUMIR_MIR_ABI //p' tools/mir-abi.txt)
 tools/mir-abi "$src/mir.h" > "$tmp/abi.txt"
-if ! cmp -s "$tmp/abi.txt" tools/mir-abi.txt; then
-  if [ "${MIR_ABI_REVIEWED:-0}" != 1 ]; then
+if ! tail -n +2 tools/mir-abi.txt | cmp -s "$tmp/abi.txt" -; then
+  if [ "${MIR_ABI_REVIEWED:-0}" != 1 ] || [ "$abi_now" -le "$abi_was" ]; then
     echo "The enums and structs of mir.h changed (tools/mir-abi):" >&2
-    diff -u tools/mir-abi.txt "$tmp/abi.txt" >&2 || true
-    echo "Bump the MIR ABI number in the C API table (D21), then re-run with" >&2
-    echo "MIR_ABI_REVIEWED=1 to record the new tools/mir-abi.txt." >&2
+    tail -n +2 tools/mir-abi.txt | diff -u - "$tmp/abi.txt" >&2 || true
+    echo "Bump ZUMIR_MIR_ABI in inst/include/zumir.h (now $abi_now, recorded" >&2
+    echo "$abi_was; D21), then re-run with MIR_ABI_REVIEWED=1." >&2
     exit 1
   fi
-  cp "$tmp/abi.txt" tools/mir-abi.txt
   echo "recorded the new tools/mir-abi.txt"
 fi
+{ echo "# ZUMIR_MIR_ABI $abi_now"; cat "$tmp/abi.txt"; } > tools/mir-abi.txt
 
 rm -rf src/vendor/mir
 mkdir -p src/vendor/mir
 for f in $files; do cp "$src/$f" "src/vendor/mir/$f"; done
+# The headers a consumer compiles against (LinkingTo: zumir), as vendored.
+mkdir -p inst/include/zumir
+for f in $(cat tools/mir-headers.txt | grep -v '^#'); do cp "src/vendor/mir/$f" "inst/include/zumir/$f"; done
 echo "vendored MIR from $fork_url at $fork_pin: $(echo "$files" | wc -l | tr -d ' ') files"
 echo "now run tools/verify-vendor"

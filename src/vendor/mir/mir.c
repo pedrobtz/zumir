@@ -3151,7 +3151,8 @@ void MIR_output_item (MIR_context_t ctx, FILE *f, MIR_item_t item) {
   if (item->item_type == MIR_expr_data_item) {
     expr_data = item->u.expr_data;
     if (expr_data->name != NULL) fprintf (f, "%s:", expr_data->name);
-    fprintf (f, "\texpr\t%s", MIR_item_name (ctx, expr_data->expr_item));
+    fprintf (f, "\texpr\t%s\n", MIR_item_name (ctx, expr_data->expr_item));
+    return;
   }
   if (item->item_type == MIR_data_item) {
     data = item->u.data;

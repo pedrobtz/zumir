@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   46ed8157f434ba9a1895ae1e2ccbdee8af726cf1
+  Fork commit:   a603752b007b38f77011eb023549456bccf70aea
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -38,6 +38,7 @@ interpreter and the C compiler c2mir)
                  4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path
                  06104552 Empty the buffer when a macro argument has no start marker
                  46ed8157 Generate no code from a source with parse errors
+                 a603752b Keep the current stream valid after the end of the unit
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -156,6 +157,11 @@ The patches, with the fork branch that carries each one alone:
             a tree the generator could not read (SEGV, libFuzzer in CI); it
             now generates only from a source with no error.
             fix/c2mir-no-gen-after-errors; upstream: not filed yet (#30).
+  a603752b  Past the end of the unit, cs was the popped stream: reading on freed
+            it and read it again (heap-use-after-free); removing the last
+            string stream left cs undefined. Both from libFuzzer in CI.
+            fix/c2mir-stream-after-end (on fix/c2mir-allocator, which it
+            needs); upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

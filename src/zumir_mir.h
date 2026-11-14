@@ -44,7 +44,8 @@
   "feacf4fe Stop at the end of the unit after a ## concatenation",\
   "4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path",\
   "06104552 Empty the buffer when a macro argument has no start marker",\
-  "46ed8157 Generate no code from a source with parse errors"
+  "46ed8157 Generate no code from a source with parse errors",\
+  "a603752b Keep the current stream valid after the end of the unit"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

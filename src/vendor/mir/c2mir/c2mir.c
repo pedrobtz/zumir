@@ -1088,9 +1088,21 @@ static void set_string_stream (c2m_ctx_t c2m_ctx, const char *str, pos_t pos,
 }
 
 static void remove_string_stream (c2m_ctx_t c2m_ctx) {
+  MIR_alloc_t alloc = c2m_alloc (c2m_ctx);
+
   assert (cs->f == NULL && cs->f == NULL);
-  free_stream (c2m_alloc (c2m_ctx), VARR_POP (stream_t, streams));
-  cs = VARR_LAST (stream_t, streams);
+  if (VARR_LENGTH (stream_t, streams) > 1) {
+    free_stream (alloc, VARR_POP (stream_t, streams));
+    cs = VARR_LAST (stream_t, streams);
+    return;
+  }
+  /* The unit's last stream: emptied and kept as the ended stream, as at an
+     EOF, so cs stays valid and the next read ends the unit. Popping it and
+     reading VARR_LAST of the empty stack left cs undefined. */
+  VARR_TRUNC (char, cs->ln, 0);
+  if (VARR_LENGTH (stream_t, streams) == 1) VARR_POP (stream_t, streams);
+  if (eof_s != NULL && eof_s != cs) free_stream (alloc, eof_s);
+  eof_s = cs;
 }
 
 #define MAX_UTF8 0x1FFFFF
@@ -1570,6 +1582,10 @@ static token_t get_next_pptoken_1 (c2m_ctx_t c2m_ctx, int header_p) {
     case ']': return new_token (c2m_ctx, cs->pos, "]", curr_c, N_IGNORE);
     case EOF: {
       pos = cs->pos;
+      /* Past the end of the unit, cs is eof_s: it ends the unit again, and
+         is not freed (the next read would read it). */
+      if (VARR_LENGTH (stream_t, streams) == 0)
+        return new_token (c2m_ctx, pos, "<EOU>", T_EOU, N_IGNORE);
       if (eof_s != NULL) free_stream (c2m_alloc (c2m_ctx), eof_s);
       if (eof_s != cs && cs->f != stdin && cs->f != NULL) {
         fclose (cs->f);

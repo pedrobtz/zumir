@@ -30,7 +30,7 @@ between pull requests and the full profile.
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | [#34](https://github.com/pedrobtz/zumir/pull/34) | 2026-11-13 |
 | 6 | [rfunction()](#stage-6--rfunction) | full | [#17](https://github.com/pedrobtz/zumir/issues/17) | [#36](https://github.com/pedrobtz/zumir/pull/36) | 2026-11-14 |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | [#39](https://github.com/pedrobtz/zumir/pull/39) | 2026-11-14 |
-| 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
+| 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | 2026-11-14 |
 | 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
 | 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
 | 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
@@ -630,6 +630,34 @@ system header, with only the allowed library names resolving.
   TinyCC alternative is written up in the design for the maintainer.
 
 **Design.** [§4.5](design.md#45-cfunction) steps 1 to 4, D5, D6, D9, D19.
+
+**Deviations (2026-11-14).**
+
+- **Patches.** The roadmap's three planned `c2mir` patches were not
+  needed:
+  - the no-exit treatment and the seven `abort ()` calls go through the
+    existing redirection in `src/zumir_mir_stdio.h`;
+  - `message_file` is set to the same sink.
+
+  Ten fork patches came instead, each found by this stage's checks:
+  - four for building: `-pedantic` semicolons, an unused variable,
+    `snprintf`, and in-memory headers with no file reads (D5);
+  - one for `c2mir` freeing with `free` what it allocates with MIR's
+    allocator, which corrupted the heap under zumir's arena;
+  - two for crashes in `c2mir`: shift folding (UBSan) and an
+    enumeration constant read as a declaration (ASan);
+  - three in MIR's core, all undefined behaviour the corpus reached
+    under the sanitizers: the generator's constant folding, misaligned
+    reads of x86-64 code, and the interpreter's arithmetic and memory
+    accesses.
+- **The corpus.** It has 34 `.expect` files, not 272, plus 235
+  `.expectrc` exit statuses. The runner follows `runtests.sh`'s rules
+  through zumir's own compile path, not `c2m`'s. Its harness headers
+  also give `assert` (through `abort`) and `NULL`, which the corpus's
+  tests take from the headers they include.
+- **Out of scope.** One ASan finding on the interpreter tier, a small
+  struct over-read in `c2mir`'s argument lowering, is #42. The corpus
+  check runs under the sanitizers on the generator tier.
 
 ## Stage 9 — cfunction()
 

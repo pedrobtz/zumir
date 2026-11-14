@@ -14,6 +14,8 @@ typedef struct {
 } zumir_import_entry;
 
 const zumir_import_entry *zumir_import_list(int kind, size_t *n);
+/* D6's list alone (zumir_imports_d6.c), without R. */
+const zumir_import_entry *zumir_import_d6(size_t *n);
 
 double zumir_r_fmod(double x1, double x2);
 double zumir_r_intdiv(double x1, double x2);

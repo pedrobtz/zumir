@@ -65,7 +65,7 @@ SEXP zumir_c2mir_compile(SEXP source, SEXP fname, SEXP tier, SEXP name);
 SEXP zumir_test_c2mir_call(SEXP x, SEXP args);
 SEXP zumir_test_prelude(void);
 SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name);
-SEXP zumir_cfun_call(SEXP x, SEXP args, SEXP kinds);
+SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args);
 SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_result);
 
 static const R_CallMethodDef zumir_call_methods[] = {
@@ -107,7 +107,7 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_test_c2mir_call", (DL_FUNC) &zumir_test_c2mir_call, 2},
   {"zumir_test_prelude", (DL_FUNC) &zumir_test_prelude, 0},
   {"zumir_cfun_new", (DL_FUNC) &zumir_cfun_new, 3},
-  {"zumir_cfun_call", (DL_FUNC) &zumir_cfun_call, 3},
+  {"zumir_cfun_invoke", (DL_FUNC) &zumir_cfun_invoke, 3},
   {"zumir_rf_call", (DL_FUNC) &zumir_rf_call, 5},
   {NULL, NULL, 0}
 };

@@ -1,0 +1,243 @@
+#!/usr/bin/env Rscript
+# tools/run-benchmarks: the performance targets of design §9, measured on
+# this machine, for .agents/benchmarks.md. Run from the package root with
+# the package installed:
+#
+#   Rscript tools/run-benchmarks [rounds]
+#
+# Each figure is the median of `rounds` rounds (default 7). The reference C
+# is built by R CMD SHLIB, with R's own compiler and CFLAGS (-O2 on CRAN's
+# builds), so it needs a toolchain; zumir itself does not. The interpreter's
+# dispatch row is not here: tools/ci/platform.sh builds MIR's own
+# interpreter benchmarks twice, with MIR_DIRECT_DISPATCH and with computed
+# goto, since the package can only be built one way.
+#
+# Output: one line per §9 row, "row | value | target", ready for the table.
+suppressPackageStartupMessages(library(zumir))
+ns <- asNamespace("zumir")
+rounds <- as.integer(commandArgs(TRUE)[1])
+if (is.na(rounds)) rounds <- 7L
+set.seed(20261114)
+tier <- zumir_tier()
+if (tier == "none") {
+  stop("no tier on this machine: nothing to measure")
+}
+
+# Seconds per evaluation of `expr`, evaluated `times` times in a loop per
+# round (the loop is the expression's own, so no call is added to it); the
+# median of the rounds.
+per_call <- function(expr, times) {
+  loop <- eval(
+    call("function", NULL, call("for", quote(j), call("seq_len", times), substitute(expr))),
+    parent.frame()
+  )
+  loop <- compiler::cmpfun(loop)
+  r <- vapply(seq_len(rounds), function(i) {
+    t <- proc.time()[["elapsed"]]
+    loop()
+    proc.time()[["elapsed"]] - t
+  }, 0)
+  stats::median(r) / times
+}
+ms <- function(s) sprintf("%.2f ms", 1000 * s)
+us <- function(s) sprintf("%.2f µs", 1e6 * s)
+row <- function(what, value, target) {
+  cat(sprintf("%s | %s | %s\n", what, value, target))
+}
+
+cat(sprintf(
+  "zumir %s, %s, R %s, tier %s, MIR %s\n",
+  utils::packageVersion("zumir"),
+  R.version$platform,
+  getRversion(),
+  tier,
+  substr(zumir_info()$mir_commit, 1, 12)
+))
+cat(sprintf(
+  "reference C: %s %s\n",
+  system2(file.path(R.home("bin"), "R"), c("CMD", "config", "CC"), stdout = TRUE),
+  system2(file.path(R.home("bin"), "R"), c("CMD", "config", "CFLAGS"), stdout = TRUE)
+))
+
+# --- 1. cfunction() end to end, a ten-line function ------------------------
+ten_lines <- "
+double dot(int n, const double *x, const double *y) {
+  double s = 0, c = 0;
+  for (int i = 0; i < n; i++) {
+    double t = x[i] * y[i] - c;
+    double u = s + t;
+    c = (u - s) - t;
+    s = u;
+  }
+  return s;
+}"
+t_cf <- per_call(cfunction(ten_lines, n = "n"), 50)
+row("cfunction(), ten lines, end to end", ms(t_cf), "< 10 ms")
+
+# --- 2. a ten-function module, generated -----------------------------------
+# Ten functions of 24 instructions each, the size of a lowered model's
+# right-hand side, compiled and linked as one module.
+mir_fn <- function(k) {
+  body <- character()
+  prev <- "x"
+  for (j in seq_len(12)) {
+    body <- c(
+      body,
+      sprintf("  dmul t%d, %s, y", j, prev),
+      sprintf("  dadd t%d, t%d, %d.%d", j, j, k, j)
+    )
+    prev <- sprintf("t%d", j)
+  }
+  c(
+    sprintf("f%d: func d, d:x, d:y", k),
+    sprintf("  local %s", paste0("d:t", 1:12, collapse = ", ")),
+    body,
+    sprintf("  ret %s", prev),
+    "  endfunc"
+  )
+}
+module <- paste(
+  c(
+    "m: module",
+    sprintf("  export %s", paste0("f", 1:10, collapse = ", ")),
+    unlist(lapply(1:10, mir_fn)),
+    "endmodule",
+    ""
+  ),
+  collapse = "\n"
+)
+t_mod <- per_call(mir_function(module, "f10"), 50)
+row("ten-function module, generated", ms(t_mod), "< 5 ms")
+
+# --- 3, 4, 6, 7. one numeric kernel by every route -------------------------
+# A degree-6 polynomial by Horner's rule at each x[i], summed: one multiply
+# and one add per coefficient, a loop the C compiler may unroll or vectorize.
+kernel_c <- "
+double kern(int n, const double *x) {
+  double s = 0;
+  for (int i = 0; i < n; i++) {
+    double v = x[i];
+    s += (((((0.5 * v + 1.25) * v - 0.75) * v + 2.0) * v - 1.5) * v + 0.25) * v + 3.0;
+  }
+  return s;
+}"
+kernel_r <- function(x) {
+  s <- 0
+  for (i in seq_along(x)) {
+    v <- x[i]
+    s <- s + ((((((0.5 * v + 1.25) * v - 0.75) * v + 2.0) * v - 1.5) * v + 0.25) * v + 3.0)
+  }
+  s
+}
+
+dir <- tempfile("zumir-bench")
+dir.create(dir)
+writeLines(
+  c(
+    "#include <R.h>",
+    "#include <Rinternals.h>",
+    kernel_c,
+    "SEXP kern_call(SEXP x) { return ScalarReal(kern(LENGTH(x), REAL(x))); }",
+    "SEXP add1_call(SEXP x) { return ScalarReal(REAL(x)[0] + 1); }"
+  ),
+  file.path(dir, "ref.c")
+)
+old <- setwd(dir)
+out <- system2(
+  file.path(R.home("bin"), "R"),
+  c("CMD", "SHLIB", "ref.c"),
+  stdout = TRUE,
+  stderr = TRUE
+)
+setwd(old)
+dll <- file.path(dir, paste0("ref", .Platform$dynlib.ext))
+if (!file.exists(dll)) {
+  stop("R CMD SHLIB failed:\n", paste(out, collapse = "\n"))
+}
+ref <- dyn.load(dll)
+kern_sym <- getNativeSymbolInfo("kern_call", ref)
+add1_sym <- getNativeSymbolInfo("add1_call", ref)
+
+x <- stats::runif(1e6, -1, 1)
+k_native <- cfunction(kernel_c, n = "n", tier = tier)
+k_interp <- cfunction(kernel_c, n = "n", tier = "interp")
+k_mir <- mir_compile(kernel_r, tier = tier)
+k_byte <- compiler::cmpfun(kernel_r)
+
+# Every route computes the same sum (the C compiler may reassociate, so
+# the reference is within rounding).
+v_ref <- .Call(kern_sym, x)
+v_native <- k_native(x = x)
+stopifnot(
+  identical(v_native, k_interp(x = x)),
+  abs(v_native - v_ref) <= 1e-9 * abs(v_ref),
+  isTRUE(all.equal(v_native, k_mir(x), tolerance = 1e-12)),
+  identical(k_mir(x), k_byte(x))
+)
+
+t_gcc <- per_call(.Call(kern_sym, x), 50)
+t_native <- per_call(k_native(x = x), 50)
+t_interp <- per_call(k_interp(x = x), 3)
+t_mir <- per_call(k_mir(x), 50)
+t_byte <- per_call(k_byte(x), 3)
+row(
+  sprintf("generated code against C compiler, kernel on 1e6 (%s; C %s)", ms(t_native), ms(t_gcc)),
+  sprintf("%.2f×", t_native / t_gcc),
+  "within 1.5×"
+)
+row(
+  sprintf("interpreter on the same kernel (%s)", ms(t_interp)),
+  sprintf("%.1f× generated, %.1f× C", t_interp / t_native, t_interp / t_gcc),
+  "recorded"
+)
+row(
+  sprintf("mir_compile() against cfunction(), same kernel (%s)", ms(t_mir)),
+  sprintf("%.2f×", t_mir / t_native),
+  "within 1.5×"
+)
+row(
+  sprintf("mir_compile() against byte-compiled R (%s)", ms(t_byte)),
+  sprintf("%.1f× faster", t_byte / t_mir),
+  "recorded"
+)
+
+# --- 5. call overhead --------------------------------------------------------
+# Against .Call itself, and against the R function a package wraps it in,
+# which is what its user calls.
+add1 <- cfunction("double add1(double x) { return x + 1; }", tier = tier)
+add1_r <- compiler::cmpfun(function(x) .Call(add1_sym, x))
+stopifnot(identical(add1(x = 1), .Call(add1_sym, 1)), identical(add1_r(1), 2))
+t_call_cf <- per_call(add1(x = 1), 2e5)
+t_call_c <- per_call(.Call(add1_sym, 1), 2e5)
+t_call_r <- per_call(add1_r(1), 2e5)
+row(
+  sprintf(
+    "cfunction() call (%s) against .Call (%s) and a package's wrapper (%s)",
+    us(t_call_cf), us(t_call_c), us(t_call_r)
+  ),
+  sprintf("%.2f× .Call, %.2f× wrapper", t_call_cf / t_call_c, t_call_cf / t_call_r),
+  "within 1.2×"
+)
+
+# --- 8. mir_compile() compile time, emitter against text --------------------
+helpers <- list.files("tests/testthat", "^helper-mir-compile", full.names = TRUE)
+if (length(helpers) == 1L) {
+  sys.source(helpers, environment())
+  progs <- list()
+  while (length(progs) < 50L) {
+    p <- tryCatch(ns$rf_compile(rf_gen_function()), error = function(e) NULL)
+    if (!is.null(p)) progs[[length(progs) + 1L]] <- p
+  }
+  route <- function(r) {
+    per_call(for (p in progs) ns$rf_context(p, tier, r), 1) / length(progs)
+  }
+  t_e <- route("emitter")
+  t_t <- route("text")
+  row(
+    sprintf("mir_compile() compile, emitter against text (%s, %s)", ms(t_e), ms(t_t)),
+    sprintf("%.2f×", t_e / t_t),
+    "recorded"
+  )
+} else {
+  cat("mir_compile() routes: tests/testthat/helper-mir-compile.R not found\n")
+}

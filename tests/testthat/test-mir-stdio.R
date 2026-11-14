@@ -8,7 +8,12 @@ test_that("writes to stderr reach zumir's buffer, not the process's stderr", {
   got <- .Call(zumir_test_sink, "héllo %d", path)
   # fprintf, fputc and perror each reach the buffer, in order, and the
   # format string is the text, not a format applied twice.
-  expect_identical(got, paste0("héllo %d!p: ", strerror_enoent(), "\n"))
+  # Compared as bytes: the buffer's bytes come back unmarked, and the
+  # literal is UTF-8, so as strings they differ outside a UTF-8 locale.
+  expect_identical(
+    charToRaw(got),
+    charToRaw(enc2utf8(paste0("héllo %d!p: ", strerror_enoent(), "\n")))
+  )
 })
 
 test_that("a FILE that is not stderr is written as stdio writes it", {

@@ -14,10 +14,11 @@ library(zumir)
 
 ## Compile an R function
 
-`rfunction()` takes a numeric R function and compiles it to native code.
-The result has the same arguments and returns exactly what the R
-function returns. It accepts doubles, loops over indices, conditions and
-the usual maths; anything else is refused with the construct named.
+[`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+takes a numeric R function and compiles it to native code. The result
+has the same arguments and returns exactly what the R function returns.
+It accepts doubles, loops over indices, conditions and the usual maths;
+anything else is refused with the construct named.
 
 ``` r
 

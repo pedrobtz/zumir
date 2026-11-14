@@ -15,6 +15,13 @@
   compiles a function from MIR’s textual form, natively or on MIR’s
   interpreter, and returns an R function that calls it.
 
+- [`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+  compiles a numeric R function, in a subset of R, to native code that
+  returns exactly what R returns, warnings and errors included. Where
+  matching R is not cheap it refuses, at compile time or at the call,
+  with a classed error. Compiled loops stop for Ctrl-C and
+  [`setTimeLimit()`](https://rdrr.io/r/base/setTimeLimit.html).
+
 - Packages can build and compile MIR code through zumir’s C API: put
   `LinkingTo: zumir` in DESCRIPTION and include `zumir.h`. MIR’s errors
   are reported through the context, never by ending the R session.

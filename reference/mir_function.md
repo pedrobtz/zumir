@@ -47,6 +47,11 @@ error. Compiled code runs with the rights of
 [`.Call()`](https://rdrr.io/r/base/CallExternal.html) code: a wrong
 memory access crashes R, as it would in a package's C code.
 
+## See also
+
+Other compilers:
+[`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+
 ## Examples
 
 ``` r

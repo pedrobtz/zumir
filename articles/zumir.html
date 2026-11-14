@@ -71,7 +71,7 @@ compiled to native code from R with nothing else installed.</p>
 <div class="section level2">
 <h2 id="compile-an-r-function">Compile an R function<a class="anchor" aria-label="anchor" href="#compile-an-r-function"></a>
 </h2>
-<p><code>rfunction()</code> takes a numeric R function and compiles it
+<p><code><a href="../reference/rfunction.html">rfunction()</a></code> takes a numeric R function and compiles it
 to native code. The result has the same arguments and returns exactly
 what the R function returns. It accepts doubles, loops over indices,
 conditions and the usual maths; anything else is refused with the
@@ -86,7 +86,7 @@ construct named.</p>
 <span>  <span class="op">}</span></span>
 <span>  <span class="va">y</span></span>
 <span><span class="op">}</span></span>
-<span><span class="va">csum</span> <span class="op">&lt;-</span> <span class="fu">rfunction</span><span class="op">(</span><span class="va">csum_r</span><span class="op">)</span></span>
+<span><span class="va">csum</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rfunction.html">rfunction</a></span><span class="op">(</span><span class="va">csum_r</span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="cn">NA</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
@@ -159,7 +159,7 @@ yourself.</p>
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/zumir_info.html">zumir_tier</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/zumir_info.html">zumir_info</a></span><span class="op">(</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu">rfunction</span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
+<span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rfunction.html">rfunction</a></span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="next">Next<a class="anchor" aria-label="anchor" href="#next"></a>

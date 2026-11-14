@@ -47,7 +47,8 @@ endgroup
 # the interpreter's MIR_DIRECT_DISPATCH, as src/zumir_mir.c sets it, and
 # gcc's -fno-tree-sra below. The exit and stderr redirection is not built
 # in: MIR's tests read their own stderr and exit status.
-# inline-test is left out: it builds c2mir (Stage 8).
+# inline-test is left out: it builds c2mir's driver; c2mir itself is tested
+# on c-tests below, through zumir's compile path.
 group "MIR's own tests"
 fork_url=$(awk '/^  Fork:/ {print $2}' src/vendor/PROVENANCE)
 fork_pin=$(awk '/^  Fork commit:/ {print $3}' src/vendor/PROVENANCE)
@@ -172,6 +173,59 @@ if [ "$os" = ubuntu ]; then
   "$tmp/test-trap-threads-asan"
 fi
 endgroup
+
+# ---------------------------------------------------------------------------
+# c2mir on MIR's c-tests corpus (Stage 8, #20): tests/c/c-tests-runner.c,
+# built without R from the vendored MIR and c2mir and zumir's R-free files,
+# compiles each test as cfunction() would (the prelude, no header read from
+# a file, D6's list) plus the harness's printf, abort and exit, and runs
+# it on each tier by c-tests/runtests.sh's rules. The tests that fail must
+# be exactly those tools/c-tests-expected.txt lists, on both tiers. The
+# corpus comes from the fork's clone of step 1. POSIX only: the runner
+# forks a child per test, so Windows does not run it.
+if [ "$os" != windows ]; then
+  group "c2mir on c-tests"
+  runner_srcs="tests/c/c-tests-runner.c src/zumir_mir.c src/zumir_mir_gen.c src/zumir_c2mir.c
+    src/zumir_prelude.c src/zumir_imports_d6.c src/zumir_mir_glue.c src/zumir_mir_stdio.c
+    src/zumir_trap.c"
+  runner_flags="-Isrc -Isrc/vendor/mir -DNDEBUG -DZUMIR_C2MIR_TEST_HEADERS"
+  $cc_cmd $r_cflags $runner_flags $runner_srcs -o "$tmp/c-tests-runner" -lm
+  dirs="havoc new andrewchambers_c gcc lacc"
+  grep -v '^#' tools/c-tests-expected.txt | awk 'NF {print $1}' | sort > "$tmp/c-expected"
+  for tier in gen interp; do
+    "$tmp/c-tests-runner" "$mir/c-tests" "$tier" $dirs > "$tmp/c-$tier.txt"
+    tail -1 "$tmp/c-$tier.txt"
+    awk '$2 == "fail" {print $1}' "$tmp/c-$tier.txt" | sort > "$tmp/c-$tier-failed"
+    if ! cmp -s "$tmp/c-expected" "$tmp/c-$tier-failed"; then
+      echo "FAIL: c-tests on $tier differ from tools/c-tests-expected.txt (< listed, > failed):" >&2
+      diff "$tmp/c-expected" "$tmp/c-$tier-failed" >&2 || true
+      grep -F -f "$tmp/c-$tier-failed" "$tmp/c-$tier.txt" | grep -v -F -f "$tmp/c-expected" >&2 || true
+      exit 1
+    fi
+    echo "ok: on $tier, exactly the listed tests fail"
+  done
+  # Not vacuous (#20): a passing test whose .expect is broken must fail.
+  probe="$tmp/c-probe/new"
+  mkdir -p "$probe"
+  cp "$mir/c-tests/new/bf1.c" "$probe/"
+  printf 'not what it prints\n' > "$probe/bf1.expect"
+  "$tmp/c-tests-runner" "$tmp/c-probe" gen new | grep -q "^new/bf1.c fail" ||
+    { echo "FAIL: a broken .expect was not reported" >&2; exit 1; }
+  echo "ok: a broken .expect is reported"
+  if [ "$os" = ubuntu ] && [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+    $cc_cmd -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all $runner_flags \
+      $runner_srcs -o "$tmp/c-tests-runner-asan" -lm
+    # A child the sanitizers stop shows as a failure; the list must still
+    # match, so a sanitizer finding fails this step.
+    ASAN_OPTIONS=detect_leaks=0 "$tmp/c-tests-runner-asan" "$mir/c-tests" gen $dirs > "$tmp/c-asan.txt"
+    tail -1 "$tmp/c-asan.txt"
+    awk '$2 == "fail" {print $1}' "$tmp/c-asan.txt" | sort | cmp -s "$tmp/c-expected" - ||
+      { echo "FAIL: c-tests under ASan and UBSan differ from the list" >&2;
+        awk '$2 == "fail"' "$tmp/c-asan.txt" | grep -v -F -f "$tmp/c-expected" >&2; exit 1; }
+    echo "ok: c-tests under ASan and UBSan"
+  fi
+  endgroup
+fi
 
 # ---------------------------------------------------------------------------
 # The C API (Stage 5): inst/include/zumir.h compiles alone as C99 and as

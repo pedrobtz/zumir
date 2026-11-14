@@ -1,0 +1,73 @@
+# MIR's c-tests corpus through zumir's compile path (tests/c/c-tests-runner.c,
+# #20): the tests expected to fail, one per line, "<test> <why>", the same on
+# both tiers. tools/ci/platform.sh fails when a test fails that is not listed
+# here, or passes while listed, so a regression is seen and a fix updates
+# this list. Generated from the runner's output; the reasons fall into:
+#
+#   import of undefined item NAME   calls a C library name outside D6's list
+#                                   and the harness's printf, abort and exit
+#   no header NAME                  includes a system header the prelude does
+#                                   not give (setjmp.h, ctype.h, inttypes.h),
+#                                   or another file of the corpus: no header
+#                                   is read from a file (D5)
+#   repeated declaration uint64_t, syntax error on enum/number
+#                                   declares bool, true, false or uint64_t
+#                                   itself: the prelude includes stdbool.h
+#                                   and stdint.h (design §4.5)
+#   undeclared identifier sprintf, NULL, HUGE_VALF
+#                                   uses a name of a header the harness does
+#                                   not give (NULL from a header it does not
+#                                   include; no float functions in D6)
+#   no main                         defines main in a file it does not include
+new/bf2.c repeated declaration uint64_t
+new/issue18.c import of undefined item puts
+new/issue199.c import of undefined item free
+new/issue227-2.c import of undefined item malloc
+new/issue227.c import of undefined item malloc
+new/issue23.c undeclared identifier HUGE_VALF
+new/issue353-2.c no main
+new/mike.c no header inttypes.h: headers are not read from files here
+new/setjmp.c no header setjmp.h: headers are not read from files here
+new/setjmp2.c no header setjmp.h: headers are not read from files here
+new/var-size-in-var-initializer.c import of undefined item malloc
+new/vararg-sse-struct.c import of undefined item strcmp
+gcc/20000112-1.c import of undefined item strchr
+gcc/20000914-1.c import of undefined item malloc
+gcc/20010915-1.c import of undefined item strcmp
+gcc/20020404-1.c syntax error on enum (expected '<declarator>'):
+gcc/20030714-1.c syntax error on number (expected '<declarator>'):
+gcc/20030715-1.c import of undefined item strcmp
+gcc/20031204-1.c import of undefined item strcpy
+gcc/20040629-1.c no header 20040629-1.c: headers are not read from files here
+gcc/20040705-1.c no header 20040629-1.c: headers are not read from files here
+gcc/20040705-2.c no header 20040629-1.c: headers are not read from files here
+gcc/20041126-1.c import of undefined item abs
+gcc/920810-1.c import of undefined item malloc
+gcc/930513-1.c undeclared identifier sprintf
+gcc/980707-1.c undeclared identifier NULL
+gcc/int-compare.c syntax error on number (expected '<declarator>'):
+gcc/loop-9.c syntax error on number (expected '<declarator>'):
+gcc/pr15262-1.c import of undefined item malloc
+gcc/strcmp-1.c import of undefined item strcmp
+gcc/strcpy-1.c import of undefined item strcpy
+gcc/string-opt-17.c import of undefined item strcpy
+gcc/string-opt-18.c import of undefined item strcpy
+lacc/array-registers.c import of undefined item puts
+lacc/conditional-void.c import of undefined item puts
+lacc/declarator-complex.c import of undefined item puts
+lacc/function-pointer-call.c import of undefined item puts
+lacc/function-pointer.c import of undefined item puts
+lacc/function.c import of undefined item puts
+lacc/hello.c import of undefined item puts
+lacc/include.c no header hello.c: headers are not read from files here
+lacc/macro.c import of undefined item puts
+lacc/preprocess.c no header header.h: headers are not read from files here
+lacc/printstr.c no header ctype.h: headers are not read from files here
+lacc/string-addr.c import of undefined item puts
+lacc/string-concat.c import of undefined item puts
+lacc/string-escape.c import of undefined item puts
+lacc/strings.c import of undefined item puts
+lacc/token.c import of undefined item puts
+lacc/typedef-function.c import of undefined item atoi
+lacc/typedef.c import of undefined item puts
+lacc/unsigned-sign-extend.c import of undefined item putchar

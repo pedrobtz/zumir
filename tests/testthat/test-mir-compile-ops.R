@@ -1,4 +1,4 @@
-# Each construct of rfunction()'s subset (design §4.6) against R itself.
+# Each construct of mir_compile()'s subset (design §4.6) against R itself.
 
 test_that("arithmetic, ^, %% and %/% equal R's on odd doubles", {
   skip_if(zumir_tier() == "none", "no tier runs here")
@@ -16,7 +16,7 @@ test_that("arithmetic, ^, %% and %/% equal R's on odd doubles", {
     function(a, b) max(a, b)
   )
   for (f in fs) {
-    g <- rfunction(f)
+    g <- mir_compile(f)
     for (a in v) {
       for (b in v) {
         d <- compare_with_r(f, g, list(a = a, b = b))
@@ -44,7 +44,7 @@ test_that("the math table equals R's, warnings included", {
     "tan"
   )) {
     f <- eval(bquote(function(a) .(as.name(fn))(a)))
-    g <- rfunction(f)
+    g <- mir_compile(f)
     for (a in v) {
       d <- compare_with_r(f, g, list(a = a))
       expect(is.null(d), paste(fn, a, d))
@@ -75,8 +75,8 @@ test_that("comparisons and logic follow R's three-valued rules", {
     }
   }
   # NA && FALSE is FALSE, NA && TRUE is NA, as in R.
-  expect_identical(rfunction(and)(NA_real_, 0), 0)
-  expect_identical(rfunction(and)(NA_real_, 1), NA_real_)
+  expect_identical(mir_compile(and)(NA_real_, 0), 0)
+  expect_identical(mir_compile(and)(NA_real_, 1), NA_real_)
   isf <- function(a) {
     as.double(is.na(a)) + 2 * as.double(is.nan(a)) + 4 * as.double(is.finite(a))
   }
@@ -191,15 +191,15 @@ test_that("results do not change in a hostile session", {
     s
   }
   want <- f(1, 2)
-  g <- rfunction(f)
+  g <- mir_compile(f)
   old <- options(OutDec = ",", scipen = -5, digits = 3)
   on.exit(options(old))
   expect_identical(g(1, 2), want)
   # And compiled under it.
-  expect_identical(rfunction(f)(1, 2), want)
+  expect_identical(mir_compile(f)(1, 2), want)
 })
 
-test_that("native and interpreted rfunction()s agree", {
+test_that("native and interpreted mir_compile()s agree", {
   skip_if(zumir_tier() != "native", "the native tier does not run here")
   f <- function(x, a) {
     s <- a
@@ -208,8 +208,8 @@ test_that("native and interpreted rfunction()s agree", {
     }
     s
   }
-  n <- rfunction(f, tier = "native")
-  i <- rfunction(f, tier = "interp")
+  n <- mir_compile(f, tier = "native")
+  i <- mir_compile(f, tier = "interp")
   for (x in list(c(1, 2, 3), c(-1, NA, 1e300))) {
     expect_identical(
       suppressWarnings(n(x, 0.5)),

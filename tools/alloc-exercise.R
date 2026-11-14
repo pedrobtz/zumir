@@ -5,7 +5,7 @@
 # the process must not die. ZUMIR_ALLOC_EXERCISE picks the section, one job
 # each, since the sweep is capped by allocation count:
 #   trap       each invalid-module kind through the error trap (Stage 3)
-#   rfunction  rfunction() through the emitter (Stage 7): the .Call bridge
+#   mir_compilemir_compile() through the emitter (Stage 7): the .Call bridge
 #              reads R's values, allocates with R_alloc and builds a MIR
 #              module, then the function runs
 library(zumir)
@@ -17,10 +17,10 @@ if (section == "trap") {
       zumir_error = function(e) cat("zumir_error:", conditionMessage(e), "\n")
     )
   }
-} else if (section == "rfunction" && zumir_tier() != "none") {
+} else if (section == "mir_compile" && zumir_tier() != "none") {
   tryCatch(
     {
-      g <- rfunction(function(x) {
+      g <- mir_compile(function(x) {
         s <- 0
         for (i in seq_along(x)) {
           if (x[i] > 2) next
@@ -30,7 +30,7 @@ if (section == "trap") {
       })
       # The answer, when it comes, is R's.
       stopifnot(identical(g(c(1, 4, 9, 2)), 1 + sqrt(2)))
-      cat("rfunction: ok\n")
+      cat("mir_compile: ok\n")
     },
     zumir_error = function(e) cat("zumir_error:", conditionMessage(e), "\n")
   )

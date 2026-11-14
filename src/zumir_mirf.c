@@ -155,7 +155,7 @@ static void body_wrapper(zumir_rctx *z, void *arg) {
 }
 
 /* Compiles `name` from MIR text on `tier` ("native" or "interp") with
- * import set `imports` (0 D6's, 2 rfunction()'s, for tests). Returns
+ * import set `imports` (0 D6's, 2 mir_compile()'s, for tests). Returns
  * list(context, arg_names, arg_types, res_type), or a zumir_status. */
 SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
   int t = strcmp(CHAR(STRING_ELT(tier, 0)), "native") == 0 ? ZUMIR_ITIER_NATIVE

@@ -30,7 +30,7 @@ between pull requests and the full profile.
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | [#34](https://github.com/pedrobtz/zumir/pull/34) | 2026-11-13 |
 | 6 | [rfunction()](#stage-6--rfunction) | full | [#17](https://github.com/pedrobtz/zumir/issues/17) | [#36](https://github.com/pedrobtz/zumir/pull/36) | 2026-11-14 |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | [#39](https://github.com/pedrobtz/zumir/pull/39) | 2026-11-14 |
-| 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | 2026-11-14 |
+| 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | [#43](https://github.com/pedrobtz/zumir/pull/43) | 2026-11-14 |
 | 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
 | 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
 | 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
@@ -447,6 +447,10 @@ table and call the result; R users can run MIR text.
 
 ## Stage 6 — rfunction()
 
+**Renamed (2026-11-14).** `rfunction()` is now `mir_compile()` (design
+D15); the Stage 6 and 7 sections keep the name they were written with,
+which is also their issues' titles.
+
 **Issue.** [#17](https://github.com/pedrobtz/zumir/issues/17), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
 
@@ -537,7 +541,7 @@ warnings and error class asserted separately.
   profile, and a dispatched full-profile run 10⁴ per leg, without a
   difference; the quick run stays inside its five minutes.
 
-**Design.** [§4.6](design.md#46-rfunction), [§5](design.md#5-public-r-api-complete-v010-surface),
+**Design.** [§4.6](design.md#46-mir_compile), [§5](design.md#5-public-r-api-complete-v010-surface),
 [§6](design.md#6-errors), D15, D16, D17, D18, D22, D23, Q6.
 
 ## Stage 7 — rfunction() through the emitter
@@ -577,7 +581,7 @@ text, and the text route proves it right (D17).
 - Every Tests line holds on the full profile; the bridge is the default
   route; the benchmark row is recorded.
 
-**Design.** [§4.6](design.md#46-rfunction), D13, D17.
+**Design.** [§4.6](design.md#46-mir_compile), D13, D17.
 
 ## Stage 8 — c2mir and the prelude
 
@@ -684,11 +688,11 @@ pointers for user code, with copies for outputs: valgrind (with
 - `cfunction()` with its signature parser, argument checks, output
   allocation and copies (D24), and the one `.Call` wrapper; `tier =`.
 - The Get started article's chunks switched to `eval = TRUE`, its
-  `rfunction()` section included.
-- A "What `rfunction()` accepts" article: the subset, every D16 and D22
+  `mir_compile()` section included.
+- A "What `mir_compile()` accepts" article: the subset, every D16 and D22
   difference from R with its reason, two-argument `min`/`max` only
   (`min(x)` is refused), and the interrupt poll; linked from
-  `?rfunction`.
+  `?mir_compile`.
 - Every exported function's roxygen page complete, with examples that
   run on every tier.
 
@@ -706,7 +710,7 @@ pointers for user code, with copies for outputs: valgrind (with
   outputs comes back as a named list in the documented order, in the
   same file.
 - Imports through `cfunction()` itself: a consumer's import and a name
-  from `rfunction()`'s list (`R_pow`) are link errors, in the same file.
+  from `mir_compile()`'s list (`R_pow`) are link errors, in the same file.
 - Lengths at the limit: `n` equal to `length(x)`, one less, one more; and
   a vector longer than `.Machine$integer.max` refused before any data
   pointer is taken, with an ALTREP sequence ([#24](https://github.com/pedrobtz/zumir/issues/24)), in the same
@@ -714,7 +718,7 @@ pointers for user code, with copies for outputs: valgrind (with
 - The returned closure keeps its context alive through `rm()` and
   `gc()`, fails with a classed error after `readRDS`, and gives the
   parent's answer in a forked child ([#23](https://github.com/pedrobtz/zumir/issues/23)); the same for
-  `rfunction()` and `mir_function()` closures, in
+  `mir_compile()` and `mir_function()` closures, in
   `tests/testthat/test-closures.R`.
 - `tier = "interp"` and native give identical results, in the same file.
 - Values under a hostile session (`LC_ALL=C`, `OutDec = ","`), unchanged.

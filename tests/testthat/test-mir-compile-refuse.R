@@ -1,4 +1,4 @@
-# What rfunction() refuses at compile time (design §4.6, D22), each with a
+# What mir_compile() refuses at compile time (design §4.6, D22), each with a
 # zumir_compile_error that names it. Where the refusal is a D22 rule, R
 # runs the same function too, to show the difference the rule guards.
 
@@ -20,11 +20,11 @@ test_that("constructs outside the subset are refused by name", {
     }
   )
   for (nm in names(cases)) {
-    e <- expect_error(rfunction(cases[[nm]]), class = "zumir_compile_error")
+    e <- expect_error(mir_compile(cases[[nm]]), class = "zumir_compile_error")
     expect_match(conditionMessage(e), paste0("`", nm, "`"), fixed = TRUE)
   }
   expect_error(
-    rfunction(function(a) {
+    mir_compile(function(a) {
       s <- "x"
       a
     }),
@@ -39,11 +39,11 @@ test_that("a result R would type as integer or logical is refused", {
     function(n) seq_len(n),
     function(a) is.na(a)
   )) {
-    expect_error(rfunction(f), class = "zumir_compile_error")
+    expect_error(mir_compile(f), class = "zumir_compile_error")
     expect_false(is.double(f(1)))
   }
   skip_if(zumir_tier() == "none", "no tier runs here")
-  expect_identical(rfunction(function(a) as.double(a > 0))(1), 1)
+  expect_identical(mir_compile(function(a) as.double(a > 0))(1), 1)
 })
 
 test_that("a name rebound in environment(f) is refused", {
@@ -56,8 +56,8 @@ test_that("a name rebound in environment(f) is refused", {
   environment(g) <- e
   expect_identical(f(1), 42)
   expect_identical(g(1), 42)
-  expect_error(rfunction(f), class = "zumir_compile_error")
-  expect_error(rfunction(g), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
+  expect_error(mir_compile(g), class = "zumir_compile_error")
 })
 
 test_that("a local named like a function the body calls is refused", {
@@ -67,16 +67,16 @@ test_that("a local named like a function the body calls is refused", {
   }
   # R skips the double when it looks up a function: exp(1) + 2.
   expect_identical(f(1), exp(1) + 2)
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
 })
 
 test_that("defaults and ... are refused", {
   f <- function(a = 1) a
   expect_identical(f(), 1)
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
   g <- function(...) 1
   expect_identical(g(1, 2), 1)
-  expect_error(rfunction(g), class = "zumir_compile_error")
+  expect_error(mir_compile(g), class = "zumir_compile_error")
 })
 
 test_that("arguments are read-only", {
@@ -85,7 +85,7 @@ test_that("arguments are read-only", {
     n
   }
   expect_identical(f(1), 2)
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
   # R copies before x[1] <- 0; writing in place would change the caller's x.
   g <- function(x) {
     x[1] <- 0
@@ -94,7 +94,7 @@ test_that("arguments are read-only", {
   x <- c(5, 6)
   expect_identical(g(x), 0)
   expect_identical(x, c(5, 6))
-  expect_error(rfunction(g), class = "zumir_compile_error")
+  expect_error(mir_compile(g), class = "zumir_compile_error")
 })
 
 test_that("numeric() only once per name, at the top level", {
@@ -109,14 +109,14 @@ test_that("numeric() only once per name, at the top level", {
   }
   # R makes a new y each time: 3, where one y kept across the loop gives 6.
   expect_identical(in_loop(3), 3)
-  expect_error(rfunction(in_loop), class = "zumir_compile_error")
+  expect_error(mir_compile(in_loop), class = "zumir_compile_error")
   in_branch <- function(n) {
     if (n > 0) {
       y <- numeric(2)
     }
     0
   }
-  expect_error(rfunction(in_branch), class = "zumir_compile_error")
+  expect_error(mir_compile(in_branch), class = "zumir_compile_error")
   alias <- function(n) {
     y <- numeric(n)
     z <- y
@@ -125,7 +125,7 @@ test_that("numeric() only once per name, at the top level", {
   }
   # R copies on modify: y stays zero.
   expect_identical(alias(2), c(0, 0))
-  expect_error(rfunction(alias), class = "zumir_compile_error")
+  expect_error(mir_compile(alias), class = "zumir_compile_error")
   again <- function(n) {
     y <- numeric(n)
     y[1] <- 5
@@ -133,7 +133,7 @@ test_that("numeric() only once per name, at the top level", {
     y
   }
   expect_identical(again(2), c(0, 0))
-  expect_error(rfunction(again), class = "zumir_compile_error")
+  expect_error(mir_compile(again), class = "zumir_compile_error")
 })
 
 test_that("a local read where it may be unassigned is refused", {
@@ -145,7 +145,7 @@ test_that("a local read where it may be unassigned is refused", {
   }
   expect_identical(f(1), 1)
   expect_error(f(-1), "not found")
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
 })
 
 test_that("a loop variable read after its loop is refused", {
@@ -156,18 +156,18 @@ test_that("a loop variable read after its loop is refused", {
   # R leaves i at the last value, or NULL when the loop never ran.
   expect_identical(f(3), 3L)
   expect_null(f(0))
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
 })
 
-test_that("with no tier, rfunction() is a zumir_tier_error", {
+test_that("with no tier, mir_compile() is a zumir_tier_error", {
   skip_if(zumir_tier() != "none", "a tier runs here")
-  expect_error(rfunction(function(a) a + 1), class = "zumir_tier_error")
+  expect_error(mir_compile(function(a) a + 1), class = "zumir_tier_error")
 })
 
 test_that("tier = must name a tier", {
   for (t in list("jit", 1, NA_character_, c("native", "interp"))) {
     expect_error(
-      rfunction(function(a) a + 1, tier = t),
+      mir_compile(function(a) a + 1, tier = t),
       class = "zumir_argument_error"
     )
   }
@@ -183,16 +183,16 @@ test_that("abs() of an integer or logical is refused: R keeps the type", {
   }
   # R's s ends as an integer.
   expect_identical(f(3), 3L)
-  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_error(mir_compile(f), class = "zumir_compile_error")
   expect_identical(typeof(abs(TRUE)), "integer")
   expect_error(
-    rfunction(function(a) abs(a > 0) + 0.5),
+    mir_compile(function(a) abs(a > 0) + 0.5),
     class = "zumir_compile_error"
   )
   skip_if(zumir_tier() == "none", "no tier runs here")
-  expect_identical(rfunction(function(a) abs(a))(-2), 2)
+  expect_identical(mir_compile(function(a) abs(a))(-2), 2)
   expect_identical(
-    rfunction(function(n) {
+    mir_compile(function(n) {
       s <- 0
       for (i in seq_len(n)) {
         s <- abs(as.double(i))

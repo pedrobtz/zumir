@@ -203,6 +203,25 @@ if [ "$os" = ubuntu ]; then
 fi
 endgroup
 
+# zumir's R-free C against what each part must give (Stage 11): the trap's
+# stack, MIR's stderr buffer and exit, the arena through every allocation
+# failure on both tiers, D6's list. mutation.yaml runs it under Mull.
+group "R-free C"
+# Under the full profile, every one of c2mir's allocations fails in turn,
+# not every 53rd.
+glue_srcs="tests/c/test-glue.c src/zumir_mir.c src/zumir_mir_gen.c src/zumir_c2mir.c
+  src/zumir_prelude.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c
+  src/zumir_imports_d6.c"
+[ "${R_ACTIONS_PROFILE:-quick}" = full ] && export ZUMIR_GLUE_FULL=1
+$cc_cmd $r_cflags -Isrc -Isrc/vendor/mir -DNDEBUG $glue_srcs -o "$tmp/test-glue" -lm
+"$tmp/test-glue"
+if [ "$os" = ubuntu ]; then
+  $cc_cmd -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all -Isrc -Isrc/vendor/mir \
+    -DNDEBUG $glue_srcs -o "$tmp/test-glue-asan" -lm
+  "$tmp/test-glue-asan"
+fi
+endgroup
+
 # ---------------------------------------------------------------------------
 # c2mir on MIR's c-tests corpus (Stage 8, #20): tests/c/c-tests-runner.c,
 # built without R from the vendored MIR and c2mir and zumir's R-free files,

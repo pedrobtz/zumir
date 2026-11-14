@@ -69,9 +69,7 @@ void zumir_mir_perror(const char *s) {
 void zumir_mir_exit(int status) {
   char buf[ZUMIR_MIR_MESSAGE_MAX];
   snprintf(buf, sizeof(buf), "%s", zumir_mir_message());
-  /* Drop a trailing newline: the message becomes an R condition's. */
-  size_t n = strlen(buf);
-  while (n > 0 && buf[n - 1] == '\n') buf[--n] = '\0';
+  /* zumir_trap_raise() drops the trailing newlines. */
   zumir_mir_message_clear();
   zumir_trap_raise(ZUMIR_TRAP_EXIT, status, buf);
 }

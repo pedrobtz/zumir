@@ -62,7 +62,7 @@ struct zumir_arena {
   MIR_code_alloc_t real_code_alloc;
   zumir_block head; /* circular list of live blocks */
   zumir_mapping *mappings;
-  size_t bytes, blocks;
+  size_t bytes, nmappings;
   int failed;    /* an allocation failed: never MIR_finish */
   int map_errno; /* errno of the last code mapping refused, or 0 */
   void *owner;   /* the zumir context this MIR context belongs to */
@@ -89,6 +89,18 @@ int zumir_arena_map_errno(const zumir_arena *a) {
 #include <stdatomic.h>
 static _Atomic long live_arenas;
 static _Atomic long long live_bytes;
+/* Code mappings zumir_mir_free() unmapped after a MIR_finish that ran and
+ * returned: MIR unmaps its own code, so a count that grows there is a
+ * mapping the arena failed to stop tracking (a test hook). */
+static _Atomic long stray_mappings;
+
+long zumir_mir_stray_mappings(void) {
+  return stray_mappings;
+}
+
+size_t zumir_arena_mappings(const zumir_arena *a) {
+  return a->nmappings;
+}
 
 long zumir_mir_live_arenas(void) {
   return live_arenas;
@@ -128,7 +140,6 @@ static void link_block(zumir_arena *a, zumir_block *b, size_t size) {
   a->head.h.next->h.prev = b;
   a->head.h.next = b;
   a->bytes += size;
-  a->blocks++;
   live_bytes += (long long) size;
 }
 
@@ -136,7 +147,6 @@ static void unlink_block(zumir_arena *a, zumir_block *b) {
   b->h.prev->h.next = b->h.next;
   b->h.next->h.prev = b->h.prev;
   a->bytes -= b->h.size;
-  a->blocks--;
   live_bytes -= (long long) b->h.size;
 }
 
@@ -201,6 +211,7 @@ static void *zm_mem_map(size_t len, void *user_data) {
   m->len = len;
   m->next = a->mappings;
   a->mappings = m;
+  a->nmappings++;
   return addr;
 }
 
@@ -211,6 +222,7 @@ static int zm_mem_unmap(void *addr, size_t len, void *user_data) {
     if ((*p)->addr == addr) {
       zumir_mapping *m = *p;
       *p = m->next;
+      a->nmappings--;
       free(m);
       break;
     }
@@ -265,6 +277,7 @@ int zumir_mir_free(MIR_context_t ctx, zumir_arena *a, int gen) {
   while (a->mappings != NULL) {
     zumir_mapping *m = a->mappings;
     a->mappings = m->next;
+    if (finished && ctx != NULL) stray_mappings++;
     a->real_code_alloc->mem_unmap(m->addr, m->len, a->real_code_alloc->user_data);
     free(m);
   }

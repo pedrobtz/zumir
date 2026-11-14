@@ -51,4 +51,8 @@ add <- mir_function("
 add(1, 2)
 \dontshow{\}) # examplesIf}
 }
+\seealso{
+Other compilers:
+\code{\link[=rfunction]{rfunction()}}
+}
 \concept{compilers}

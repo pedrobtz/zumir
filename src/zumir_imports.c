@@ -18,6 +18,7 @@
 #define R_NO_REMAP
 #include <float.h>
 #include <math.h>
+#include <stdint.h>
 #include <string.h>
 #include <R.h>
 #include <Rinternals.h>
@@ -105,16 +106,143 @@ double zumir_r_max2(double x1, double x2) {
   return z;
 }
 
+/* ---- R's math1 for rfunction()'s math table ----
+ *
+ * R 4.6 wraps several functions with small-argument shortcuts (src/main/
+ * arithmetic.c: Rexp, Rexpm1, Rlog1p, Rsin, Rcos, Rtan, Rsqrt) and calls
+ * them through math1_ari, which returns a fixed value at one argument;
+ * R 4.5 calls the C library through math1. Both then keep an incoming NaN
+ * as it was and flag a NaN made from a number ("NaNs produced"). These
+ * follow the R the session runs: .onLoad passes getRversion() >= 4.6.0. */
+
+static int r46 = 1;
+
+SEXP zumir_set_r46(SEXP on) {
+  r46 = Rf_asLogical(on) == TRUE;
+  return R_NilValue;
+}
+
+/* Set where R would warn "NaNs produced"; rfunction()'s wrapper reads and
+ * clears it. */
+_Thread_local int zumir_r_nan_warned;
+
+static double nan_rule(double x, double y) {
+  if (ISNAN(y)) {
+    if (ISNAN(x)) return x; /* the incoming NaN is preserved */
+    zumir_r_nan_warned = 1;
+  }
+  return y;
+}
+
+static double f_x_x(double x, double (*f)(double), double m) {
+  return (fabs(x) <= m) ? x : f(x);
+}
+
+static double r_exp(double x) {
+  return (fabs(x) <= sqrt(DBL_EPSILON)) ? 1. + x : exp(x);
+}
+static double r_expm1(double x) {
+  return f_x_x(x, expm1, DBL_EPSILON);
+}
+static double r_log1p(double x) {
+  return f_x_x(x, log1p, DBL_EPSILON);
+}
+static double r_sin(double x) {
+  return f_x_x(x, sin, sqrt(3. * DBL_EPSILON));
+}
+static double r_tan(double x) {
+  return f_x_x(x, tan, sqrt(1.5 * DBL_EPSILON));
+}
+static double r_cos(double x) {
+  if (fabs(x) < sqrt(sqrt(12. * DBL_EPSILON))) return (1. - x * x * 0.5);
+  return cos(x);
+}
+static double r_sqrt(double x) {
+  if (x == 0.) return x;
+  for (int i = 1; i < 12; i++)
+    if (x == i * i) return i;
+  return sqrt(x);
+}
+
+/* math1_ari: res at x == arg, else f(x); then the NaN rule. */
+static double ari(double x, double (*f)(double), double arg, double res) {
+  return nan_rule(x, x == arg ? res : f(x));
+}
+
+double zumir_r_exp(double x) {
+  return r46 ? ari(x, r_exp, 0., 1.) : nan_rule(x, exp(x));
+}
+double zumir_r_expm1(double x) {
+  return r46 ? ari(x, r_expm1, 0., 0.) : nan_rule(x, expm1(x));
+}
+double zumir_r_log1p(double x) {
+  return r46 ? ari(x, r_log1p, 0., 0.) : nan_rule(x, log1p(x));
+}
+double zumir_r_sin(double x) {
+  return r46 ? ari(x, r_sin, 0., 0.) : nan_rule(x, sin(x));
+}
+double zumir_r_cos(double x) {
+  return r46 ? ari(x, r_cos, 0., 1.) : nan_rule(x, cos(x));
+}
+double zumir_r_tan(double x) {
+  return r46 ? ari(x, r_tan, 0., 0.) : nan_rule(x, tan(x));
+}
+double zumir_r_sqrt(double x) {
+  return nan_rule(x, r46 ? r_sqrt(x) : sqrt(x));
+}
+/* R_log (src/main/arithmetic.h), through math1. */
+double zumir_r_log(double x) {
+  return nan_rule(x, x > 0 ? log(x) : x == 0 ? R_NegInf : R_NaN);
+}
+double zumir_r_floor(double x) {
+  return nan_rule(x, floor(x));
+}
+double zumir_r_ceil(double x) {
+  return nan_rule(x, ceil(x));
+}
+double zumir_r_trunc(double x) {
+  return nan_rule(x, trunc(x));
+}
+double zumir_r_abs(double x) {
+  return fabs(x);
+}
+
+/* 1 when x is R's NA (not another NaN): R_IsNA. */
+int64_t zumir_r_isna(double x) {
+  return R_IsNA(x) ? 1 : 0;
+}
+
 /* The interrupt poll (D23): 1 when R has an interrupt or a time limit
- * pending, 0 otherwise. R_CheckUserInterrupt runs inside R_ToplevelExec,
- * so nothing jumps through generated code. */
-static void check_interrupt(void *data) {
+ * pending, 0 otherwise. R_CheckUserInterrupt runs under R_tryCatchError,
+ * which keeps an error's message (a time limit is an error, and R resets
+ * the limit as it raises it), inside R_ToplevelExec, which stops an
+ * interrupt; both jumps end in frames below the generated code. */
+_Thread_local char zumir_r_poll_message[512];
+
+static SEXP poll_body(void *data) {
   (void) data;
   R_CheckUserInterrupt();
+  return R_NilValue;
+}
+
+static SEXP poll_error(SEXP cond, void *data) {
+  (void) data;
+  SEXP msg = R_NilValue;
+  if (TYPEOF(cond) == VECSXP && XLENGTH(cond) > 0) msg = VECTOR_ELT(cond, 0);
+  snprintf(zumir_r_poll_message, sizeof zumir_r_poll_message, "%s",
+           TYPEOF(msg) == STRSXP && XLENGTH(msg) > 0 ? CHAR(STRING_ELT(msg, 0)) : "error");
+  return R_NilValue;
+}
+
+static void poll_toplevel(void *data) {
+  (void) data;
+  R_tryCatchError(poll_body, NULL, poll_error, NULL);
 }
 
 int zumir_r_poll(void) {
-  return R_ToplevelExec(check_interrupt, NULL) ? 0 : 1;
+  zumir_r_poll_message[0] = '\0';
+  int ok = R_ToplevelExec(poll_toplevel, NULL);
+  return (!ok || zumir_r_poll_message[0] != '\0') ? 1 : 0;
 }
 
 /* ---- The lists ---- */
@@ -143,8 +271,19 @@ static const zumir_import_entry d6_list[] = {
 };
 
 static const zumir_import_entry rfunction_list[] = {
-  MATH1(exp), MATH1(log), MATH1(log1p), MATH1(expm1), MATH1(sqrt), MATH1(fabs),
-  MATH1(floor), MATH1(ceil), MATH1(trunc), MATH1(sin), MATH1(cos), MATH1(tan),
+  {"zumir_r_exp", (void *) zumir_r_exp},
+  {"zumir_r_expm1", (void *) zumir_r_expm1},
+  {"zumir_r_log1p", (void *) zumir_r_log1p},
+  {"zumir_r_sin", (void *) zumir_r_sin},
+  {"zumir_r_cos", (void *) zumir_r_cos},
+  {"zumir_r_tan", (void *) zumir_r_tan},
+  {"zumir_r_sqrt", (void *) zumir_r_sqrt},
+  {"zumir_r_log", (void *) zumir_r_log},
+  {"zumir_r_floor", (void *) zumir_r_floor},
+  {"zumir_r_ceil", (void *) zumir_r_ceil},
+  {"zumir_r_trunc", (void *) zumir_r_trunc},
+  {"zumir_r_abs", (void *) zumir_r_abs},
+  {"zumir_r_isna", (void *) zumir_r_isna},
   {"R_pow", (void *) R_pow},
   {"zumir_r_fmod", (void *) zumir_r_fmod},
   {"zumir_r_intdiv", (void *) zumir_r_intdiv},
@@ -174,6 +313,34 @@ void zumir_imports_load(MIR_context_t ctx, int kind, const zumir_import_entry *e
     for (size_t i = 0; i < nextra; i++) MIR_load_external(ctx, extra[i].name, extra[i].addr);
 }
 #endif
+
+/* Test entry: one of rfunction()'s math wrappers called directly on x,
+ * returning list(value, warned) for comparison with R's function. */
+SEXP zumir_test_math(SEXP which, SEXP x) {
+  const char *w = CHAR(STRING_ELT(which, 0));
+  static const struct {
+    const char *name;
+    double (*f)(double);
+  } fns[] = {{"exp", zumir_r_exp},     {"expm1", zumir_r_expm1}, {"log1p", zumir_r_log1p},
+             {"sin", zumir_r_sin},     {"cos", zumir_r_cos},     {"tan", zumir_r_tan},
+             {"sqrt", zumir_r_sqrt},   {"log", zumir_r_log},     {"floor", zumir_r_floor},
+             {"ceiling", zumir_r_ceil}, {"trunc", zumir_r_trunc}, {"abs", zumir_r_abs}};
+  double (*f)(double) = NULL;
+  for (size_t i = 0; i < sizeof(fns) / sizeof(fns[0]); i++)
+    if (strcmp(fns[i].name, w) == 0) f = fns[i].f;
+  if (f == NULL) Rf_error("unknown function");
+  R_xlen_t n = XLENGTH(x);
+  SEXP out = PROTECT(Rf_allocVector(REALSXP, n));
+  zumir_r_nan_warned = 0;
+  for (R_xlen_t i = 0; i < n; i++) REAL(out)[i] = f(REAL(x)[i]);
+  const char *names[] = {"value", "warned", ""};
+  SEXP res = PROTECT(Rf_mkNamed(VECSXP, names));
+  SET_VECTOR_ELT(res, 0, out);
+  SET_VECTOR_ELT(res, 1, Rf_ScalarLogical(zumir_r_nan_warned));
+  zumir_r_nan_warned = 0;
+  UNPROTECT(2);
+  return res;
+}
 
 /* Test entry: the C ports called directly, for comparison with R
  * (tests/testthat/test-imports.R). `which`: "fmod", "intdiv", "min2",

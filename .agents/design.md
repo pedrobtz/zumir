@@ -479,8 +479,12 @@ module (`MIR_output`) and return the same results, and the benchmarks
 record what the bridge saves in compile time.
 
 **Imports (D18).** Generated code calls a fixed internal list, resolved
-only for `rfunction()`: the C library's `exp`, `log`, `log1p`, `expm1`,
-`sqrt`, `fabs`, `floor`, `ceil`, `trunc`, `sin`, `cos`, `tan`; R's
+only for `rfunction()`: `exp`, `log`, `log1p`, `expm1`, `sqrt`, `fabs`,
+`floor`, `ceil`, `trunc`, `sin`, `cos`, `tan` as R calls them (on R 4.6
+and later, ports of R's own wrappers, `Rexp`, `Rexpm1` and the rest,
+which differ from the C library's on some inputs and platforms; before
+4.6, the C library's, with R's "NaNs produced" rule; decided
+2026-11-13, when Windows' `expm1` differed from R 4.6's); R's
 `R_pow` for `^`, a pure function of libR that neither allocates nor
 raises a condition; and zumir's own C ports of R's `%%`, `%/%` and
 two-argument `min`/`max` (R's `myfmod`, `myfloor` and `rmin`/`rmax`
@@ -500,9 +504,11 @@ even if the name is rebound later; that is a documented difference.
 
 - Every argument is a `double` scalar or a `double` vector with no
   attributes. An argument that is indexed (`x[i]`), passed to
-  `length()` or to `seq_along()` is a vector. Any other is a scalar,
-  checked to be length one at the call. Inference reads the whole body,
-  not one path through it. A scalar argument of another length is an
+  `length()` or to `seq_along()` is a vector. Any other the body reads
+  is a scalar, checked to be length one at the call. Inference reads the
+  whole body, not one path through it (Q6, decided 2026-11-13). An
+  argument the body never reads has no shape: as in R, it is neither
+  evaluated nor checked. A scalar argument of another length is an
   error, where R might answer with a vector (D16).
 - An argument that is not `double` (integer, logical, character) is
   refused at the call with a classed error: R's own function would
@@ -517,7 +523,9 @@ even if the name is rebound later; that is a documented difference.
   argument is refused, and the body writes `m <- n + 1` instead.
 - Locals are `double` scalars, `logical` scalars (from comparisons,
   `is.na()`, `!`, `&&`, `||`), `integer` loop counters, or `double`
-  vectors made by `numeric(<size>)`.
+  vectors made by `numeric(<size>)`. A scalar local is always a double:
+  assigning it an integer or a logical (`s <- i`) is refused, and
+  `as.double(i)` is accepted, since R would change the local's type.
 - **Vector locals (D22).** Each one is made by exactly one
   `numeric(<size>)` statement at the top level of the body, before any
   loop or branch, never inside one. `<size>` uses only constants,
@@ -536,7 +544,11 @@ even if the name is rebound later; that is a documented difference.
 - A logical in arithmetic is `1`, `0` or `NA`, as in R. An integer
   counter in arithmetic with another integer stays integer, as in R; an
   overflow, where R would give `NA` with a warning, is an error (D16).
-  With a double it becomes double.
+  With a double it becomes double. Arithmetic with no double operand
+  that R would type as integer and that is not one of these (`%/%` of
+  two integers, `min()` or `max()` of two non-doubles, a logical plus a
+  logical or an integer, unary minus of a logical) is refused at compile
+  time; `as.double()` on an operand is accepted.
 - The result is a `double` scalar expression or a `double` vector local,
   returned by the last expression or `return()`. A result R would
   return as integer or logical (`length(x)`, a comparison, the counter)
@@ -558,9 +570,19 @@ even if the name is rebound later; that is a documented difference.
 **Errors and warnings.** Generated code cannot call R, so it returns a
 status, and the wrapper acts on it after the call:
 
-- `if (NA)` and `while (NA)` raise R's "missing value where TRUE/FALSE
-  needed", `if (NaN)` R's "argument is not interpretable as logical",
-  as `zumir_error` conditions.
+- A condition that is a logical `NA` (`if (a > 0)` with `a` `NA`)
+  raises R's "missing value where TRUE/FALSE needed"; a double `NA` or
+  `NaN` (`if (a)`) raises R's "argument is not interpretable as
+  logical", as R's `asLogicalNoNA` does. Both are `zumir_runtime_error`
+  conditions, which inherit from `zumir_error`.
+- The status word: `0` is success, `1` and `2` the two conditions
+  above, `3` an index, `4` an integer overflow, `5` the interrupt poll,
+  `6` a `seq_len()` argument and `7` an `a:b` bound. The wrapper turns
+  each into its condition; the warnings come back as flags beside it.
+- Constants travel in a pool the wrapper passes in, never as decimal
+  text in the MIR, so every double, `-0`, `NA` and the subnormals
+  included, reaches the code with R's bits; the pool tells `0` from
+  `-0`.
 - Where R warns (`log(-1)` and `sqrt(-1)`, "NaNs produced"; `%%` with
   "probable complete loss of accuracy in modulus"), the wrapper issues
   the same warning once per kind per call. R may warn more than once in
@@ -587,7 +609,17 @@ same inputs, random and chosen (`NA`, `NaN`, `±Inf`, `-0`, subnormals,
 empty vectors), and compares with `identical(num.eq = FALSE)`. That
 compares non-NaN doubles bit for bit, so `0` and `-0` differ, and tells
 `NA` from `NaN`; checked on R 4.6. Only the NA-or-NaN case above is
-allowed. The value, its type and attributes, the warnings and the error
+allowed: on chosen inputs, where the arguments hold both an `NA` and a
+`NaN`; on random functions, on any element, since a `NaN` can be made
+inside (`0/0`) and a comparison with it gives an `NA`, so the inputs do
+not show whether the two met (decided 2026-11-14, when CI's gctorture and
+ASan legs saw the native tier give `NA` and the interpreter `NaN` for
+`(x >= NaN) + NaN`). Native against interpreter follows the same rule. R's side runs in R's AST evaluator, an uncompiled copy of `f`
+with the JIT off: R 4.6's byte compiler folds `s <- 0; -(0 * 0)` to the
+`0` already in its constant pool, which cannot tell `0` from `-0`, so
+R's own answer changes once the JIT compiles `f` (found by the random
+differential, 2026-11-13). The AST evaluator is the language's meaning,
+and `rfunction()` follows it. The value, its type and attributes, the warnings and the error
 class are separate assertions, so a failure says which one differs.
 
 ## 5. Public R API (complete v0.1.0 surface)
@@ -1026,7 +1058,7 @@ decides it and the maintainer may overturn it.
   detection (2026-11-13); option (a) touches every code write in
   `mir.c`, since MIR's code allocator has no address to write through.
 - **Q6.** Should `rfunction()` take argument shapes from use, as §4.6
-  proposes, or from an explicit `types =` argument? Inference keeps the
-  call as plain R; an explicit argument makes a scalar-or-vector
-  ambiguity impossible. This RFC takes inference, with `types =` as an
-  override if Stage 6 finds a case inference gets wrong.
+  proposes, or from an explicit `types =` argument? **Decided
+  2026-11-13: inference.** Stage 6's random differential found one case
+  inference got wrong, an argument the body never reads, now given no
+  shape (§4.6, Values); none needed `types =`.

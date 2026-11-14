@@ -15,7 +15,9 @@ installed_lib <- function() {
 # path is set inside the script, not through system2(env =): on Windows
 # that prepends `R_LIBS=...` to the command line, which only commands such
 # as R and make accept, and Rscript does not.
-run_child <- function(lib, code) {
+# `timeout` (seconds, 0 for none) ends a child that hangs, with status 124,
+# so a regression fails instead of stalling the suite.
+run_child <- function(lib, code, timeout = 0) {
   script <- tempfile(fileext = ".R")
   on.exit(unlink(script))
   writeLines(
@@ -27,7 +29,8 @@ run_child <- function(lib, code) {
     rscript,
     c("--vanilla", shQuote(script)),
     stdout = TRUE,
-    stderr = TRUE
+    stderr = TRUE,
+    timeout = timeout
   ))
   status <- attr(out, "status")
   list(status = if (is.null(status)) 0L else status, output = out)

@@ -28,7 +28,7 @@ between pull requests and the full profile.
 | 3 | [Error trap](#stage-3--error-trap) | full | [#5](https://github.com/pedrobtz/zumir/issues/5) | [#32](https://github.com/pedrobtz/zumir/pull/32) | 2026-11-13 |
 | 4 | [Contexts, tiers and zumir_info()](#stage-4--contexts-tiers-and-zumir_info) | full | [#6](https://github.com/pedrobtz/zumir/issues/6) | [#33](https://github.com/pedrobtz/zumir/pull/33) | 2026-11-13 |
 | 5 | [C API and mir_function()](#stage-5--c-api-and-mir_function) | full | [#7](https://github.com/pedrobtz/zumir/issues/7) | [#34](https://github.com/pedrobtz/zumir/pull/34) | 2026-11-13 |
-| 6 | [rfunction()](#stage-6--rfunction) | quick | [#17](https://github.com/pedrobtz/zumir/issues/17) | | |
+| 6 | [rfunction()](#stage-6--rfunction) | full | [#17](https://github.com/pedrobtz/zumir/issues/17) | | 2026-11-13 |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | | |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | | |
 | 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
@@ -450,8 +450,11 @@ table and call the result; R users can run MIR text.
 **Issue.** [#17](https://github.com/pedrobtz/zumir/issues/17), sub-issue of
 [v0.1.0](https://github.com/pedrobtz/zumir/issues/1).
 
-**CI.** `quick`: R code that emits MIR text, compiled by Stage 5's
-`mir_function()` path and resolver; no new native code.
+**CI.** `full` (was `quick`; changed 2026-11-13): planned as R code
+only, the stage also added native code: the `.Call` bridge
+`src/zumir_rf.c`, which allocates R results under `PROTECT` and calls
+generated code that re-enters R through the interrupt poll, and ports of
+R 4.6's math wrappers in `src/zumir_imports.c` (design §4.6, D18).
 
 **Goal.** A numeric R function in §4.6's subset compiles to native code
 through MIR text, and returns exactly what R returns.
@@ -824,8 +827,6 @@ pointers for user code, with copies for outputs: valgrind (with
 
 ## Blocking open questions
 
-- [Q6](design.md#14-open-questions) is settled by Stage 6 (inference,
-  with `types =` only if needed); it does not block it.
 - [Q2](design.md#14-open-questions) blocks Stage 9: one function per
   `cfunction()` source, or several. It meets D24 in the same wrapper,
   so the maintainer reads both before the stage starts.

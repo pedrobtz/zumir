@@ -9,4 +9,4 @@ PKG_CPPFLAGS = $(ZUMIR_NO_MIR:1=-DZUMIR_NO_MIR)
 PKG_CFLAGS = $(C_VISIBILITY)
 # pthreads for the thread tests (src/zumir_test_models.c).
 PKG_LIBS = -lpthread
-OBJECTS = zumir.o zumir_mir.o zumir_mir_gen.o zumir_mir_stdio.o zumir_mir_glue.o zumir_trap.o zumir_ctx.o zumir_probe.o zumir_imports.o zumir_api.o zumir_mirf.o zumir_test_sink.o zumir_test_trap.o zumir_test_models.o zumir_test_wx.o
+OBJECTS = zumir.o zumir_mir.o zumir_mir_gen.o zumir_mir_stdio.o zumir_mir_glue.o zumir_trap.o zumir_ctx.o zumir_probe.o zumir_imports.o zumir_api.o zumir_mirf.o zumir_rf.o zumir_test_sink.o zumir_test_trap.o zumir_test_models.o zumir_test_wx.o

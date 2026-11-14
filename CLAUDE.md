@@ -45,7 +45,9 @@ load-time tier probe, and the first exports, `zumir_info()` and
 runs and `zumir_tier()` is `"none"`. Stage 5 added the C API table
 (`inst/include/zumir.h`, `src/zumir_api.c`), the import resolver with
 zumir's ports of R's arithmetic (`src/zumir_imports.c`), and
-`mir_function()` (`src/zumir_mirf.c`). The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+`mir_function()` (`src/zumir_mirf.c`). Stage 6 added `rfunction()`: an R
+walker in `R/rfunction.R` that emits MIR text, the `.Call` bridge
+`src/zumir_rf.c`, and ports of R 4.6's math wrappers. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -139,6 +141,17 @@ These are fixed by the design before any code exists:
 
 ## Testing
 
+`rfunction()`'s oracle is R itself, through `compare_with_r()` in
+`helper-rfunction.R`: `identical(num.eq = FALSE)`, with R's side run
+uncompiled and with the JIT off (R 4.6's byte compiler can turn `-0`
+into `0`). `test-rfunction-ops.R` (each construct),
+`test-rfunction-errors.R` (run-time errors, warnings, limits and the time
+limit in a child process), `test-rfunction-refuse.R` (compile-time
+refusals beside R running the same function) and
+`test-rfunction-random.R` (random functions from the helper's
+generator; 10² per run, 10⁴ when `R_ACTIONS_PROFILE=full`;
+`ZUMIR_RF_SEED=<n>` replays one, and a difference is saved under
+`tempdir()`).
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
 Stage 4's: `test-tier.R` (the probe; W+X refused under seccomp in a child
@@ -196,8 +209,8 @@ difference.
 
 Every job tests the labels in its `if:` (`ci.md`, Labels). The scheduled
 slot is Saturday 08:00 to 09:59 UTC, a different minute per workflow;
-gctorture's daily run is at 09:56. The roadmap marks Stages 2 to 5, 7, 8
-and 9 `full`, with the closing three.
+gctorture's daily run is at 09:56. The roadmap marks Stages 2 to 9
+`full`, with the closing three.
 
 ## Vendored native code
 

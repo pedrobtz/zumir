@@ -80,7 +80,18 @@ cfunction <- function(code, out = character(), n = NULL, tier = NULL) {
     quote(list),
     stats_setNames(lapply(sig$params$name, as.name), sig$params$name)
   ))
-  body(g) <- bquote(cf_call(.(spec), .(res$context), .(call_args)))
+  # The body is one .Call: zumir_cfun_invoke() checks and marshals the
+  # arguments and signals what it refuses, so a call costs about what a
+  # package's .Call wrapper does (design §9). R's JIT does not compile a
+  # closure made here, so nothing else goes in the body.
+  invoke <- bquote(
+    .Call(zumir_cfun_invoke, .(res$context), .(cf_cspec(spec)), .(call_args))
+  )
+  body(g) <- if (spec$ret == "void" && length(spec$out) == 0L) {
+    call("invisible", invoke)
+  } else {
+    invoke
+  }
   environment(g) <- new.env(parent = asNamespace("zumir"))
   structure(
     g,
@@ -350,153 +361,31 @@ cf_spec <- function(sig, out, n) {
   )
 }
 
-cf_call <- function(spec, ctx, args) {
+# The spec zumir_cfun_invoke() reads: per parameter its kind (0 int, 1
+# double, 2 const pointer, 3 output pointer), its type (0 int, 1 double),
+# its name and an output's fixed length (-1 for none); the 1-based index of
+# the length parameter (0 for none); and the value's name (NA for void).
+cf_cspec <- function(spec) {
   p <- spec$params
-  # Pointer inputs first: their lengths decide n. A long vector is refused
-  # before anything reads it (an ALTREP sequence is never expanded).
-  lens <- integer()
-  for (i in which(p$kind == "input")) {
-    v <- args[[i]]
-    if (!(is.double(v) || is.integer(v))) {
-      cf_stop("argument", sprintf("`%s` must be a numeric vector", p$name[[i]]))
-    }
-    if (length(v) > .Machine$integer.max) {
-      cf_stop(
-        "argument",
-        sprintf("`%s` is longer than .Machine$integer.max", p$name[[i]])
-      )
-    }
-    lens[[p$name[[i]]]] <- length(v)
-  }
-  n <- NULL
-  if (!is.null(spec$n)) {
-    given <- args[[spec$n]]
-    if (is.null(given)) {
-      if (length(lens) == 0L) {
-        cf_stop(
-          "argument",
-          sprintf("`%s` must be given: no input vector gives it", spec$n)
-        )
-      }
-      if (length(unique(lens)) != 1L) {
-        cf_stop(
-          "argument",
-          sprintf(
-            "the input vectors have different lengths; give `%s`",
-            spec$n
-          )
-        )
-      }
-      n <- unname(lens[[1]])
-    } else {
-      n <- cf_int(given, spec$n)
-      if (n < 0L) {
-        cf_stop("argument", sprintf("`%s` must not be negative", spec$n))
-      }
-      if (length(lens) && n > min(lens)) {
-        cf_stop(
-          "argument",
-          sprintf(
-            "`%s` is %d, longer than input `%s` (%d)",
-            spec$n,
-            n,
-            names(lens)[which.min(lens)],
-            min(lens)
-          )
-        )
-      }
-    }
-    args[[spec$n]] <- n
-  }
-  kinds <- integer(nrow(p))
-  for (i in seq_len(nrow(p))) {
-    nm <- p$name[[i]]
-    v <- args[[i]]
-    if (p$kind[[i]] == "scalar") {
-      kinds[[i]] <- if (p$type[[i]] == "int") 0L else 1L
-      args[[i]] <- if (p$type[[i]] == "int") cf_int(v, nm) else cf_double(v, nm)
-    } else if (p$kind[[i]] == "input") {
-      kinds[[i]] <- 2L
-      args[[i]] <- if (p$type[[i]] == "double") {
-        as.double(v)
-      } else {
-        cf_int_vector(v, nm)
-      }
-    } else {
-      kinds[[i]] <- 3L
-      len <- if (nm %in% names(spec$fixed)) spec$fixed[[nm]] else n
-      if (is.null(v)) {
-        v <- if (p$type[[i]] == "double") numeric(len) else integer(len)
-      } else {
-        if (!(is.double(v) || is.integer(v))) {
-          cf_stop("argument", sprintf("`%s` must be a numeric vector", nm))
-        }
-        if (length(v) > .Machine$integer.max) {
-          cf_stop(
-            "argument",
-            sprintf("`%s` is longer than .Machine$integer.max", nm)
-          )
-        }
-        if (length(v) < len) {
-          cf_stop(
-            "argument",
-            sprintf(
-              "`%s` has length %d; the function writes %d",
-              nm,
-              length(v),
-              as.integer(len)
-            )
-          )
-        }
-        v <- if (p$type[[i]] == "double") as.double(v) else cf_int_vector(v, nm)
-      }
-      args[[i]] <- v
-    }
-  }
-  res <- zumir_check(.Call(zumir_cfun_call, ctx, unname(args), kinds))
-  outs <- stats_setNames(res$outputs, p$name[p$kind == "output"])
-  items <- c(
-    if (spec$ret != "void") stats_setNames(list(res$value), spec$name),
-    outs
+  kinds <- ifelse(
+    p$kind == "scalar",
+    ifelse(p$type == "int", 0L, 1L),
+    ifelse(p$kind == "input", 2L, 3L)
   )
-  if (length(items) == 0L) {
-    return(invisible(NULL))
-  }
-  if (length(items) == 1L) items[[1]] else items
-}
-
-cf_int <- function(v, nm) {
-  if (
-    !(is.numeric(v) && length(v) == 1L) ||
-      is.na(v) ||
-      v != floor(v) ||
-      abs(v) > .Machine$integer.max
-  ) {
-    cf_stop(
-      "argument",
-      sprintf("`%s` must be one whole number that fits an int", nm)
-    )
-  }
-  as.integer(v)
-}
-
-cf_double <- function(v, nm) {
-  if (!(is.numeric(v) && length(v) == 1L)) {
-    cf_stop("argument", sprintf("`%s` must be one number", nm))
-  }
-  as.double(v)
-}
-
-cf_int_vector <- function(v, nm) {
-  if (is.integer(v)) {
-    return(v)
-  }
-  w <- v[!is.na(v)]
-  if (any(w != floor(w)) || any(abs(w) > .Machine$integer.max)) {
-    cf_stop(
-      "argument",
-      sprintf("`%s` must hold whole numbers that fit an int", nm)
-    )
-  }
-  as.integer(v)
+  fixed <- vapply(
+    p$name,
+    function(nm) {
+      if (nm %in% names(spec$fixed)) as.integer(spec$fixed[[nm]]) else -1L
+    },
+    1L,
+    USE.NAMES = FALSE
+  )
+  list(
+    kinds = as.integer(kinds),
+    types = as.integer(p$type == "double"),
+    names = p$name,
+    n = if (is.null(spec$n)) 0L else match(spec$n, p$name),
+    fixed = fixed,
+    value = if (spec$ret == "void") NA_character_ else spec$name
+  )
 }

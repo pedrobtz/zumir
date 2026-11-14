@@ -3,6 +3,8 @@
  * memory, its diagnostics go to the message buffer, and the module is
  * linked against D6's list alone on the context's tier. Stage 9's
  * cfunction() builds its R closure on zumir_c2mir_compile(). */
+#include <limits.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -264,52 +266,221 @@ SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name) {
   return res;
 }
 
-/* Calls the function cfunction() compiled. `args` holds one R value per C
- * parameter, already of the right type and checked by R: an integer or a
- * double of length one for int and double; an integer or double vector for
- * a pointer. `kinds` per parameter: 0 int, 1 double, 2 an input pointer
- * (const), 3 an output pointer. An output is duplicated here before its
- * pointer is taken, so the caller's vector is never written (D24).
- * Returns list(value, outputs) with value NULL for void, outputs the
- * written copies in parameter order. */
-SEXP zumir_cfun_call(SEXP x, SEXP args, SEXP kinds) {
+/* A call of cfunction()'s closure, whose body is this .Call alone: the
+ * arguments are checked and marshalled here, not in R, so a call costs
+ * about what a package's .Call wrapper does (design §9). `spec` is
+ * cf_cspec()'s list(kinds, types, names, n, fixed, value): per parameter
+ * its kind (0 int scalar, 1 double scalar, 2 const pointer, 3 output
+ * pointer), its type (0 int, 1 double), its name and an output's fixed
+ * length (-1 for none); the 1-based index of the length parameter (0 for
+ * none); and the value's name (NA for void). The result: the value, the
+ * one output, or the named list of them; NULL when there is neither.
+ *
+ * A refused argument, or a context that cannot run, is signalled here
+ * through zumir_check(), as a classed R condition. That is a longjmp out
+ * of this frame, which is safe: it happens before the compiled function is
+ * called, no MIR trap is set, and everything allocated is R's. */
+static SEXP cf_raise(SEXP st) {
+  PROTECT(st);
+  SEXP ns = PROTECT(R_FindNamespace(Rf_mkString("zumir")));
+  SEXP call = PROTECT(Rf_lang3(Rf_install("zumir_check"), st, R_NilValue));
+  Rf_eval(call, ns);
+  UNPROTECT(3);
+  return R_NilValue;
+}
+
+static SEXP cf_refuse(const char *fmt, const char *a, long long b, const char *c, long long d) {
+  char msg[512];
+  char body[480];
+  snprintf(body, sizeof body, fmt, a, b, c, d);
+  snprintf(msg, sizeof msg, "cfunction(): %s.", body);
+  return cf_raise(zumir_status("argument", 0, msg));
+}
+
+static int cf_is_vector(SEXP v) {
+  return TYPEOF(v) == REALSXP || TYPEOF(v) == INTSXP;
+}
+
+/* is.numeric(): an integer or double vector that is not a factor. */
+static int cf_is_numeric(SEXP v) {
+  return TYPEOF(v) == REALSXP || (TYPEOF(v) == INTSXP && !Rf_inherits(v, "factor"));
+}
+
+/* cf_int(): one whole number that fits an int; 0 when it is not. */
+static int cf_int(SEXP v, int *out) {
+  if (!cf_is_numeric(v) || XLENGTH(v) != 1) return 0;
+  if (TYPEOF(v) == INTSXP) {
+    if (INTEGER(v)[0] == NA_INTEGER) return 0;
+    *out = INTEGER(v)[0];
+    return 1;
+  }
+  double d = REAL(v)[0];
+  if (ISNAN(d) || d != floor(d) || fabs(d) > INT_MAX) return 0;
+  *out = (int) d;
+  return 1;
+}
+
+/* A fresh vector of `type` holding v's elements, without its attributes:
+ * as.double(v), or as.integer(v) when every non-NA element is a whole
+ * number that fits (0 when one is not). */
+static SEXP cf_fresh(SEXP v, int type, int *ok) {
+  R_xlen_t len = XLENGTH(v);
+  *ok = 1;
+  if (type == 1) {
+    SEXP r = Rf_allocVector(REALSXP, len);
+    double *p = REAL(r);
+    if (TYPEOF(v) == REALSXP) {
+      if (len) memcpy(p, REAL(v), (size_t) len * sizeof(double));
+    } else {
+      const int *q = INTEGER(v);
+      for (R_xlen_t j = 0; j < len; j++) p[j] = q[j] == NA_INTEGER ? NA_REAL : q[j];
+    }
+    return r;
+  }
+  if (TYPEOF(v) == REALSXP) {
+    const double *q = REAL(v);
+    for (R_xlen_t j = 0; j < len; j++) {
+      if (!ISNAN(q[j]) && (q[j] != floor(q[j]) || fabs(q[j]) > INT_MAX)) {
+        *ok = 0;
+        return R_NilValue;
+      }
+    }
+    SEXP r = Rf_allocVector(INTSXP, len);
+    int *p = INTEGER(r);
+    for (R_xlen_t j = 0; j < len; j++) p[j] = ISNAN(q[j]) ? NA_INTEGER : (int) q[j];
+    return r;
+  }
+  SEXP r = Rf_allocVector(INTSXP, len);
+  if (len) memcpy(INTEGER(r), INTEGER(v), (size_t) len * sizeof(int));
+  return r;
+}
+
+SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
   SEXP st;
   zumir_rctx *z = zumir_rctx_get(x, 1, &st);
-  if (z == NULL) return st;
-  if (z->fn == NULL) return zumir_status("context", 0, "not compiled");
-  R_xlen_t n = XLENGTH(args);
-  if (n != z->nargs || XLENGTH(kinds) != n)
-    return zumir_status("argument", 0, "wrong number of arguments");
-  const int *k = INTEGER(kinds);
-  int nout = 0;
-  for (R_xlen_t i = 0; i < n; i++) nout += k[i] == 3;
-  SEXP outs = PROTECT(Rf_allocVector(VECSXP, nout));
-  int64_t *slots = (int64_t *) R_alloc((size_t) n + 1, sizeof(int64_t));
-  int o = 0;
-  for (R_xlen_t i = 0; i < n; i++) {
+  if (z == NULL) return cf_raise(st);
+  if (z->fn == NULL) return cf_raise(zumir_status("context", 0, "not compiled"));
+  const int *kinds = INTEGER(VECTOR_ELT(spec, 0));
+  const int *types = INTEGER(VECTOR_ELT(spec, 1));
+  SEXP names = VECTOR_ELT(spec, 2);
+  int n_at = INTEGER(VECTOR_ELT(spec, 3))[0] - 1;
+  const int *fixed = INTEGER(VECTOR_ELT(spec, 4));
+  SEXP value_name = VECTOR_ELT(spec, 5);
+  R_xlen_t np = XLENGTH(args);
+  if (np != z->nargs || XLENGTH(VECTOR_ELT(spec, 0)) != np)
+    return cf_raise(zumir_status("argument", 0, "wrong number of arguments"));
+#define NAME(i) CHAR(STRING_ELT(names, i))
+
+  /* Pointer inputs first: their lengths decide n. A long vector is refused
+   * before anything reads it (an ALTREP sequence is never expanded). */
+  R_xlen_t min_len = -1;
+  int min_at = -1, same = 1;
+  for (R_xlen_t i = 0; i < np; i++) {
+    if (kinds[i] != 2) continue;
     SEXP v = VECTOR_ELT(args, i);
-    if (k[i] == 0) {
-      slots[i] = (int64_t) INTEGER(v)[0];
-    } else if (k[i] == 1) {
-      double d = REAL(v)[0];
+    if (!cf_is_vector(v)) return cf_refuse("`%s` must be a numeric vector", NAME(i), 0, "", 0);
+    if (XLENGTH(v) > INT_MAX)
+      return cf_refuse("`%s` is longer than .Machine$integer.max", NAME(i), 0, "", 0);
+    if (min_len >= 0 && XLENGTH(v) != min_len) same = 0;
+    if (min_len < 0 || XLENGTH(v) < min_len) {
+      min_len = XLENGTH(v);
+      min_at = (int) i;
+    }
+  }
+  int n = 0;
+  if (n_at >= 0) {
+    SEXP given = VECTOR_ELT(args, n_at);
+    if (Rf_isNull(given)) {
+      if (min_len < 0)
+        return cf_refuse("`%s` must be given: no input vector gives it", NAME(n_at), 0, "", 0);
+      if (!same) return cf_refuse("the input vectors have different lengths; give `%s`", NAME(n_at), 0, "", 0);
+      n = (int) min_len;
+    } else {
+      if (!cf_int(given, &n))
+        return cf_refuse("`%s` must be one whole number that fits an int", NAME(n_at), 0, "", 0);
+      if (n < 0) return cf_refuse("`%s` must not be negative", NAME(n_at), 0, "", 0);
+      if (min_len >= 0 && n > min_len)
+        return cf_refuse("`%s` is %lld, longer than input `%s` (%lld)", NAME(n_at), n, NAME(min_at),
+                         (long long) min_len);
+    }
+  }
+
+  /* The slots, on the stack for the usual few parameters; the vectors
+   * passed by pointer are held in `keep` while the function runs. */
+  int64_t slot_buf[16];
+  int64_t *slots = np < 16 ? slot_buf : (int64_t *) R_alloc((size_t) np + 1, sizeof(int64_t));
+  int npointers = 0;
+  for (R_xlen_t i = 0; i < np; i++) npointers += kinds[i] >= 2;
+  SEXP keep = PROTECT(npointers ? Rf_allocVector(VECSXP, np) : R_NilValue);
+  int nout = 0;
+  for (R_xlen_t i = 0; i < np; i++) {
+    SEXP v = VECTOR_ELT(args, i);
+    const char *nm = NAME(i);
+    if (kinds[i] == 0) {
+      int k = n;
+      if (i != n_at && !cf_int(v, &k)) {
+        UNPROTECT(1);
+        return cf_refuse("`%s` must be one whole number that fits an int", nm, 0, "", 0);
+      }
+      slots[i] = (int64_t) k;
+    } else if (kinds[i] == 1) {
+      if (!cf_is_numeric(v) || XLENGTH(v) != 1) {
+        UNPROTECT(1);
+        return cf_refuse("`%s` must be one number", nm, 0, "", 0);
+      }
+      double d = TYPEOF(v) == REALSXP ? REAL(v)[0] : INTEGER(v)[0] == NA_INTEGER ? NA_REAL : INTEGER(v)[0];
       memcpy(&slots[i], &d, sizeof d);
     } else {
-      if (k[i] == 3) {
-        v = Rf_duplicate(v);
-        SET_VECTOR_ELT(outs, o++, v);
+      int ok = 1;
+      if (kinds[i] == 2) {
+        /* An input of the parameter's type is passed as it is, no copy. */
+        if (TYPEOF(v) != (types[i] == 1 ? REALSXP : INTSXP)) v = cf_fresh(v, types[i], &ok);
+      } else {
+        R_xlen_t len = fixed[i] >= 0 ? fixed[i] : n;
+        if (Rf_isNull(v)) {
+          v = Rf_allocVector(types[i] == 1 ? REALSXP : INTSXP, len);
+          if (len) memset(types[i] == 1 ? (void *) REAL(v) : (void *) INTEGER(v), 0,
+                          (size_t) len * (types[i] == 1 ? sizeof(double) : sizeof(int)));
+        } else {
+          if (!cf_is_vector(v)) {
+            UNPROTECT(1);
+            return cf_refuse("`%s` must be a numeric vector", nm, 0, "", 0);
+          }
+          if (XLENGTH(v) > INT_MAX) {
+            UNPROTECT(1);
+            return cf_refuse("`%s` is longer than .Machine$integer.max", nm, 0, "", 0);
+          }
+          if (XLENGTH(v) < len) {
+            UNPROTECT(1);
+            return cf_refuse("`%s` has length %lld; the function writes %lld", nm, (long long) XLENGTH(v),
+                             "", (long long) len);
+          }
+          /* D24: the C function writes a copy, never the caller's vector. */
+          v = cf_fresh(v, types[i], &ok);
+        }
+        nout++;
       }
+      if (!ok) {
+        UNPROTECT(1);
+        return cf_refuse("`%s` must hold whole numbers that fit an int", nm, 0, "", 0);
+      }
+      SET_VECTOR_ELT(keep, i, v);
       /* A pointer is never taken to a vector of length zero (R's data
        * pointer there is not one to dereference). */
       void *p = XLENGTH(v) == 0 ? NULL : TYPEOF(v) == REALSXP ? (void *) REAL(v) : (void *) INTEGER(v);
       slots[i] = (int64_t) (intptr_t) p;
     }
   }
+#undef NAME
+
   int64_t r = 0;
   void (*fn)(int64_t *, int64_t *);
   memcpy(&fn, &z->fn, sizeof fn);
   fn(slots, &r);
+
   SEXP value = R_NilValue;
-  if (z->nres == 1) {
+  int has_value = z->nres == 1;
+  if (has_value) {
     if (z->res_type == MIR_T_D) {
       double d;
       memcpy(&d, &r, sizeof d);
@@ -319,11 +490,32 @@ SEXP zumir_cfun_call(SEXP x, SEXP args, SEXP kinds) {
     }
   }
   PROTECT(value);
-  const char *rn[] = {"value", "outputs", ""};
-  SEXP res = PROTECT(Rf_mkNamed(VECSXP, rn));
-  SET_VECTOR_ELT(res, 0, value);
-  SET_VECTOR_ELT(res, 1, outs);
-  UNPROTECT(3);
+  int nitems = has_value + nout;
+  SEXP res;
+  if (nitems == 0) {
+    res = R_NilValue;
+  } else if (nitems == 1) {
+    res = value;
+    if (!has_value)
+      for (R_xlen_t i = 0; i < np; i++)
+        if (kinds[i] == 3) res = VECTOR_ELT(keep, i);
+  } else {
+    res = PROTECT(Rf_allocVector(VECSXP, nitems));
+    SEXP rn = PROTECT(Rf_allocVector(STRSXP, nitems));
+    int k = 0;
+    if (has_value) {
+      SET_VECTOR_ELT(res, k, value);
+      SET_STRING_ELT(rn, k++, STRING_ELT(value_name, 0));
+    }
+    for (R_xlen_t i = 0; i < np; i++) {
+      if (kinds[i] != 3) continue;
+      SET_VECTOR_ELT(res, k, VECTOR_ELT(keep, i));
+      SET_STRING_ELT(rn, k++, STRING_ELT(names, i));
+    }
+    Rf_setAttrib(res, R_NamesSymbol, rn);
+    UNPROTECT(2);
+  }
+  UNPROTECT(2);
   return res;
 }
 
@@ -383,10 +575,10 @@ SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name) {
   (void) name;
   return zumir_status("context", 0, "zumir was built without MIR: no target");
 }
-SEXP zumir_cfun_call(SEXP x, SEXP args, SEXP kinds) {
+SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
   (void) x;
+  (void) spec;
   (void) args;
-  (void) kinds;
   return zumir_status("context", 0, "zumir was built without MIR");
 }
 #endif

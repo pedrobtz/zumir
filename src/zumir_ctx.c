@@ -21,8 +21,11 @@ SEXP zumir_status(const char *kind, int type, const char *message) {
 #if ZUMIR_HAVE_MIR
 #include "vendor/mir/mir-gen.h"
 
+/* Looked up once: every call of a compiled function checks it. */
 static SEXP context_tag(void) {
-  return Rf_install("zumir_context");
+  static SEXP tag = NULL;
+  if (tag == NULL) tag = Rf_install("zumir_context");
+  return tag;
 }
 
 void zumir_rctx_fail(zumir_rctx *z, const void *trap) {

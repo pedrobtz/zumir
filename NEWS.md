@@ -15,7 +15,8 @@
   compiler, and returns an R function that calls it: no Rtools, Xcode
   tools or `gcc` needed. Output arguments are copies, so the caller's
   vectors are never changed, and no system header is read, so a source
-  compiles the same everywhere.
+  compiles the same everywhere. Arguments are checked and passed in C, so
+  a call costs under a microsecond.
 
 * `mir_function()` compiles a function from MIR's textual form, natively or
   on MIR's interpreter, and returns an R function that calls it.

@@ -69,6 +69,7 @@ test_that("every argument and return type against R", {
   expect_identical(dcum(x = 1:4), cumsum(c(1, 2, 3, 4)))
   # void with no output returns invisible NULL.
   nothing <- cfunction("void nothing(double a) { (void) a; }")
+  expect_invisible(nothing(1))
   expect_null(nothing(1))
   # The prelude's maths, against R where R's function is the C library's.
   ex <- cfunction("double ex(double a) { return exp(a) + sqrt(a) - floor(a); }")
@@ -223,6 +224,51 @@ test_that("refusals carry their classes", {
   expect_error(isum(x = "a"), class = "zumir_argument_error")
 })
 
+test_that("each value is checked and converted as R's as.integer() and as.double() would", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  half <- cfunction("double half(double a, int k) { return a / k; }")
+  # Scalars: is.numeric() and one element; an int is whole and fits.
+  expect_error(half(factor("a"), 1L), class = "zumir_argument_error")
+  expect_error(half(TRUE, 1L), class = "zumir_argument_error")
+  expect_error(half(numeric(), 1L), class = "zumir_argument_error")
+  expect_error(half(1, Inf), class = "zumir_argument_error")
+  expect_error(half(1, NaN), class = "zumir_argument_error")
+  expect_error(half(1, -2^31), class = "zumir_argument_error")
+  expect_identical(half(1, -(2^31 - 1)), 1 / -(2^31 - 1))
+  expect_identical(half(1, .Machine$integer.max), 1 / .Machine$integer.max)
+  expect_identical(half(3L, 2), 1.5)
+  expect_identical(half(NA_integer_, 1L), NA_real_)
+  # A const int * gets as.integer() of a double vector: NA and NaN become
+  # NA_integer_; a const double * gets as.double() of an integer one.
+  first_i <- cfunction("int first_i(const int *x) { return x[0]; }")
+  expect_identical(first_i(c(NaN, 1)), NA_integer_)
+  expect_identical(first_i(c(NA, 1)), NA_integer_)
+  expect_identical(first_i(c(-3, 1)), -3L)
+  expect_error(first_i(c(1, 2^31)), class = "zumir_argument_error")
+  first_d <- cfunction("double first_d(const double *x) { return x[0]; }")
+  expect_identical(first_d(c(NA_integer_, 1L)), NA_real_)
+  expect_identical(first_d(c(7L, 1L)), 7)
+  # A given output comes back as a plain copy: its values, not its
+  # attributes, and converted to the parameter's type.
+  inc <- cfunction(
+    "void inc(int n, double *y, int *k) {
+       for (int i = 0; i < n; i++) { y[i] += 1; k[i] += 1; }
+     }",
+    out = c("y", "k"),
+    n = "n"
+  )
+  y <- c(a = 1, b = 2)
+  k <- c(5, 6)
+  r <- inc(y = y, k = k, n = 2L)
+  expect_identical(r, list(y = c(2, 3), k = c(6L, 7L)))
+  expect_identical(y, c(a = 1, b = 2))
+  expect_error(
+    inc(y = y, k = c(1.5, 2), n = 2L),
+    class = "zumir_argument_error"
+  )
+  expect_error(inc(y = y, k = "a", n = 2L), class = "zumir_argument_error")
+})
+
 test_that("a name outside D6 is a link error, mir_compile()'s and R's included", {
   skip_if(zumir_tier() == "none", "no tier runs here")
   for (fn in c("R_pow", "zumir_r_fmod", "expit", "printf", "Rf_error")) {
@@ -298,4 +344,26 @@ test_that("results do not change in a hostile session", {
   on.exit(options(old))
   expect_identical(cfunction(src)(1), want)
   expect_identical(want, 1 / 3 + 1234567.891)
+})
+
+test_that("15, 16 and 17 parameters arrive in order (the slots' stack buffer)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  for (k in 15:17) {
+    params <- paste0("double a", seq_len(k), collapse = ", ")
+    terms <- paste0(seq_len(k), " * a", seq_len(k), collapse = " + ")
+    f <- cfunction(
+      sprintf(
+        "double wsum(%s, int m, double *y) { y[0] = m; return %s; }",
+        params,
+        terms
+      ),
+      out = c(y = 1)
+    )
+    args <- as.list(sqrt(seq_len(k) + 0.5))
+    names(args) <- paste0("a", seq_len(k))
+    r <- do.call(f, c(args, list(m = 7L)))
+    # Left to right in doubles, as C adds (sum() may use long double).
+    expect_identical(r$wsum, Reduce(`+`, seq_len(k) * unlist(args)), info = k)
+    expect_identical(r$y, 7, info = k)
+  }
 })

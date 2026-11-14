@@ -23,3 +23,4 @@
 ^tools/bench-mir-compile-routes\.R$
 ^tests/fuzz$
 ^tools/c-tests-expected\.txt$
+^README\.Rmd$

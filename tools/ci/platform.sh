@@ -15,6 +15,9 @@
 #   4. Linux: the package built with MIR forced out installs, loads and
 #      reports no target (tests/testthat/test-no-target.R).
 #
+# Under the full profile, also the interpreter's dispatch after step 1 and
+# tools/run-benchmarks after step 3 (Stage 10): recorded, not gated.
+#
 # Stages 3 to 5 add theirs.
 set -eu
 os=${1:?usage: tools/ci/platform.sh <macos|windows|ubuntu>}
@@ -36,6 +39,13 @@ echo "CC = $cc_cmd"
 echo "CFLAGS = $r_cflags"
 $cc_cmd --version | head -1
 uname -m
+# The CPU, and on macOS whether this is Rosetta (Stage 10: the macOS
+# x86-64 runner's interpreter is about 8 times slower than every other
+# leg's, MIR's own benchmarks included).
+if [ "$os" = macos ]; then
+  sysctl -n machdep.cpu.brand_string || true
+  echo "translated: $(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)"
+fi
 endgroup
 
 # ---------------------------------------------------------------------------
@@ -89,6 +99,25 @@ for t in $targets; do
 done
 endgroup
 [ -z "$failed" ] || { echo "MIR's own tests failed:$failed" >&2; exit 1; }
+
+# The interpreter's dispatch (Stage 10, design §9), full profile only: MIR's
+# own interpreter benchmarks, loop-interp and sieve-interp, built from the
+# clone above with R's compiler and flags twice, with MIR_DIRECT_DISPATCH
+# (the switch the package is built with) and with computed goto (MIR's
+# default, which -pedantic reports). Recorded, never gated: the times go to
+# the log for .agents/benchmarks.md.
+if [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+  group "Interpreter dispatch"
+  goto_cflags=$(echo "$mir_cflags" | sed 's/-DMIR_DIRECT_DISPATCH=1//')
+  for t in loop-interp sieve-interp; do
+    for d in switch goto; do
+      if [ $d = switch ]; then f=$mir_cflags; else f=$goto_cflags; fi
+      $cc_bin $f -I"$mir" "$mir/mir.c" "$mir/mir-tests/$t.c" -o "$tmp/$t-$d" -lm
+      echo "dispatch $d, $t: $("$tmp/$t-$d" 2>&1 | tail -1)"
+    done
+  done
+  endgroup
+fi
 
 # ---------------------------------------------------------------------------
 # 2. The installed package's symbols (Stage 2).
@@ -276,6 +305,17 @@ if [ -s "$tmp/cflagged" ]; then
 fi
 echo "ok: the consumer links no CRAN-flagged symbol"
 endgroup
+
+# ---------------------------------------------------------------------------
+# The benchmarks (Stage 10, design §9), full profile only: tools/run-benchmarks
+# against the package built in step 2, its reference C built by R CMD SHLIB
+# with R's compiler. Recorded, never gated: one line per §9 row in the log,
+# for .agents/benchmarks.md.
+if [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+  group "Benchmarks"
+  R_LIBS="$lib${R_LIBS:+:$R_LIBS}" "$Rscript" tools/run-benchmarks
+  endgroup
+fi
 
 # ---------------------------------------------------------------------------
 # The R suite on this runner (Linux, Stage 4): R CMD check has no aarch64

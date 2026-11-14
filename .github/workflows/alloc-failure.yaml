@@ -29,8 +29,9 @@ jobs:
     with:
       run: ZUMIR_ALLOC_EXERCISE=trap R_ENABLE_JIT=0 Rscript tools/alloc-exercise.R
       baseline-run: R_ENABLE_JIT=0 Rscript -e "library(zumir)"
-      # R's own allocation errors, and MIR's through the trap.
-      expect-pattern: "[Cc]annot allocate|could not allocate|[Oo]ut of memory|memory exhausted|zumir_error"
+      # R's own allocation errors ("Could not allocate saveds in
+      # savetl_init" from order() among them), and MIR's through the trap.
+      expect-pattern: "[Cc]annot allocate|[Cc]ould not allocate|[Oo]ut of memory|memory exhausted|zumir_error"
       target-pattern: "Not enough memory|no memory|MIR_init failed"
       min-target-hits: 1
       ignore-crash-pattern: "^ 1: (grepl?|sub|gsub|strsplit|gzfile)\\("
@@ -44,7 +45,7 @@ jobs:
     with:
       run: ZUMIR_ALLOC_EXERCISE=rfunction R_ENABLE_JIT=0 Rscript tools/alloc-exercise.R
       baseline-run: R_ENABLE_JIT=0 Rscript -e "library(zumir)"
-      expect-pattern: "[Cc]annot allocate|could not allocate|[Oo]ut of memory|memory exhausted|zumir_error"
+      expect-pattern: "[Cc]annot allocate|[Cc]ould not allocate|[Oo]ut of memory|memory exhausted|zumir_error"
       target-pattern: "Not enough memory|no memory|MIR_init failed"
       min-target-hits: 1
       ignore-crash-pattern: "^ 1: (grepl?|sub|gsub|strsplit|gzfile)\\("

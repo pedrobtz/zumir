@@ -43,7 +43,8 @@
   "55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy",\
   "feacf4fe Stop at the end of the unit after a ## concatenation",\
   "4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path",\
-  "06104552 Empty the buffer when a macro argument has no start marker"
+  "06104552 Empty the buffer when a macro argument has no start marker",\
+  "46ed8157 Generate no code from a source with parse errors"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

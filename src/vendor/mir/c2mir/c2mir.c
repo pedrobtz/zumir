@@ -14467,7 +14467,6 @@ int c2mir_compile (MIR_context_t ctx, struct c2mir_options *ops, int (*getc_func
   struct c2m_ctx *c2m_ctx = *c2m_ctx_loc (ctx);
   double start_time = real_usec_time ();
   node_t r;
-  unsigned n_error_before;
   MIR_module_t m;
 
   if (c2m_ctx == NULL) return 0;
@@ -14493,9 +14492,10 @@ int c2mir_compile (MIR_context_t ctx, struct c2mir_options *ops, int (*getc_func
     if (c2m_options->verbose_p && c2m_options->message_file != NULL && n_errors)
       fprintf (c2m_options->message_file, "parser - FAIL\n");
     if (!c2m_options->syntax_only_p) {
-      n_error_before = n_errors;
       do_context (c2m_ctx, r);
-      if (n_errors > n_error_before) {
+      /* No code from a tree with errors, the parser's included: after a
+         parse error the tree can lack what the generator reads. */
+      if (n_errors != 0) {
         if (c2m_options->debug_p) print_node (c2m_ctx, c2m_options->message_file, r, 0, FALSE);
         if (c2m_options->verbose_p && c2m_options->message_file != NULL)
           fprintf (c2m_options->message_file, "C2MIR context checker - FAIL\n");

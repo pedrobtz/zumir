@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   06104552b719120a07f7056ae5f9d6aa4ec996e6
+  Fork commit:   46ed8157f434ba9a1895ae1e2ccbdee8af726cf1
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -37,6 +37,7 @@ interpreter and the C compiler c2mir)
                  feacf4fe Stop at the end of the unit after a ## concatenation
                  4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path
                  06104552 Empty the buffer when a macro argument has no start marker
+                 46ed8157 Generate no code from a source with parse errors
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -151,6 +152,10 @@ The patches, with the fork branch that carries each one alone:
             input left no T_BOA marker, so the next push wrote before the
             array (libFuzzer in CI, UBSan). fix/c2mir-arg-without-marker;
             upstream: not filed yet (#30).
+  46ed8157  c2mir_compile generated code after recovered parse errors, from
+            a tree the generator could not read (SEGV, libFuzzer in CI); it
+            now generates only from a source with no error.
+            fix/c2mir-no-gen-after-errors; upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

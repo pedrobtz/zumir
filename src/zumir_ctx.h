@@ -73,6 +73,10 @@ SEXP zumir_ctx_scan(SEXP x, SEXP text);
 
 typedef void (*zumir_body)(zumir_rctx *z, void *arg);
 
+/* zumir_mirf.c: builds `void _zumir_call (int64 *args, int64 *res)` around
+ * the function item `arg` (a zumir_body, under a trap). */
+void zumir_mirf_wrapper(zumir_rctx *z, void *arg);
+
 /* Runs body under a trap. Returns 1 when it returned, 0 when MIR raised
  * (the context is then failed) or the context was already failed. */
 int zumir_rctx_run(zumir_rctx *z, zumir_body body, void *arg);

@@ -38,6 +38,10 @@
 #' between R, the two tiers and builds, and `is.nan()` of such a value
 #' can take a different branch. `is.na()` is `TRUE` either way.
 #'
+#' [What mir_compile() accepts](https://pedrobtz.github.io/zumir/articles/mir-compile.html)
+#' lists the subset in full, every place it errors where R would answer,
+#' and why.
+#'
 #' @param f A function.
 #' @param tier `"native"` or `"interp"`; by default [zumir_tier()].
 #' @returns A function of class `zumir_compiled`, with `f`'s arguments.

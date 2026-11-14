@@ -51,7 +51,10 @@ walker in `R/mir_compile.R` that emits MIR text, the `.Call` bridge
 c2mir (`src/zumir_c2mir.c`, with the fork's `C2MIR_NO_FILE_INCLUDES`)
 and the compile path `c2mir_compile()` (`src/zumir_cfun.c`, with the
 prelude in `src/zumir_prelude.c` and D6's table in
-`src/zumir_imports_d6.c`); `cfunction()` is Stage 9. Stage 7 added the
+`src/zumir_imports_d6.c`). Stage 9 added `cfunction()` (`R/cfunction.R`,
+`zumir_cfun_new()` and `zumir_cfun_call()` in `src/zumir_cfun.c`), on
+`mir_function()`'s slot wrapper, with Q2 decided (one function per call)
+and D24 confirmed. Stage 7 added the
 emitter route (`zumir_rf_build`), which builds the module with MIR's API
 from the lowering's instructions; the text route stays, internal
 (`rf_make(route = "text")`), as its oracle. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
@@ -151,6 +154,10 @@ These are fixed by the design before any code exists:
 
 ## Testing
 
+`test-cfunction.R` (Stage 9): every type and the design's examples
+against R, the refusals, D24's copies checked bitwise, and `n` straddled;
+`test-closures.R`: the three compilers' closures through `rm()`/`gc()`,
+`readRDS` and `fork`.
 `test-prelude.R` and `test-c2mir-errors.R` (Stage 8): the prelude
 against D6's table, each name against the C library or R, the
 diagnostics' line and column, and no header file read. The `c-tests`

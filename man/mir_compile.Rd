@@ -54,6 +54,10 @@ Where an \code{NA} and a \code{NaN} meet in one operation, R leaves open which
 comes out (see \link{NA}), and so does \code{mir_compile()}: the answer can differ
 between R, the two tiers and builds, and \code{is.nan()} of such a value
 can take a different branch. \code{is.na()} is \code{TRUE} either way.
+
+\href{https://pedrobtz.github.io/zumir/articles/mir-compile.html}{What mir_compile() accepts}
+lists the subset in full, every place it errors where R would answer,
+and why.
 }
 \examples{
 \dontshow{if (zumir_tier() != "none") withAutoprint(\{ # examplesIf}
@@ -67,6 +71,7 @@ ss(c(1, 2, 3))
 }
 \seealso{
 Other compilers:
+\code{\link[=cfunction]{cfunction()}},
 \code{\link[=mir_function]{mir_function()}}
 }
 \concept{compilers}

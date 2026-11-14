@@ -609,7 +609,12 @@ same inputs, random and chosen (`NA`, `NaN`, `±Inf`, `-0`, subnormals,
 empty vectors), and compares with `identical(num.eq = FALSE)`. That
 compares non-NaN doubles bit for bit, so `0` and `-0` differ, and tells
 `NA` from `NaN`; checked on R 4.6. Only the NA-or-NaN case above is
-allowed. R's side runs in R's AST evaluator, an uncompiled copy of `f`
+allowed: on chosen inputs, where the arguments hold both an `NA` and a
+`NaN`; on random functions, on any element, since a `NaN` can be made
+inside (`0/0`) and a comparison with it gives an `NA`, so the inputs do
+not show whether the two met (decided 2026-11-14, when CI's gctorture and
+ASan legs saw the native tier give `NA` and the interpreter `NaN` for
+`(x >= NaN) + NaN`). Native against interpreter follows the same rule. R's side runs in R's AST evaluator, an uncompiled copy of `f`
 with the JIT off: R 4.6's byte compiler folds `s <- 0; -(0 * 0)` to the
 `0` already in its constant pool, which cannot tell `0` from `-0`, so
 R's own answer changes once the JIT compiles `f` (found by the random

@@ -1,8 +1,8 @@
 # The rfunction() oracle (#21): R itself. run_r() and run_z() evaluate a
 # function on the same arguments and return what happened; same_as_r()
 # compares them: the value with identical(num.eq = FALSE), which tells 0
-# from -0 and NA from NaN, allowing only R's own NA-or-NaN freedom where
-# the inputs hold both; the warnings as a set of messages (R may warn more
+# from -0 and NA from NaN, allowing only R's own NA-or-NaN freedom (?NA:
+# where a NaN is involved, either may result); the warnings as a set of messages (R may warn more
 # than once in a loop, rfunction() once per kind); the error by message.
 
 run_capture <- function(fun, args) {
@@ -20,9 +20,26 @@ run_capture <- function(fun, args) {
   list(value = value, warnings = unique(warnings))
 }
 
-na_nan_mixed <- function(args) {
+# Where R's NA-or-NaN freedom applies. "inputs": the arguments hold both an
+# NA and a NaN, for chosen inputs, where an NA alone (NA + 1) must stay NA.
+# "any": on any element, for random functions, where a NaN can be made
+# inside (0/0) and a comparison with it makes an NA, so the inputs do not
+# show whether the two met.
+na_nan_free <- function(args, rule) {
+  if (rule == "any") {
+    return(TRUE)
+  }
   v <- unlist(args, use.names = FALSE)
   any(is.na(v) & !is.nan(v)) && any(is.nan(v))
+}
+
+# Two run_capture() results agree: the same warnings, and values equal but
+# for NA-or-NaN.
+same_capture <- function(a, b) {
+  identical(a$warnings, b$warnings) &&
+    !inherits(a$value, "error") &&
+    !inherits(b$value, "error") &&
+    same_value(a$value, b$value, TRUE)
 }
 
 same_value <- function(a, b, mixed) {
@@ -50,7 +67,7 @@ run_r <- function(f, args) {
   run_capture(plain, args)
 }
 
-compare_with_r <- function(f, g, args) {
+compare_with_r <- function(f, g, args, na_nan = "inputs") {
   r <- run_r(f, args)
   z <- run_capture(g, args)
   if (inherits(r$value, "error")) {
@@ -81,7 +98,7 @@ compare_with_r <- function(f, g, args) {
       conditionMessage(z$value)
     ))
   }
-  if (!same_value(r$value, z$value, na_nan_mixed(args))) {
+  if (!same_value(r$value, z$value, na_nan_free(args, na_nan))) {
     return(sprintf(
       "value %s, R's %s",
       paste(format(z$value, digits = 17), collapse = " "),
@@ -378,5 +395,8 @@ rf_save_reproducer <- function(seed, f, args, what) {
 
 # One line of R that rebuilds x, every double to 17 digits.
 rf_show <- function(x) {
-  paste(deparse(x, control = c("keepNA", "digits17", "niceNames")), collapse = " ")
+  paste(
+    deparse(x, control = c("keepNA", "digits17", "niceNames")),
+    collapse = " "
+  )
 }

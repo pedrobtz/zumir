@@ -20,7 +20,7 @@ test_that("random functions return what R returns", {
     for (j in 1:3) {
       args <- rf_gen_args()
       setTimeLimit(elapsed = 30, transient = TRUE)
-      d <- compare_with_r(f, g, args)
+      d <- compare_with_r(f, g, args, na_nan = "any")
       setTimeLimit()
       if (!is.null(d)) {
         path <- rf_save_reproducer(seed, f, args, d)
@@ -42,7 +42,7 @@ test_that("random functions return what R returns", {
   expect_gt(compiled, rf_random_count() * 0.8)
 })
 
-test_that("native and interpreted random functions agree bit for bit", {
+test_that("native and interpreted random functions agree", {
   skip_if(zumir_tier() != "native", "the native tier does not run here")
   base <- rf_random_seed()
   local_seed(base)
@@ -61,7 +61,9 @@ test_that("native and interpreted random functions agree bit for bit", {
     args <- rf_gen_args()
     a <- run_capture(n, args)
     b <- run_capture(i, args)
-    if (!identical(a, b, num.eq = FALSE)) {
+    # Bit for bit but for NA-or-NaN: which payload survives NA + NaN is
+    # the operand order the hardware sees, which R leaves open.
+    if (!identical(a, b, num.eq = FALSE) && !same_capture(a, b)) {
       path <- rf_save_reproducer(seed, f, args, "native and interp differ")
       # The runner's tempdir() is gone after the job, so the message
       # carries the reproducer and both results.

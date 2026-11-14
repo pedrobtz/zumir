@@ -17,6 +17,10 @@
     <div id="navbar" class="collapse navbar-collapse ms-3">
       <ul class="navbar-nav me-auto"><li class="nav-item"><a class="nav-link" href="../articles/zumir.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles"><li><a class="dropdown-item" href="../articles/mir-compile.html">What mir_compile() accepts</a></li>
+  </ul></li>
 <li class="active nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul><ul class="navbar-nav"><li class="nav-item"><form class="form-inline" role="search">
  <input class="form-control" type="search" name="search-input" id="search-input" autocomplete="off" aria-label="Search site" placeholder="Search for" data-search-index="../search.json"></form></li>
@@ -37,6 +41,7 @@
 <h2 class="pkg-version" data-toc-text="0.0.0.9000" id="zumir-0009000">zumir 0.0.0.9000<a class="anchor" aria-label="anchor" href="#zumir-0009000"></a></h2>
 <ul><li><p>Initial CRAN submission.</p></li>
 <li><p>Bundles MIR, Vladimir Makarov’s JIT compiler (core, code generator, interpreter and its C compiler <code>c2mir</code>), at upstream commit <code>dc2c763</code>, with local patches that make it build cleanly under R’s compilers and remove the undefined behaviour and memory errors its own C test corpus found under the sanitizers. MIR can no longer end the R session or print from it: its exits and messages go to zumir. <code>c2mir</code> reads no header file: C code compiles the same on every machine. On a CPU MIR has no code generator for, and on Windows on ARM, the package installs without it.</p></li>
+<li><p><code><a href="../reference/cfunction.html">cfunction()</a></code> compiles one C function, in memory, with MIR’s own C compiler, and returns an R function that calls it: no Rtools, Xcode tools or <code>gcc</code> needed. Output arguments are copies, so the caller’s vectors are never changed, and no system header is read, so a source compiles the same everywhere.</p></li>
 <li><p><code><a href="../reference/mir_function.html">mir_function()</a></code> compiles a function from MIR’s textual form, natively or on MIR’s interpreter, and returns an R function that calls it.</p></li>
 <li><p><code><a href="../reference/mir_compile.html">mir_compile()</a></code> compiles a numeric R function, in a subset of R, to native code that returns exactly what R returns, warnings and errors included. Where matching R is not cheap it refuses, at compile time or at the call, with a classed error. Compiled loops stop for Ctrl-C and <code><a href="https://rdrr.io/r/base/setTimeLimit.html" class="external-link">setTimeLimit()</a></code>.</p></li>
 <li><p>Packages can build and compile MIR code through zumir’s C API: put <code>LinkingTo: zumir</code> in DESCRIPTION and include <code>zumir.h</code>. MIR’s errors are reported through the context, never by ending the R session.</p></li>

@@ -31,6 +31,12 @@
       <ul class="navbar-nav me-auto">
 <li class="active nav-item"><a class="nav-link" href="../articles/zumir.html">Get started</a></li>
 <li class="nav-item"><a class="nav-link" href="../reference/index.html">Reference</a></li>
+<li class="nav-item dropdown">
+  <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
+  <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
+<li><a class="dropdown-item" href="../articles/mir-compile.html">What mir_compile() accepts</a></li>
+  </ul>
+</li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
       </ul>
 <ul class="navbar-nav">
@@ -75,7 +81,9 @@ compiled to native code from R with nothing else installed.</p>
 to native code. The result has the same arguments and returns exactly
 what the R function returns. It accepts doubles, loops over indices,
 conditions and the usual maths; anything else is refused with the
-construct named.</p>
+construct named. <a href="mir-compile.html">What
+<code>mir_compile()</code> accepts</a> lists the subset, and every place
+it errors where R would answer differently.</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">csum_r</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
@@ -90,23 +98,27 @@ construct named.</p>
 <span></span>
 <span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="cn">NA</span>, <span class="fl">4</span><span class="op">)</span></span>
 <span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum_r</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="co">#&gt; [1]  1  3 NA NA</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum_r</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="compile-a-c-function">Compile a C function<a class="anchor" aria-label="anchor" href="#compile-a-c-function"></a>
 </h2>
-<p><code>cfunction()</code> takes the source of one C function and
-returns an R function that calls it. Arguments named in <code>out</code>
-are allocated for you and returned. Lengths come from the
+<p><code><a href="../reference/cfunction.html">cfunction()</a></code> takes the source of one C function and
+returns an R function that calls it. The source defines one
+non-<code>static</code> function; <code>static</code> helpers beside it
+are fine. Arguments named in <code>out</code> are allocated for you and
+returned, and your own vectors are never changed. Lengths come from the
 <code>int</code> argument you name.</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># Open: should one source hold several functions, returned as a list? (Q2)</span></span>
-<span><span class="va">sq</span> <span class="op">&lt;-</span> <span class="fu">cfunction</span><span class="op">(</span><span class="st">"</span></span>
+<code class="sourceCode R"><span><span class="va">sq</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  void sq(int n, const double *x, double *y) {</span></span>
 <span><span class="st">    for (int i = 0; i &lt; n; i++) y[i] = x[i] * x[i];</span></span>
 <span><span class="st">  }"</span>, out <span class="op">=</span> <span class="st">"y"</span>, n <span class="op">=</span> <span class="st">"n"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">sq</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">sq</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 1 4 9</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="return-a-value">Return a value<a class="anchor" aria-label="anchor" href="#return-a-value"></a>
@@ -114,14 +126,15 @@ are allocated for you and returned. Lengths come from the
 <p>A function that returns <code>int</code> or <code>double</code> gives
 that value back directly.</p>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="fu">cfunction</span><span class="op">(</span><span class="st">"</span></span>
+<code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  double dot(int n, const double *x, const double *y) {</span></span>
 <span><span class="st">    double s = 0;</span></span>
 <span><span class="st">    for (int i = 0; i &lt; n; i++) s += x[i] * y[i];</span></span>
 <span><span class="st">    return s;</span></span>
 <span><span class="st">  }"</span>, n <span class="op">=</span> <span class="st">"n"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">dot</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>, y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">dot</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>, y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 32</span></span></code></pre></div>
 <p>Arguments can be <code>int</code>, <code>double</code>,
 <code>const int *</code>, <code>const double *</code>,
 <code>int *</code> and <code>double *</code>. The source may use the C
@@ -145,7 +158,8 @@ hand.</p>
 <span><span class="st">     endfunc</span></span>
 <span><span class="st">     endmodule"</span>, <span class="st">"add"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="fu">f</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu">f</span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 3</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="native-code-or-the-interpreter">Native code or the interpreter<a class="anchor" aria-label="anchor" href="#native-code-or-the-interpreter"></a>
@@ -157,7 +171,64 @@ MIR’s interpreter. Results are the same, only slower.
 yourself.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/zumir_info.html">zumir_tier</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "native"</span></span>
 <span><span class="fu"><a href="../reference/zumir_info.html">zumir_info</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; $mir_commit</span></span>
+<span><span class="co">#&gt; [1] "dc2c763f1c8bc746102ce87933d866335f9e6c06"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $mir_patches</span></span>
+<span><span class="co">#&gt;  [1] "ea7f1643 Fix two warnings Rtools gcc 14 reports"                                      </span></span>
+<span><span class="co">#&gt;  [2] "773a4834 Release code memory with a zero size on Windows"                             </span></span>
+<span><span class="co">#&gt;  [3] "dafb8e1b Remove variables clang -Wall reports as unused"                              </span></span>
+<span><span class="co">#&gt;  [4] "f35a0021 Drop the semicolons after DEF_* macros at file scope"                        </span></span>
+<span><span class="co">#&gt;  [5] "6edb5ce2 Give mem_page_size a prototype"                                              </span></span>
+<span><span class="co">#&gt;  [6] "1571f134 Use snprintf with the buffer's size instead of sprintf"                      </span></span>
+<span><span class="co">#&gt;  [7] "0b8063f7 Clear curr_func and curr_module first in MIR_finish"                         </span></span>
+<span><span class="co">#&gt;  [8] "4c27a18f Return NULL from MIR_init2 and _MIR_init instead of exiting"                 </span></span>
+<span><span class="co">#&gt;  [9] "5803194c Load unaligned hash and reduce keys with memcpy"                             </span></span>
+<span><span class="co">#&gt; [10] "1c4b1cca Declare MIR_insn's operands as a flexible array member"                      </span></span>
+<span><span class="co">#&gt; [11] "c65e7044 Report code-memory failures through the error function"                      </span></span>
+<span><span class="co">#&gt; [12] "3e643e83 Spill float arguments in the Win64 interpreter shim"                         </span></span>
+<span><span class="co">#&gt; [13] "ca84f3e4 End MIR_output_item's expr data case"                                        </span></span>
+<span><span class="co">#&gt; [14] "0068c2fd Drop the semicolons after DEF_* macros at file scope in c2mir"               </span></span>
+<span><span class="co">#&gt; [15] "df2df6f5 Remove a variable c2mir declares and never uses"                             </span></span>
+<span><span class="co">#&gt; [16] "3762da20 Use snprintf with the buffer's size in c2mir"                                </span></span>
+<span><span class="co">#&gt; [17] "3bfb8d45 Let an embedder give headers in memory and forbid header files"              </span></span>
+<span><span class="co">#&gt; [18] "7f6c4a03 Allocate and free all of c2mir's memory with MIR's allocator"                </span></span>
+<span><span class="co">#&gt; [19] "f7672f28 Fold constant shifts without undefined behaviour in c2mir"                   </span></span>
+<span><span class="co">#&gt; [20] "96763195 Read a declaration's decl_spec only when the node is a declaration"          </span></span>
+<span><span class="co">#&gt; [21] "b6e92b74 Fold integer constants by MIR's wrapping rules, without undefined behaviour" </span></span>
+<span><span class="co">#&gt; [22] "2ad09397 Read call offsets and addresses in x86-64 code with memcpy"                  </span></span>
+<span><span class="co">#&gt; [23] "55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy"</span></span>
+<span><span class="co">#&gt; [24] "feacf4fe Stop at the end of the unit after a ## concatenation"                        </span></span>
+<span><span class="co">#&gt; [25] "4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path"                   </span></span>
+<span><span class="co">#&gt; [26] "06104552 Empty the buffer when a macro argument has no start marker"                  </span></span>
+<span><span class="co">#&gt; [27] "46ed8157 Generate no code from a source with parse errors"                            </span></span>
+<span><span class="co">#&gt; [28] "a603752b Keep the current stream valid after the end of the unit"                     </span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $target</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $tier</span></span>
+<span><span class="co">#&gt; [1] "native"</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $capabilities</span></span>
+<span><span class="co">#&gt;     tier capability   ok reason</span></span>
+<span><span class="co">#&gt; 1 native    compile TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 2 native      entry TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 3 native        run TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 4 native   external TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 5 interp    compile TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 6 interp      entry TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 7 interp        run TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; 8 interp   external TRUE   &lt;NA&gt;</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $memory</span></span>
+<span><span class="co">#&gt; $memory$contexts</span></span>
+<span><span class="co">#&gt; [1] 4</span></span>
+<span><span class="co">#&gt; </span></span>
+<span><span class="co">#&gt; $memory$bytes</span></span>
+<span><span class="co">#&gt; [1] 2004718</span></span>
 <span></span>
 <span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mir_compile.html">mir_compile</a></span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
 </div>

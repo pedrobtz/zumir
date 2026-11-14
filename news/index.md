@@ -14,6 +14,13 @@
   has no code generator for, and on Windows on ARM, the package installs
   without it.
 
+- [`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
+  compiles one C function, in memory, with MIR’s own C compiler, and
+  returns an R function that calls it: no Rtools, Xcode tools or `gcc`
+  needed. Output arguments are copies, so the caller’s vectors are never
+  changed, and no system header is read, so a source compiles the same
+  everywhere.
+
 - [`mir_function()`](https://pedrobtz.github.io/zumir/reference/mir_function.md)
   compiles a function from MIR’s textual form, natively or on MIR’s
   interpreter, and returns an R function that calls it.

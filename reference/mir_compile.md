@@ -72,9 +72,15 @@ builds, and [`is.nan()`](https://rdrr.io/r/base/is.finite.html) of such
 a value can take a different branch.
 [`is.na()`](https://rdrr.io/r/base/NA.html) is `TRUE` either way.
 
+[What mir_compile()
+accepts](https://pedrobtz.github.io/zumir/articles/mir-compile.html)
+lists the subset in full, every place it errors where R would answer,
+and why.
+
 ## See also
 
 Other compilers:
+[`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md),
 [`mir_function()`](https://pedrobtz.github.io/zumir/reference/mir_function.md)
 
 ## Examples

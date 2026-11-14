@@ -49,3 +49,4 @@ po/*~
 
 # Claude Code local settings
 .claude/settings.local.json
+/build/

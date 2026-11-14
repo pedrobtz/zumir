@@ -41,7 +41,6 @@ SEXP zumir_ctx_begin(SEXP x, SEXP name);
 SEXP zumir_ctx_end(SEXP x);
 SEXP zumir_ctx_scan(SEXP x, SEXP text);
 SEXP zumir_ctx_link(SEXP x, SEXP name);
-SEXP zumir_ctx_call_d(SEXP x, SEXP arg);
 SEXP zumir_memory(void);
 SEXP zumir_probe_run(void);
 SEXP zumir_probe_result(void);
@@ -58,7 +57,6 @@ SEXP zumir_mirf_call(SEXP x, SEXP args);
 SEXP zumir_mir_roundtrip(SEXP text, SEXP path);
 void zumir_api_register(void);
 SEXP zumir_set_r46(SEXP on);
-SEXP zumir_test_math(SEXP which, SEXP x);
 SEXP zumir_rf_new(SEXP text, SEXP tier, SEXP path);
 SEXP zumir_rf_build(SEXP spec, SEXP tier, SEXP path);
 SEXP zumir_c2mir_compile(SEXP source, SEXP fname, SEXP tier, SEXP name);
@@ -84,7 +82,6 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_ctx_end", (DL_FUNC) &zumir_ctx_end, 1},
   {"zumir_ctx_scan", (DL_FUNC) &zumir_ctx_scan, 2},
   {"zumir_ctx_link", (DL_FUNC) &zumir_ctx_link, 2},
-  {"zumir_ctx_call_d", (DL_FUNC) &zumir_ctx_call_d, 2},
   {"zumir_memory", (DL_FUNC) &zumir_memory, 0},
   {"zumir_probe_run", (DL_FUNC) &zumir_probe_run, 0},
   {"zumir_probe_result", (DL_FUNC) &zumir_probe_result, 0},
@@ -100,7 +97,6 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_mirf_call", (DL_FUNC) &zumir_mirf_call, 2},
   {"zumir_mir_roundtrip", (DL_FUNC) &zumir_mir_roundtrip, 2},
   {"zumir_set_r46", (DL_FUNC) &zumir_set_r46, 1},
-  {"zumir_test_math", (DL_FUNC) &zumir_test_math, 2},
   {"zumir_rf_new", (DL_FUNC) &zumir_rf_new, 3},
   {"zumir_rf_build", (DL_FUNC) &zumir_rf_build, 3},
   {"zumir_c2mir_compile", (DL_FUNC) &zumir_c2mir_compile, 4},

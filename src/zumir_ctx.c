@@ -326,16 +326,6 @@ SEXP zumir_ctx_link(SEXP x, SEXP name) {
   return R_NilValue;
 }
 
-/* Calls the linked function as double f(double). Generated code runs
- * outside the trap: it is not MIR. */
-SEXP zumir_ctx_call_d(SEXP x, SEXP arg) {
-  SEXP st;
-  zumir_rctx *z = zumir_rctx_get(x, 1, &st);
-  if (z == NULL) return st;
-  if (z->fn == NULL) return zumir_status("context", 0, "nothing linked yet");
-  double (*f)(double) = (double (*)(double)) z->fn;
-  return Rf_ScalarReal(f(Rf_asReal(arg)));
-}
 #else
 SEXP zumir_ctx_new(SEXP s_tier) {
   (void) s_tier;
@@ -365,5 +355,4 @@ NO_MIR_ENTRY(zumir_ctx_begin, SEXP x, SEXP name)
 NO_MIR_ENTRY(zumir_ctx_end, SEXP x)
 NO_MIR_ENTRY(zumir_ctx_scan, SEXP x, SEXP text)
 NO_MIR_ENTRY(zumir_ctx_link, SEXP x, SEXP name)
-NO_MIR_ENTRY(zumir_ctx_call_d, SEXP x, SEXP arg)
 #endif

@@ -53,6 +53,9 @@ jobs:
       profile: auto
       # Other packages' findings only, each with its reason.
       suppressions: tools/valgrind.supp
+      # The default options, plus --smc-check=all: MIR writes the code it
+      # runs, and valgrind checks code written at run time only with it.
+      valgrind-opts: "--leak-check=full --track-origins=yes --num-callers=30 --smc-check=all"
 
   lto:
     # Decided without a runner (ci.md, Labels); the gate inside repeats it.

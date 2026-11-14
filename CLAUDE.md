@@ -47,7 +47,10 @@ runs and `zumir_tier()` is `"none"`. Stage 5 added the C API table
 zumir's ports of R's arithmetic (`src/zumir_imports.c`), and
 `mir_function()` (`src/zumir_mirf.c`). Stage 6 added `rfunction()`: an R
 walker in `R/rfunction.R` that emits MIR text, the `.Call` bridge
-`src/zumir_rf.c`, and ports of R 4.6's math wrappers. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+`src/zumir_rf.c`, and ports of R 4.6's math wrappers. Stage 7 added the
+emitter route (`zumir_rf_build`), which builds the module with MIR's API
+from the lowering's instructions; the text route stays, internal
+(`rf_make(route = "text")`), as its oracle. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that
@@ -151,7 +154,10 @@ refusals beside R running the same function) and
 `test-rfunction-random.R` (random functions from the helper's
 generator; 10² per run, 10⁴ when `R_ACTIONS_PROFILE=full`;
 `ZUMIR_RF_SEED=<n>` replays one, and a difference is saved under
-`tempdir()`).
+`tempdir()`), and `test-rfunction-routes.R` (the two routes print the same
+module and give R's results; each of MIR's allocations failed in the
+emitter). `tools/bench-rfunction-routes.R` times the routes for
+`.agents/benchmarks.md`.
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
 Stage 4's: `test-tier.R` (the probe; W+X refused under seccomp in a child
@@ -184,7 +190,8 @@ which holds a write token and is pinned to a commit:
 
 - `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
   R-devel row added to `runners` (full profile only).
-- `native-checks.yaml`: sanitizers (with ASan), valgrind, lto, rchk,
+- `native-checks.yaml`: sanitizers (with ASan), valgrind (with
+  `--smc-check=all`, for the code MIR writes), lto, rchk,
   analyzers and cran-special. `analyzers` runs off pull requests only, with
   180 minutes: `-fanalyzer` on vendored MIR outran the 45-minute default,
   and `exclude` does not skip the analysis (pedrobtz/r-actions#113).
@@ -195,9 +202,10 @@ which holds a write token and is pinned to a commit:
   dispatch): MIR's own tests on the vendored copy, the symbol guards, and
   on Linux the build with MIR forced out.
 - `alloc-failure.yaml`: weekly, on dispatch and on `full-ci` pull
-  requests, fails each allocation in
-  turn while `tools/alloc-exercise.R` runs the error trap's three invalid
-  modules.
+  requests, fails each allocation in turn while `tools/alloc-exercise.R`
+  runs one section per job (`ZUMIR_ALLOC_EXERCISE`): the error trap's
+  three invalid modules, and `rfunction()` through the emitter. The
+  sweep is capped at 3,000 allocations, hence a job each.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`

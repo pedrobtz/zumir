@@ -300,7 +300,11 @@ SEXP zumir_mirf_call(SEXP x, SEXP args) {
     slots[i] = t == MIR_T_U64 ? (int64_t) (uint64_t) d : (int64_t) d;
   }
   int64_t res = 0;
-  ((void (*)(int64_t *, int64_t *)) z->fn)(slots, &res);
+  /* ISO C has no cast from an object pointer to a function pointer; the
+   * bytes are copied instead (the address MIR returned is code). */
+  void (*fn)(int64_t *, int64_t *);
+  memcpy(&fn, &z->fn, sizeof fn);
+  fn(slots, &res);
   if (z->nres == 0) return R_NilValue;
   if (z->res_type == MIR_T_D || z->res_type == MIR_T_F) {
     double d;

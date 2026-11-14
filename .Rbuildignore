@@ -20,3 +20,4 @@
 ^\.gitattributes$
 ^tests/c$
 ^tests/consumer$
+^tools/bench-rfunction-routes\.R$

@@ -98,6 +98,9 @@ compare_with_r <- function(f, g, args, na_nan = "inputs") {
       conditionMessage(z$value)
     ))
   }
+  if (!identical(typeof(r$value), typeof(z$value))) {
+    return(sprintf("type %s, R's %s", typeof(z$value), typeof(r$value)))
+  }
   if (!same_value(r$value, z$value, na_nan_free(args, na_nan))) {
     return(sprintf(
       "value %s, R's %s",
@@ -399,4 +402,128 @@ rf_show <- function(x) {
     deparse(x, control = c("keepNA", "digits17", "niceNames")),
     collapse = " "
   )
+}
+
+# ---- The two routes (D17) ----
+
+# Functions covering every construct of the subset, for the route tests:
+# each operator and math function, the logic, every loop form, vector
+# locals, and each run-time check.
+rf_construct_cases <- function() {
+  ops <- c("+", "-", "*", "/", "^", "%%", "%/%", "min", "max")
+  binary <- lapply(ops, function(op) {
+    eval(bquote(function(a, b) .(as.name(op))(a, b)))
+  })
+  math <- c(
+    "exp",
+    "log",
+    "log1p",
+    "expm1",
+    "sqrt",
+    "abs",
+    "floor",
+    "ceiling",
+    "trunc",
+    "sin",
+    "cos",
+    "tan"
+  )
+  unary <- lapply(math, function(fn) {
+    eval(bquote(function(a) .(as.name(fn))(a)))
+  })
+  cmp <- lapply(c("==", "!=", "<", "<=", ">", ">="), function(op) {
+    eval(bquote(function(a, b) as.double(.(as.name(op))(a, b))))
+  })
+  c(
+    binary,
+    unary,
+    cmp,
+    list(
+      function(a) -a,
+      function(a, b) as.double(a > 0 && b > 0) + as.double(a > 0 || b > 0),
+      function(a) as.double(!(a > 0)) + (a > 0) + 0.5,
+      function(a) {
+        as.double(is.na(a)) +
+          2 * as.double(is.nan(a)) +
+          4 * as.double(is.finite(a))
+      },
+      function(a) {
+        s <- 0
+        if (a > 0) {
+          s <- 1
+        } else {
+          s <- 2
+        }
+        s
+      },
+      function(x) {
+        s <- 0
+        for (i in seq_along(x)) {
+          s <- s + i * x[i]
+        }
+        s
+      },
+      function(n) {
+        s <- 0
+        for (i in seq_len(n)) {
+          s <- s + i
+        }
+        s
+      },
+      function(a, b) {
+        s <- 0
+        for (i in a:b) {
+          s <- s * 2 + i
+        }
+        s
+      },
+      function(n) {
+        i <- 0
+        s <- 0
+        while (i < n) {
+          i <- i + 1
+          if (i %% 3 == 0) {
+            next
+          }
+          s <- s + i
+          if (s > 50) break
+        }
+        s
+      },
+      function(x) {
+        y <- numeric(length(x))
+        acc <- 0
+        for (i in seq_along(x)) {
+          acc <- acc + x[i]
+          y[i] <- acc
+        }
+        y
+      },
+      function(x, i) x[i],
+      function(n) {
+        s <- 0
+        for (i in seq_len(n)) {
+          if (i == n) s <- s + i * i
+        }
+        s
+      },
+      function(x) {
+        s <- 0
+        for (i in seq_along(x)) {
+          s <- s + min(as.double(i), i) + max(i, x[i])
+        }
+        s
+      }
+    )
+  )
+}
+
+# The module a route builds for f, as MIR prints it before linking. The
+# text does not depend on the tier, and the interpreter links fastest.
+rf_module_text <- function(f, route) {
+  prog <- rf_compile(f)
+  path <- tempfile(fileext = ".mir")
+  on.exit(unlink(path))
+  rf_context(prog, "interp", route, path)
+  readLines(path)
 }

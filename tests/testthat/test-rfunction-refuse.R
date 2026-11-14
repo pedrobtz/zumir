@@ -172,3 +172,33 @@ test_that("tier = must name a tier", {
     )
   }
 })
+
+test_that("abs() of an integer or logical is refused: R keeps the type", {
+  f <- function(n) {
+    s <- 0
+    for (i in seq_len(n)) {
+      s <- abs(i)
+    }
+    s
+  }
+  # R's s ends as an integer.
+  expect_identical(f(3), 3L)
+  expect_error(rfunction(f), class = "zumir_compile_error")
+  expect_identical(typeof(abs(TRUE)), "integer")
+  expect_error(
+    rfunction(function(a) abs(a > 0) + 0.5),
+    class = "zumir_compile_error"
+  )
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  expect_identical(rfunction(function(a) abs(a))(-2), 2)
+  expect_identical(
+    rfunction(function(n) {
+      s <- 0
+      for (i in seq_len(n)) {
+        s <- abs(as.double(i))
+      }
+      s
+    })(3),
+    3
+  )
+})

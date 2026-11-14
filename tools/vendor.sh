@@ -56,7 +56,10 @@ fi
 
 rm -rf src/vendor/mir
 mkdir -p src/vendor/mir
-for f in $files; do cp "$src/$f" "src/vendor/mir/$f"; done
+for f in $files; do
+  mkdir -p "src/vendor/mir/$(dirname "$f")"
+  cp "$src/$f" "src/vendor/mir/$f"
+done
 # The headers a consumer compiles against (LinkingTo: zumir), as vendored.
 mkdir -p inst/include/zumir
 for f in $(cat tools/mir-headers.txt | grep -v '^#'); do cp "src/vendor/mir/$f" "inst/include/zumir/$f"; done

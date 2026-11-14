@@ -1,12 +1,12 @@
-Vendored dependency: MIR, a lightweight JIT compiler (core, generator and
-interpreter)
+Vendored dependency: MIR, a lightweight JIT compiler (core, generator,
+interpreter and the C compiler c2mir)
 
   Upstream:      https://github.com/vnmakarov/mir
   Commit:        dc2c763f1c8bc746102ce87933d866335f9e6c06
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   ca84f3e447afc16975c14d4b605cf3df2b60c692
+  Fork commit:   a603752b007b38f77011eb023549456bccf70aea
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -24,6 +24,21 @@ interpreter)
                  c65e7044 Report code-memory failures through the error function
                  3e643e83 Spill float arguments in the Win64 interpreter shim
                  ca84f3e4 End MIR_output_item's expr data case
+                 0068c2fd Drop the semicolons after DEF_* macros at file scope in c2mir
+                 df2df6f5 Remove a variable c2mir declares and never uses
+                 3762da20 Use snprintf with the buffer's size in c2mir
+                 3bfb8d45 Let an embedder give headers in memory and forbid header files
+                 7f6c4a03 Allocate and free all of c2mir's memory with MIR's allocator
+                 f7672f28 Fold constant shifts without undefined behaviour in c2mir
+                 96763195 Read a declaration's decl_spec only when the node is a declaration
+                 b6e92b74 Fold integer constants by MIR's wrapping rules, without undefined behaviour
+                 2ad09397 Read call offsets and addresses in x86-64 code with memcpy
+                 55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy
+                 feacf4fe Stop at the end of the unit after a ## concatenation
+                 4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path
+                 06104552 Empty the buffer when a macro argument has no start marker
+                 46ed8157 Generate no code from a source with parse errors
+                 a603752b Keep the current stream valid after the end of the unit
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -86,12 +101,78 @@ The patches, with the fork branch that carries each one alone:
   ca84f3e4  MIR_output_item's expr data case returns instead of falling
             into the function case (heap overflow writing out test13.mir).
             fix/output-expr-data; upstream: not filed yet (#30).
+  0068c2fd  As f35a0021, in c2mir.c: 29 DEF_* invocations at file scope
+            (DEF_DLIST_TYPE keeps its `;`). gcc -pedantic.
+            fix/no-extra-semicolons; upstream: not filed yet (#30).
+  df2df6f5  check_const_addr_p's unused check_ctx. gcc -Wall.
+            fix/unused-variables; upstream: not filed yet (#30).
+  3762da20  As 1571f134, in c2mir.c: snprintf for all eight sprintf calls.
+            fix/snprintf; upstream: not filed yet (#30).
+  3bfb8d45  Build options C2MIR_EXTRA_INCLUDES (headers given in memory,
+            found first) and C2MIR_NO_FILE_INCLUDES (no header read from a
+            file; any other is an error; __has_include true only for those
+            in memory). Off by default. zumir's cfunction() reads no system
+            header (D5). fix/c2mir-memory-includes; upstream: not filed yet
+            (#30).
+  7f6c4a03  c2mir freed with free what it allocated with MIR_malloc or
+            MIR_calloc (its contexts and streams), so any allocator but the
+            default corrupted the heap; macros, macro calls and #if states
+            used plain, unchecked malloc. All now go through the context's
+            allocator. fix/c2mir-allocator; upstream: not filed yet (#30).
+  f7672f28  Constant shifts folded through helpers: a negative value shifted
+            left as unsigned, an out-of-range count gives 0 (or the sign).
+            UBSan on c-tests, found by the fuzz harness's pre-run.
+            fix/c2mir-shift-folding; upstream: not filed yet (#30).
+  96763195  def_symbol read an enumeration constant's attr as a decl
+            ('enum { x } x;': ASan heap-buffer-overflow, c-tests
+            new/issue365.c). fix/c2mir-enum-decl-spec; upstream: not filed
+            yet (#30).
+  b6e92b74  The generator's value numbering folds add, sub, mul, neg and
+            shifts with wrapping unsigned arithmetic and counts modulo the
+            width; INT_MIN / -1 is not folded. UBSan signed overflow and
+            shifts on c-tests through c2mir. fix/gvn-fold-wrapping;
+            upstream: not filed yet (#30).
+  2ad09397  target_change_to_direct_calls reads the unaligned rel32 and the
+            address slot in x86-64 code with memcpy. UBSan misaligned load
+            on c-tests. fix/x86-64-unaligned-call-offsets; upstream: not
+            filed yet (#30).
+  55047839  The interpreter's add, sub, mul, neg (and their overflow-checking
+            forms) wrap through unsigned arithmetic, shift counts are taken
+            modulo the width, and loads and stores use memcpy. UBSan signed
+            overflow, shifts and misaligned accesses on c-tests.
+            fix/interp-wrapping-memcpy; upstream: not filed yet (#30).
+  feacf4fe  token_concat gives back the end of the unit instead of reading
+            past it (a heap-use-after-free in the preprocessor, found by the
+            libFuzzer target in CI). fix/c2mir-concat-end-of-unit; upstream:
+            not filed yet (#30).
+  4fb6f621  On Windows, classify_arg wrote types[1] of a one-element array for
+            a long double (-Warray-bounds, a stack overrun); get_result_type
+            and the Windows timers are no longer unused there (Rtools gcc).
+            fix/c2mir-windows-warnings; upstream: not filed yet (#30).
+  06104552  add_arg_tokens truncated a buffer to -1 (SIZE_MAX) when malformed
+            input left no T_BOA marker, so the next push wrote before the
+            array (libFuzzer in CI, UBSan). fix/c2mir-arg-without-marker;
+            upstream: not filed yet (#30).
+  46ed8157  c2mir_compile generated code after recovered parse errors, from
+            a tree the generator could not read (SEGV, libFuzzer in CI); it
+            now generates only from a source with no error.
+            fix/c2mir-no-gen-after-errors; upstream: not filed yet (#30).
+  a603752b  Past the end of the unit, cs was the popped stream: reading on freed
+            it and read it again (heap-use-after-free); removing the last
+            string stream left cs undefined. Both from libFuzzer in CI.
+            fix/c2mir-stream-after-end (on fix/c2mir-allocator, which it
+            needs); upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 
   - exit, abort and writes to stderr are redirected to zumir by macros in
     src/zumir_mir_stdio.h, defined in the wrapper files just before MIR's
-    sources; MIR's code is unchanged for it.
+    sources; MIR's code is unchanged for it. c2mir's seven abort () calls
+    and its stderr writes go the same way (src/zumir_c2mir.c), and its
+    diagnostics are written to message_file, which zumir sets to the same
+    sink, so c2mir needs no patch for either.
+  - c2mir is compiled with C2MIR_NO_FILE_INCLUDES and zumir's prelude
+    headers as C2MIR_EXTRA_INCLUDES (src/zumir_c2mir.c, src/zumir_prelude.c).
   - MIR's sources are compiled with gcc's -fno-tree-sra
     (src/zumir_mir_gcc.h), as upstream's makefile does: without it Rtools
     gcc miscompiles the interpreter.
@@ -105,6 +186,6 @@ Not patched, built differently instead (design §4.2):
   - On a CPU MIR does not target, and on Windows aarch64 (D25), the wrapper
     files compile nothing (src/zumir_mir.h).
 
-Not vendored: c2mir (Stage 8), the tests, benchmarks, llvm2mir, mir2c, the
-drivers and utilities. The README's Mozilla Public License mention is about
+Not vendored: the tests, benchmarks, llvm2mir, mir2c, the drivers
+(c2mir-driver.c) and utilities, c2mir's README and figure. The README's Mozilla Public License mention is about
 NanoJIT, not any MIR file.

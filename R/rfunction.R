@@ -33,6 +33,11 @@
 #' Loops can be interrupted, as R's can. Code outside the subset is a
 #' compile error naming the construct.
 #'
+#' Where an `NA` and a `NaN` meet in one operation, R leaves open which
+#' comes out (see [NA]), and so does `rfunction()`: the answer can differ
+#' between R, the two tiers and builds, and `is.nan()` of such a value
+#' can take a different branch. `is.na()` is `TRUE` either way.
+#'
 #' @param f A function.
 #' @param tier `"native"` or `"interp"`; by default [zumir_tier()].
 #' @returns A function of class `zumir_rfunction`, with `f`'s arguments.

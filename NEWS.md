@@ -2,11 +2,13 @@
 
 * Initial CRAN submission.
 
-* Bundles MIR, Vladimir Makarov's JIT compiler (core, code generator and
-  interpreter), at upstream commit `dc2c763`, with six local patches that
-  make it build without warnings under R's compilers. MIR can no longer
-  end the R session or print from it: its exits and messages go to
-  zumir. On a CPU MIR has no code generator for, and on Windows on ARM,
+* Bundles MIR, Vladimir Makarov's JIT compiler (core, code generator,
+  interpreter and its C compiler `c2mir`), at upstream commit `dc2c763`,
+  with local patches that make it build cleanly under R's compilers and
+  remove the undefined behaviour and memory errors its own C test corpus
+  found under the sanitizers. MIR can no longer end the R session or
+  print from it: its exits and messages go to zumir. `c2mir` reads no
+  header file: C code compiles the same on every machine. On a CPU MIR has no code generator for, and on Windows on ARM,
   the package installs without it.
 
 * `mir_function()` compiles a function from MIR's textual form, natively or

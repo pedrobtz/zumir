@@ -1,4 +1,5 @@
-zumir bundles MIR, a lightweight JIT compiler, under src/vendor/mir/:
+zumir bundles MIR, a lightweight JIT compiler, with its C compiler c2mir,
+under src/vendor/mir/:
 https://github.com/vnmakarov/mir at commit
 dc2c763f1c8bc746102ce87933d866335f9e6c06, with the local patches listed in
 src/vendor/PROVENANCE.
@@ -10,6 +11,7 @@ MIR is distributed under the MIT License (src/vendor/mir/LICENSE):
 Its source files carry the notices
 
   Copyright (C) 2018-2024 Vladimir Makarov <vmakarov.gcc@gmail.com>
+  Copyright (C) 2019-2024 Vladimir Makarov <vmakarov.gcc@gmail.com>
   Copyright (C) 2020-2024 Vladimir Makarov <vmakarov.gcc@gmail.com>
 
 except real-time.h, which carries

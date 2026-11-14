@@ -48,6 +48,19 @@ zumir_check <- function(res, call = sys.call(-1)) {
       call = call
     ))
   }
+  if (identical(res$kind, "compile")) {
+    # c2mir's diagnostics, with where the first one points in the user's
+    # source (the prelude's lines are not counted: a #line directive).
+    stop(structure(
+      class = c("zumir_compile_error", "zumir_error", "error", "condition"),
+      list(
+        message = res$message,
+        call = call,
+        line = res$line,
+        column = res$column
+      )
+    ))
+  }
   class <- if (identical(res$kind, "argument")) {
     "zumir_argument_error"
   } else {

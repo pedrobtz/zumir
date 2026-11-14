@@ -47,7 +47,11 @@ runs and `zumir_tier()` is `"none"`. Stage 5 added the C API table
 zumir's ports of R's arithmetic (`src/zumir_imports.c`), and
 `mir_function()` (`src/zumir_mirf.c`). Stage 6 added `rfunction()`: an R
 walker in `R/rfunction.R` that emits MIR text, the `.Call` bridge
-`src/zumir_rf.c`, and ports of R 4.6's math wrappers. Stage 7 added the
+`src/zumir_rf.c`, and ports of R 4.6's math wrappers. Stage 8 vendored
+c2mir (`src/zumir_c2mir.c`, with the fork's `C2MIR_NO_FILE_INCLUDES`)
+and the compile path `c2mir_compile()` (`src/zumir_cfun.c`, with the
+prelude in `src/zumir_prelude.c` and D6's table in
+`src/zumir_imports_d6.c`); `cfunction()` is Stage 9. Stage 7 added the
 emitter route (`zumir_rf_build`), which builds the module with MIR's API
 from the lowering's instructions; the text route stays, internal
 (`rf_make(route = "text")`), as its oracle. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
@@ -135,7 +139,10 @@ These are fixed by the design before any code exists:
 - **`rfunction()` answers as R does or errors** (D16): every non-NaN result
   equals R's bit for bit, and where matching R is not cheap it refuses. Its
   tests compare with R through `identical(num.eq = FALSE)` (#21).
-- **`cfunction()` reads no system header** (D5), and its import resolver
+- **`cfunction()` reads no system header** (D5): no header at all is read
+  from a file (the fork's `C2MIR_NO_FILE_INCLUDES`), and the prelude's
+  declarations are exactly D6's table, which `test-prelude.R` checks
+  both ways. Its import resolver
   resolves only the fixed list in D6. Anything else is a link error, so the
   same source behaves the same everywhere and can't reach R's internals.
 - **MIR's symbols are hidden**, so they can't clash with another package
@@ -144,6 +151,13 @@ These are fixed by the design before any code exists:
 
 ## Testing
 
+`test-prelude.R` and `test-c2mir-errors.R` (Stage 8): the prelude
+against D6's table, each name against the C library or R, the
+diagnostics' line and column, and no header file read. The `c-tests`
+corpus runs through the same compile path in
+`tests/c/c-tests-runner.c` (`platform.sh`), and must fail exactly the
+tests in `tools/c-tests-expected.txt`; `tests/fuzz/fuzz-c2mir.c` is the
+libFuzzer target (`fuzz.yaml`).
 `rfunction()`'s oracle is R itself, through `compare_with_r()` in
 `helper-rfunction.R`: `identical(num.eq = FALSE)`, with R's side run
 uncompiled and with the JIT off (R 4.6's byte compiler can turn `-0`
@@ -206,6 +220,8 @@ which holds a write token and is pinned to a commit:
   runs one section per job (`ZUMIR_ALLOC_EXERCISE`): the error trap's
   three invalid modules, and `rfunction()` through the emitter. The
   sweep is capped at 3,000 allocations, hence a job each.
+- `fuzz.yaml`: libFuzzer over `tests/fuzz/fuzz-c2mir.c`, seeded by
+  `tests/fuzz/corpus`; brief on pull requests, long on the schedule.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`
@@ -229,10 +245,11 @@ to pin a stable release. D2 (the maintainer's decision) pins this commit on
 purpose, because the only tag (v1.0.0, May 2024) misses two and a half years
 of fixes. A bump re-runs the spike's checks.
 
-MIR's core, generator and interpreter are under `src/vendor/mir/`: the 32
-files in `tools/mir-files.txt` (c2mir comes in Stage 8). They are compiled
-only through `src/zumir_mir.c` and `src/zumir_mir_gen.c`, which include
-`mir.c` and `mir-gen.c` behind the target guard in `src/zumir_mir.h`.
+MIR's core, generator, interpreter and c2mir are under `src/vendor/mir/`:
+the 85 files in `tools/mir-files.txt`. They are compiled only through
+`src/zumir_mir.c`, `src/zumir_mir_gen.c` and `src/zumir_c2mir.c`, which
+include `mir.c`, `mir-gen.c` and `c2mir/c2mir.c` behind the target guard
+in `src/zumir_mir.h` (`-Ivendor/mir`, for c2mir's own includes).
 
 **Never edit `src/vendor/mir/` in place.** It is copied from the fork
 [`pedrobtz/mir`](https://github.com/pedrobtz/mir) (D12, as `qio` vendors
@@ -246,10 +263,12 @@ file edited in place, a series that differs from the list, or a changed
 `native-code.md`:** the fork's commits, not `tools/patches/`, are the patch
 record.
 
-The six patches (`src/vendor/PROVENANCE` has the reasons): two Rtools gcc
-warnings, `VirtualFree` on Windows (upstream #496), unused variables under
-clang `-Wall`, 97 stray `;` under `-pedantic`, one missing prototype, and
-`snprintf` for `sprintf`.
+The patches, one commit each, are listed with their reasons in
+`src/vendor/PROVENANCE` (23 on 2026-11-14): warnings and CRAN symbols,
+Windows code memory, init and finish paths, code-memory errors, and from
+Stage 8 c2mir's allocator, memory-only headers, and the undefined
+behaviour the c-tests corpus found under the sanitizers in c2mir, the
+generator and the interpreter.
 Built differently instead of patched: `MIR_DIRECT_DISPATCH`, no
 `-fsigned-char` (MIR's tests pass with unsigned `char`), and symbol hiding
 by `$(C_VISIBILITY)` and `src/zumir-win.def`.

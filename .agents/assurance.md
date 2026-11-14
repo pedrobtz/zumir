@@ -40,8 +40,8 @@ call to r-actions.
 | analyzers     | done    | native-checks.yaml |
 | alloc-failure | done    | alloc-failure.yaml |
 | mutation      | gap #11 |                    |
-| fuzz          | gap #8  |                    |
-| fuzz-reach    | gap #8  |                    |
+| fuzz          | done    | fuzz.yaml          |
+| fuzz-reach    | done    | fuzz.yaml          |
 
 Stage 1 (#3) wired `native-checks.yaml` and `gctorture.yaml` on
 2026-11-13, without `sanitizers`: its instrumentation guard fails a build
@@ -66,7 +66,7 @@ One row per boundary the package crosses. An oracle knows the answer:
 <!-- markdownlint-disable MD013 -->
 | Boundary | Oracle | Carried by |
 | --- | --- | --- |
-| Vendored MIR, built and patched | MIR's own c2mir-free test targets at the pinned commit (28, `inline-test` left for c2mir), their expected outputs, run on the vendored copy built without R, with R's compiler and flags, on macOS, Windows and Linux x86-64 and aarch64 | tools/ci/platform.sh, in platforms.yaml |
+| Vendored MIR, built and patched | MIR's own c2mir-free test targets at the pinned commit (28; `inline-test`, which builds c2mir's driver, left out: c2mir is tested on c-tests below), their expected outputs, run on the vendored copy built without R, with R's compiler and flags, on macOS, Windows and Linux x86-64 and aarch64 | tools/ci/platform.sh, in platforms.yaml |
 | Vendored MIR, provenance | the fork commit, file for file, and that commit the upstream pin plus exactly the patch list, one commit each; its canary leaves the last patch out and must fail | tools/verify-vendor, in vendor.yaml |
 | Compiled code against CRAN's rules | the shared object's imports (`nm -u`, `objdump -p` on Windows) hold no exit, abort, printf, puts, stderr, stdout, sprintf or rand; its exports are `R_init_zumir` alone | tools/ci/platform.sh, in platforms.yaml, on every runner |
 | MIR generator: module to machine code | the same three right-hand sides in C from the leg's compiler, bitwise, 40 draws each, on both tiers | tests/consumer/tests/testthat/test-consumer.R, built and run by tools/ci/platform.sh on every runner |
@@ -84,10 +84,11 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Double-expression emitter | the three right-hand sides written with it, bitwise against C; each comparison and branch helper against C on every pair of -Inf, -1, -0, 0, 1, Inf, NaN, NA | tests/consumer |
 | Consumer imports | an import resolves in the context that registered it, is a link error in one that did not, and is not under D6's list (`mir_function()`) | tests/consumer; `cfunction()` isolation gap #9: tests/testthat/test-cfunction.R |
 | `mir_function()`: MIR text in | MIR's 17 `mir-tests/*.mir` read and written back to a fixed point; hand-computed values of test1, test2, test6 and test7 on both tiers; argument limits straddled per integer type | tests/testthat/test-mir-function.R |
-| c2mir: C source to MIR | the `c-tests` corpus by its own rules (272 `.expect` outputs, exit status for the rest), with a test-only import list for printf, abort and exit | gap #20 |
-| c2mir diagnostics | an error planted at a known line and column is reported there, in the user's source, not the prelude | gap #8: tests/testthat/test-c2mir-errors.R |
+| c2mir: C source to MIR | the `c-tests` corpus by its own rules, through zumir's compile path (the prelude, no header read from a file, D6's list) plus a test-only stdio.h, stdlib.h and assert.h for the harness's printf, abort and exit: 1,069 tests (34 `.expect` outputs, 235 `.expectrc` exit statuses, exit status 0 for the rest), 1,017 passing on both tiers and the 52 others listed with their reasons in tools/c-tests-expected.txt; a broken `.expect` is reported (not vacuous); on Linux, the full profile also runs it under ASan and UBSan | tests/c/c-tests-runner.c, tools/ci/platform.sh, in platforms.yaml |
+| c2mir: robustness | libFuzzer over the compile path, seeded with tests/fuzz/corpus: the same input gives the same verdict and printed module twice, and leaves no arena and no trap; before CI, every c-tests file through it under ASan and UBSan | tests/fuzz/fuzz-c2mir.c, in fuzz.yaml |
+| c2mir diagnostics | an error planted at a known line and column is reported there, in the user's source, not the prelude, with blank and comment lines at the top counted; a warning before the error does not move it; no header is read from a file (stdio.h, a path, a file in the working directory), and `__has_include` agrees | tests/testthat/test-c2mir-errors.R |
 | Import resolver (D6, D14, D18) | R's own exp, log, sqrt and 18 more on the same inputs, bitwise; the C ports of R's %%, %/%, min and max against R on a 22 x 22 grid of signs, zeros, non-finite values and NA, directly and through MIR; a name outside a context's list is a link error | tests/testthat/test-imports.R |
-| c2mir prelude | every declared name links and returns what R's function returns; a test-only import is invisible to `cfunction()` | gap #8: tests/testthat/test-prelude.R |
+| c2mir prelude | the prelude declares exactly D6's names (both lists read); every name links and returns what the C library returns through MIR's own import, and what R's function returns where R's is the C library's; fma, ldexp, frexp, modf and the string functions against exact answers; printf, abort, exit, malloc and R's own names are link errors; the harness headers exist only in the runner's build | tests/testthat/test-prelude.R |
 | `cfunction()` marshalling | a reference written in R for every example and every argument and return type | gap #9: tests/testthat/test-cfunction.R |
 | `rfunction()`: R subset to native | R evaluating the same function on the same inputs, compared with `identical(num.eq = FALSE)`, which already tells `0` from `-0` and `NA` from `NaN`; value, attributes, warnings and error class asserted separately; R's side in R's AST evaluator with the JIT off (R 4.6's byte compiler can turn `-0` into `0`) | tests/testthat/helper-rfunction.R (`compare_with_r()`), used by every rfunction() test file |
 | `rfunction()`, constructs | each operator, math function, loop form and logical rule against R on signed zeros, subnormals, `±Inf`, `NA`, `NaN` and empty vectors, and under a hostile session | tests/testthat/test-rfunction-ops.R |

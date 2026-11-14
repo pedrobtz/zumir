@@ -49,6 +49,11 @@ an argument that is not a double, has attributes, or is a scalar of
 another length. Names must mean base R's functions in \code{environment(f)}.
 Loops can be interrupted, as R's can. Code outside the subset is a
 compile error naming the construct.
+
+Where an \code{NA} and a \code{NaN} meet in one operation, R leaves open which
+comes out (see \link{NA}), and so does \code{rfunction()}: the answer can differ
+between R, the two tiers and builds, and \code{is.nan()} of such a value
+can take a different branch. \code{is.na()} is \code{TRUE} either way.
 }
 \examples{
 \dontshow{if (zumir_tier() != "none") withAutoprint(\{ # examplesIf}

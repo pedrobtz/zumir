@@ -21,3 +21,5 @@
 ^tests/c$
 ^tests/consumer$
 ^tools/bench-rfunction-routes\.R$
+^tests/fuzz$
+^tools/c-tests-expected\.txt$

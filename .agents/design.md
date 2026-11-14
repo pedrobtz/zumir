@@ -461,6 +461,32 @@ whose cost is measured again with the benchmarks (§9).
 
 Signatures are limited to what can be marshalled without R's API (§5).
 
+**Built in Stage 8 (2026-11-14), steps 1 to 4.** `src/zumir_cfun.c`
+gives `c2mir` the prelude, the source's name and the source through one
+`getc` callback, so nothing is copied, and runs the compile under the
+trap. `message_file` is the same sink as MIR's `stderr`.
+- **No file is read (D5).** `c2mir` is built with the fork's
+  `C2MIR_NO_FILE_INCLUDES`, and `math.h` and `string.h` come from memory
+  (`src/zumir_prelude.c`, through `C2MIR_EXTRA_INCLUDES`). An `#include`
+  of anything else is a compile error at its line: a system header, a
+  path, or a file in the working directory. `__has_include` is true only
+  for those headers.
+- **The prelude's cost.** It includes `stdbool.h` and `stdint.h`, so a
+  source that uses `bool`, `true`, `false` or `uint64_t` as its own names
+  does not compile. Four of the gcc torture tests do this. Kept: numeric
+  code wants these types more than it wants the names.
+- **Line numbers.** The prelude ends with `#line 0 "<name>"` and one
+  declaration, so the user's source starts at line 1. `c2mir` does not
+  count blank or comment-only lines that directly follow a `#line`
+  directive; the extra line keeps them counted. This is a workaround,
+  not a patch, so it is offered upstream (#30) as a report.
+- **Errors.** A compile error is a `zumir_compile_error` carrying the
+  `line` and `column` of the first error, not of a warning. The C side
+  parses them, so no regex runs on an error path. A name outside D6's
+  list is a link error, a `zumir_mir_error`.
+- **The D6 table** moved to `src/zumir_imports_d6.c`, which has no R in
+  it, so the package and the `c-tests` runner link the same list.
+
 ### 4.6 `rfunction()`
 
 `rfunction(f)` takes an R function and returns one with the same formals.
@@ -635,7 +661,14 @@ allowed: on chosen inputs, where the arguments hold both an `NA` and a
 inside (`0/0`) and a comparison with it gives an `NA`, so the inputs do
 not show whether the two met (decided 2026-11-14, when CI's gctorture and
 ASan legs saw the native tier give `NA` and the interpreter `NaN` for
-`(x >= NaN) + NaN`). Native against interpreter follows the same rule. R's side runs in R's AST evaluator, an uncompiled copy of `f`
+`(x >= NaN) + NaN`). Native against interpreter is held to more: bit
+for bit, on random functions in which no value is ever `NA` (no `NA`
+argument, no arithmetic on a logical). Where an `NA` and a `NaN` meet,
+which comes out is the operand order the compiler chose, and `is.nan()`
+can turn that choice into a different answer. An unoptimised gcc build
+of the interpreter gave `NaN` where generated code gave `-2` (the
+coverage job, 2026-11-14). That is R's own freedom (`?NA`), not a defect,
+and it is documented for `rfunction()`'s users. R's side runs in R's AST evaluator, an uncompiled copy of `f`
 with the JIT off: R 4.6's byte compiler folds `s <- 0; -(0 * 0)` to the
 `0` already in its constant pool, which cannot tell `0` from `-0`, so
 R's own answer changes once the JIT compiles `f` (found by the random
@@ -984,7 +1017,20 @@ decides it and the maintainer may overturn it.
   doubles, and they use `long double` only when R does, which R's headers
   do not say: `.onLoad` passes `capabilities("long.double")` in, so a
   `noLD` R gets the double version, as R itself computes.
-- **D19 (C), 2026-11-13.** `c2mir` stays the front end of `cfunction()`.
+- **D19 (C), 2026-11-13; settled 2026-11-14, Stage 8.** `c2mir` stays
+  the front end of `cfunction()`. Through zumir's compile path it passes
+  1,017 of the 1,069 `c-tests` on x86-64, the same set on both tiers.
+  All 52 failures there are environment, not miscompilation: library
+  names outside D6, system headers, the prelude's names, or files
+  included from the corpus. Arm adds three real failures, tracked in
+  #44: on Linux aarch64, `signed char` conversions where plain `char`
+  is unsigned, and an internal check in the generator; on macOS arm64,
+  structs passed through varargs. `tools/c-tests-expected.txt` lists
+  them per platform. Its crashes were fixed on the fork, the generator's and
+  interpreter's undefined behaviour included, and no crash is open:
+  every corpus file passes the fuzz harness under ASan and UBSan. TinyCC
+  is not needed. Kept as first written: `c2mir` stays the front end of
+  `cfunction()`.
   If, in its stage, it fails the `c-tests` subset that `cfunction()`'s
   numeric functions need, or the fuzz target finds crashes upstream does
   not fix, TinyCC (§3) is weighed as the front end of `cfunction()` alone,

@@ -49,7 +49,7 @@ test_that("native and interpreted random functions agree", {
   for (k in seq_len(rf_random_count() %/% 2L)) {
     seed <- base + k
     set.seed(seed)
-    f <- rf_gen_function()
+    f <- rf_gen_function(na = FALSE)
     n <- tryCatch(
       rfunction(f, tier = "native"),
       zumir_compile_error = function(e) NULL
@@ -58,11 +58,14 @@ test_that("native and interpreted random functions agree", {
       next
     }
     i <- rfunction(f, tier = "interp")
-    args <- rf_gen_args()
+    args <- rf_gen_args(na = FALSE)
     a <- run_capture(n, args)
     b <- run_capture(i, args)
-    # Bit for bit but for NA-or-NaN: which payload survives NA + NaN is
-    # the operand order the hardware sees, which R leaves open.
+    # Bit for bit but for NaN payloads. No NA is ever made here (na =
+    # FALSE): where an NA and a NaN meet, which comes out is the operand
+    # order the compiler chose (an unoptimised gcc build of the interpreter
+    # differs from generated code), R leaves it open (?NA), and is.nan()
+    # can turn that into a different answer.
     if (!identical(a, b, num.eq = FALSE) && !same_capture(a, b)) {
       path <- rf_save_reproducer(seed, f, args, "native and interp differ")
       # The runner's tempdir() is gone after the job, so the message

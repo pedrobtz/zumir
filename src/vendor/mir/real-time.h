@@ -22,8 +22,14 @@ static double __attribute__ ((unused)) real_usec_time (void) {
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#if defined(__GNUC__)
+#define MIR_REAL_TIME_UNUSED __attribute__ ((unused))
+#else
+#define MIR_REAL_TIME_UNUSED
+#endif
+
 // does not return actual time, use as a stopwatch only
-static double real_sec_time (void) {
+static double MIR_REAL_TIME_UNUSED real_sec_time (void) {
   LARGE_INTEGER freq, count;
 
   if (QueryPerformanceFrequency (&freq) && QueryPerformanceCounter (&count))
@@ -31,7 +37,7 @@ static double real_sec_time (void) {
   return 0.0;
 }
 
-static double real_usec_time (void) {
+static double MIR_REAL_TIME_UNUSED real_usec_time (void) {
   LARGE_INTEGER freq, count;
 
   if (QueryPerformanceFrequency (&freq) && QueryPerformanceCounter (&count))

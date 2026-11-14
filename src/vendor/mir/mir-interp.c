@@ -640,6 +640,67 @@ static ALWAYS_INLINE int64_t get_mem_addr (MIR_val_t *bp, code_t c) { return bp[
     tp s = (tp) * get_iop (bp, ops + 1); \
     *r = (int64_t) s;                    \
   } while (0)
+/* MIR's integer operations wrap, and its memory may be unaligned: the
+   interpreter does the signed operations that can overflow on unsigned
+   values, takes a shift count modulo the width (as x86-64 and aarch64
+   shifts take it, so the interpreter agrees with generated code), and
+   loads and stores through memcpy. Otherwise interpreting a correct MIR
+   program is undefined behaviour in the interpreter (UBSan on c-tests). */
+static inline int64_t interp_add (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a + (uint64_t) b); }
+static inline int64_t interp_sub (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a - (uint64_t) b); }
+static inline int64_t interp_mul (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a * (uint64_t) b); }
+static inline int64_t interp_neg (int64_t a) { return (int64_t) (0 - (uint64_t) a); }
+static inline int64_t interp_lsh (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a << (b & 63)); }
+static inline int64_t interp_rsh (int64_t a, int64_t b) { return a >> (b & 63); }
+static inline int32_t interp_adds (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a + (uint32_t) b); }
+static inline int32_t interp_subs (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a - (uint32_t) b); }
+static inline int32_t interp_muls (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a * (uint32_t) b); }
+static inline int32_t interp_negs (int32_t a) { return (int32_t) (0 - (uint32_t) a); }
+static inline int32_t interp_lshs (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a << (b & 31)); }
+static inline int32_t interp_rshs (int32_t a, int32_t b) { return a >> (b & 31); }
+static inline uint64_t interp_ursh (uint64_t a, uint64_t b) { return a >> (b & 63); }
+static inline uint32_t interp_urshs (uint32_t a, uint32_t b) { return a >> (b & 31); }
+
+#define IOP2F(f)                 \
+  do {                           \
+    int64_t *r, p;               \
+    r = get_2iops (bp, ops, &p); \
+    *r = f (p);                  \
+  } while (0)
+#define IOP2SF(f)                 \
+  do {                            \
+    int64_t *r;                   \
+    int32_t p;                    \
+    r = get_2isops (bp, ops, &p); \
+    *r = f (p);                   \
+  } while (0)
+#define IOP3F(f)                       \
+  do {                                 \
+    int64_t *r, p1, p2;                \
+    r = get_3iops (bp, ops, &p1, &p2); \
+    *r = f (p1, p2);                   \
+  } while (0)
+#define IOP3SF(f)                       \
+  do {                                  \
+    int64_t *r;                         \
+    int32_t p1, p2;                     \
+    r = get_3isops (bp, ops, &p1, &p2); \
+    *r = f (p1, p2);                    \
+  } while (0)
+#define UIOP3F(f)                      \
+  do {                                 \
+    uint64_t *r, p1, p2;               \
+    r = get_3uops (bp, ops, &p1, &p2); \
+    *r = f (p1, p2);                   \
+  } while (0)
+#define UIOP3SF(f)                      \
+  do {                                  \
+    uint64_t *r;                        \
+    uint32_t p1, p2;                    \
+    r = get_3usops (bp, ops, &p1, &p2); \
+    *r = f (p1, p2);                    \
+  } while (0)
+
 #define IOP2(op)                 \
   do {                           \
     int64_t *r, p;               \
@@ -818,13 +879,16 @@ static ALWAYS_INLINE int64_t get_mem_addr (MIR_val_t *bp, code_t c) { return bp[
   do {                                      \
     val_type *r = get_##op (bp, ops);       \
     int64_t a = get_mem_addr (bp, ops + 1); \
-    *r = *((mem_type *) a);                 \
+    mem_type m;                             \
+    memcpy (&m, (void *) a, sizeof (m));    \
+    *r = m;                                 \
   } while (0)
 #define ST(op, val_type, mem_type)                \
   do {                                            \
     val_type v = (val_type) * get_##op (bp, ops); \
     int64_t a = get_mem_addr (bp, ops + 1);       \
-    *((mem_type *) a) = (mem_type) v;             \
+    mem_type m = (mem_type) v;                    \
+    memcpy ((void *) a, &m, sizeof (m));          \
   } while (0)
 
 #if !MIR_INTERP_TRACE && defined(__GNUC__) && !defined(__clang__)
@@ -1254,8 +1318,8 @@ static void OPTIMIZE eval (MIR_context_t ctx, func_desc_t func_desc, MIR_val_t *
     END_INSN;
   }
 
-  SCASE (MIR_NEG, 2, IOP2 (-));
-  SCASE (MIR_NEGS, 2, IOP2S (-));
+  SCASE (MIR_NEG, 2, IOP2F (interp_neg));
+  SCASE (MIR_NEGS, 2, IOP2SF (interp_negs));
   SCASE (MIR_FNEG, 2, FOP2 (-));
   SCASE (MIR_DNEG, 2, DOP2 (-));
   SCASE (MIR_LDNEG, 2, LDOP2 (-));
@@ -1283,20 +1347,20 @@ common_addr:;
     END_INSN;
   }
 
-  SCASE (MIR_ADD, 3, IOP3 (+));
-  SCASE (MIR_ADDS, 3, IOP3S (+));
+  SCASE (MIR_ADD, 3, IOP3F (interp_add));
+  SCASE (MIR_ADDS, 3, IOP3SF (interp_adds));
   SCASE (MIR_FADD, 3, FOP3 (+));
   SCASE (MIR_DADD, 3, DOP3 (+));
   SCASE (MIR_LDADD, 3, LDOP3 (+));
 
-  SCASE (MIR_SUB, 3, IOP3 (-));
-  SCASE (MIR_SUBS, 3, IOP3S (-));
+  SCASE (MIR_SUB, 3, IOP3F (interp_sub));
+  SCASE (MIR_SUBS, 3, IOP3SF (interp_subs));
   SCASE (MIR_FSUB, 3, FOP3 (-));
   SCASE (MIR_DSUB, 3, DOP3 (-));
   SCASE (MIR_LDSUB, 3, LDOP3 (-));
 
-  SCASE (MIR_MUL, 3, IOP3 (*));
-  SCASE (MIR_MULS, 3, IOP3S (*));
+  SCASE (MIR_MUL, 3, IOP3F (interp_mul));
+  SCASE (MIR_MULS, 3, IOP3SF (interp_muls));
   SCASE (MIR_FMUL, 3, FOP3 (*));
   SCASE (MIR_DMUL, 3, DOP3 (*));
   SCASE (MIR_LDMUL, 3, LDOP3 (*));
@@ -1320,13 +1384,13 @@ common_addr:;
   SCASE (MIR_ORS, 3, IOP3S (|));
   SCASE (MIR_XOR, 3, IOP3 (^));
   SCASE (MIR_XORS, 3, IOP3S (^));
-  SCASE (MIR_LSH, 3, IOP3 (<<));
-  SCASE (MIR_LSHS, 3, IOP3S (<<));
+  SCASE (MIR_LSH, 3, IOP3F (interp_lsh));
+  SCASE (MIR_LSHS, 3, IOP3SF (interp_lshs));
 
-  SCASE (MIR_RSH, 3, IOP3 (>>));
-  SCASE (MIR_RSHS, 3, IOP3S (>>));
-  SCASE (MIR_URSH, 3, UIOP3 (>>));
-  SCASE (MIR_URSHS, 3, UIOP3S (>>));
+  SCASE (MIR_RSH, 3, IOP3F (interp_rsh));
+  SCASE (MIR_RSHS, 3, IOP3SF (interp_rshs));
+  SCASE (MIR_URSH, 3, UIOP3F (interp_ursh));
+  SCASE (MIR_URSHS, 3, UIOP3SF (interp_urshs));
 
   SCASE (MIR_EQ, 3, ICMP (==));
   SCASE (MIR_EQS, 3, ICMPS (==));
@@ -1377,7 +1441,7 @@ common_addr:;
     int64_t op1 = *get_iop (bp, ops + 1), op2 = *get_iop (bp, ops + 2);
     unsigned_overflow_p = (uint64_t) op1 > UINT64_MAX - (uint64_t) op2;
     signed_overflow_p = op2 >= 0 ? op1 > INT64_MAX - op2 : op1 < INT64_MIN - op2;
-    *r = op1 + op2;
+    *r = interp_add (op1, op2);
     END_INSN;
   }
 
@@ -1386,7 +1450,7 @@ common_addr:;
     int32_t op1 = (int32_t) *get_iop (bp, ops + 1), op2 = (int32_t) *get_iop (bp, ops + 2);
     unsigned_overflow_p = (uint32_t) op1 > UINT32_MAX - (uint32_t) op2;
     signed_overflow_p = op2 >= 0 ? op1 > INT32_MAX - op2 : op1 < INT32_MIN - op2;
-    *r = op1 + op2;
+    *r = interp_adds (op1, op2);
     END_INSN;
   }
 
@@ -1395,7 +1459,7 @@ common_addr:;
     int64_t op1 = *get_iop (bp, ops + 1), op2 = *get_iop (bp, ops + 2);
     unsigned_overflow_p = (uint64_t) op1 < (uint64_t) op2;
     signed_overflow_p = op2 < 0 ? op1 > INT64_MAX + op2 : op1 < INT64_MIN + op2;
-    *r = op1 - op2;
+    *r = interp_sub (op1, op2);
     END_INSN;
   }
 
@@ -1404,7 +1468,7 @@ common_addr:;
     int32_t op1 = (int32_t) *get_iop (bp, ops + 1), op2 = (int32_t) *get_iop (bp, ops + 2);
     unsigned_overflow_p = (uint32_t) op1 < (uint32_t) op2;
     signed_overflow_p = op2 < 0 ? op1 > INT32_MAX + op2 : op1 < INT32_MIN + op2;
-    *r = op1 - op2;
+    *r = interp_subs (op1, op2);
     END_INSN;
   }
 
@@ -1415,7 +1479,7 @@ common_addr:;
                          : op1 == -1 ? op2 < -INT64_MAX
                          : op1 > 0   ? (op2 > 0 ? INT64_MAX / op1 < op2 : INT64_MIN / op1 > op2)
                                      : (op2 > 0 ? INT64_MIN / op1 < op2 : INT64_MAX / op1 > op2));
-    *r = op1 * op2;
+    *r = interp_mul (op1, op2);
     END_INSN;
   }
 
@@ -1426,7 +1490,7 @@ common_addr:;
                          : op1 == -1 ? op2 < -INT32_MAX
                          : op1 > 0   ? (op2 > 0 ? INT32_MAX / op1 < op2 : INT32_MIN / op1 > op2)
                                      : (op2 > 0 ? INT32_MIN / op1 < op2 : INT32_MAX / op1 > op2));
-    *r = op1 * op2;
+    *r = interp_muls (op1, op2);
     END_INSN;
   }
 

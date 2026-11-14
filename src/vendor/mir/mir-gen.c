@@ -3834,8 +3834,9 @@ static int add_sub_const_insn_p (gen_ctx_t gen_ctx, MIR_insn_t insn, int64_t *va
   if (insn->ops[1].mode == MIR_OP_VAR
       && MIR_reg_hard_reg_name (gen_ctx->ctx, insn->ops[1].u.var - MAX_HARD_REG, func) != NULL)
     return FALSE;
-  *val = insn->code == MIR_SUB || insn->code == MIR_SUBS ? -def_bb_insn->gvn_val
-                                                         : def_bb_insn->gvn_val;
+  *val = insn->code == MIR_SUB || insn->code == MIR_SUBS
+           ? (int64_t) (0 - (uint64_t) def_bb_insn->gvn_val) /* wraps, as MIR's sub does */
+           : def_bb_insn->gvn_val;
   return TRUE;
 }
 
@@ -4006,6 +4007,77 @@ static int get_gvn_3usops (MIR_insn_t insn, uint32_t *p1, uint32_t *p2) {
 #define GVN_UOP3S0(op)                                          \
   do {                                                          \
     if (get_gvn_op (insn, 2, &val) && val != 0) GVN_UOP3S (op); \
+  } while (0)
+
+/* Folding wraps, as MIR's integer operations do: the signed operations
+   that can overflow are done on unsigned values, and a shift count is taken
+   modulo the width, as x86-64 and aarch64 shifts take it, so the folded
+   value is the one the code would compute and the folding itself has no
+   undefined behaviour. */
+static int64_t gvn_add (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a + (uint64_t) b); }
+static int64_t gvn_sub (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a - (uint64_t) b); }
+static int64_t gvn_mul (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a * (uint64_t) b); }
+static int64_t gvn_neg (int64_t a) { return (int64_t) (0 - (uint64_t) a); }
+static int64_t gvn_lsh (int64_t a, int64_t b) { return (int64_t) ((uint64_t) a << (b & 63)); }
+static int64_t gvn_rsh (int64_t a, int64_t b) { return a >> (b & 63); }
+static int32_t gvn_adds (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a + (uint32_t) b); }
+static int32_t gvn_subs (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a - (uint32_t) b); }
+static int32_t gvn_muls (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a * (uint32_t) b); }
+static int32_t gvn_negs (int32_t a) { return (int32_t) (0 - (uint32_t) a); }
+static int32_t gvn_lshs (int32_t a, int32_t b) { return (int32_t) ((uint32_t) a << (b & 31)); }
+static int32_t gvn_rshs (int32_t a, int32_t b) { return a >> (b & 31); }
+static uint64_t gvn_ursh (uint64_t a, uint64_t b) { return a >> (b & 63); }
+static uint32_t gvn_urshs (uint32_t a, uint32_t b) { return a >> (b & 31); }
+
+#define GVN_IOP2F(f)                                      \
+  do {                                                    \
+    int64_t p;                                            \
+    if ((const_p = get_gvn_2iops (insn, &p))) val = f (p); \
+  } while (0)
+
+#define GVN_IOP2SF(f)                                      \
+  do {                                                     \
+    int32_t p;                                             \
+    if ((const_p = get_gvn_2isops (insn, &p))) val = f (p); \
+  } while (0)
+
+#define GVN_IOP3F(f)                                                   \
+  do {                                                                 \
+    int64_t p1, p2;                                                    \
+    if ((const_p = get_gvn_3iops (insn, &p1, &p2))) val = f (p1, p2); \
+  } while (0)
+
+#define GVN_IOP3SF(f)                                                   \
+  do {                                                                  \
+    int32_t p1, p2;                                                     \
+    if ((const_p = get_gvn_3isops (insn, &p1, &p2))) val = f (p1, p2); \
+  } while (0)
+
+#define GVN_UOP3F(f)                                                   \
+  do {                                                                 \
+    uint64_t p1, p2;                                                   \
+    if ((const_p = get_gvn_3uops (insn, &p1, &p2))) val = f (p1, p2); \
+  } while (0)
+
+#define GVN_UOP3SF(f)                                                   \
+  do {                                                                  \
+    uint32_t p1, p2;                                                    \
+    if ((const_p = get_gvn_3usops (insn, &p1, &p2))) val = f (p1, p2); \
+  } while (0)
+
+/* The most negative value divided by -1 overflows: left to run time. */
+#define GVN_IDIV(op)                                                          \
+  do {                                                                        \
+    int64_t p1, p2;                                                           \
+    if ((const_p = get_gvn_3iops (insn, &p1, &p2)))                           \
+      const_p = p2 != 0 && !(p1 == INT64_MIN && p2 == -1) && ((val = p1 op p2), 1); \
+  } while (0)
+
+#define GVN_IDIVS(op)                                                         \
+  do {                                                                        \
+    int32_t p1, p2;                                                           \
+    if ((const_p = get_gvn_3isops (insn, &p1, &p2)))                          \
+      const_p = p2 != 0 && !(p1 == INT32_MIN && p2 == -1) && ((val = p1 op p2), 1); \
   } while (0)
 
 #define GVN_ICMP(op)                                                \
@@ -4421,24 +4493,24 @@ static void gvn_modify (gen_ctx_t gen_ctx) {
       case MIR_UEXT16: GVN_EXT (uint16_t); break;
       case MIR_UEXT32: GVN_EXT (uint32_t); break;
 
-      case MIR_NEG: GVN_IOP2 (-); break;
-      case MIR_NEGS: GVN_IOP2S (-); break;
+      case MIR_NEG: GVN_IOP2F (gvn_neg); break;
+      case MIR_NEGS: GVN_IOP2SF (gvn_negs); break;
 
-      case MIR_MUL: GVN_IOP3 (*); break;
-      case MIR_MULS: GVN_IOP3S (*); break;
+      case MIR_MUL: GVN_IOP3F (gvn_mul); break;
+      case MIR_MULS: GVN_IOP3SF (gvn_muls); break;
 
-      case MIR_MULO: GVN_IOP3 (*); break;
-      case MIR_MULOS: GVN_IOP3S (*); break;
+      case MIR_MULO: GVN_IOP3F (gvn_mul); break;
+      case MIR_MULOS: GVN_IOP3SF (gvn_muls); break;
       case MIR_UMULO: GVN_UOP3 (*); break;
       case MIR_UMULOS: GVN_UOP3S (*); break;
 
-      case MIR_DIV: GVN_IOP30 (/); break;
-      case MIR_DIVS: GVN_IOP3S0 (/); break;
+      case MIR_DIV: GVN_IDIV (/); break;
+      case MIR_DIVS: GVN_IDIVS (/); break;
       case MIR_UDIV: GVN_UOP30 (/); break;
       case MIR_UDIVS: GVN_UOP3S0 (/); break;
 
-      case MIR_MOD: GVN_IOP30 (%); break;
-      case MIR_MODS: GVN_IOP3S0 (%); break;
+      case MIR_MOD: GVN_IDIV (%); break;
+      case MIR_MODS: GVN_IDIVS (%); break;
       case MIR_UMOD: GVN_UOP30 (%); break;
       case MIR_UMODS:
         GVN_UOP3S0 (%);
@@ -4456,12 +4528,12 @@ static void gvn_modify (gen_ctx_t gen_ctx) {
         set_alloca_based_flag (bb_insn, FALSE);
         break;
 
-      case MIR_LSH: GVN_IOP3 (<<); break;
-      case MIR_LSHS: GVN_IOP3S (<<); break;
-      case MIR_RSH: GVN_IOP3 (>>); break;
-      case MIR_RSHS: GVN_IOP3S (>>); break;
-      case MIR_URSH: GVN_UOP3 (>>); break;
-      case MIR_URSHS: GVN_UOP3S (>>); break;
+      case MIR_LSH: GVN_IOP3F (gvn_lsh); break;
+      case MIR_LSHS: GVN_IOP3SF (gvn_lshs); break;
+      case MIR_RSH: GVN_IOP3F (gvn_rsh); break;
+      case MIR_RSHS: GVN_IOP3SF (gvn_rshs); break;
+      case MIR_URSH: GVN_UOP3F (gvn_ursh); break;
+      case MIR_URSHS: GVN_UOP3SF (gvn_urshs); break;
 
       case MIR_EQ: GVN_ICMP (==); break;
       case MIR_EQS: GVN_ICMPS (==); break;
@@ -4490,25 +4562,25 @@ static void gvn_modify (gen_ctx_t gen_ctx) {
       case MIR_ADD:
       case MIR_ADDO:
         set_alloca_based_flag (bb_insn, TRUE);
-        GVN_IOP3 (+);
+        GVN_IOP3F (gvn_add);
         if (!const_p) goto canon_expr;
         break;
       case MIR_ADDS:
       case MIR_ADDOS:
         set_alloca_based_flag (bb_insn, TRUE);
-        GVN_IOP3S (+);
+        GVN_IOP3SF (gvn_adds);
         if (!const_p) goto canon_expr;
         break;
       case MIR_SUB:
       case MIR_SUBO:
         set_alloca_based_flag (bb_insn, TRUE);
-        GVN_IOP3 (-);
+        GVN_IOP3F (gvn_sub);
         if (!const_p) goto canon_expr;
         break;
       case MIR_SUBS:
       case MIR_SUBOS:
         set_alloca_based_flag (bb_insn, TRUE);
-        GVN_IOP3S (-);
+        GVN_IOP3SF (gvn_subs);
         if (!const_p) goto canon_expr;
         break;
       canon_expr:

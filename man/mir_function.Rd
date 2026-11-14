@@ -53,6 +53,6 @@ add(1, 2)
 }
 \seealso{
 Other compilers:
-\code{\link[=rfunction]{rfunction()}}
+\code{\link[=mir_compile]{mir_compile()}}
 }
 \concept{compilers}

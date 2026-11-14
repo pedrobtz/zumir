@@ -1,4 +1,4 @@
-# rfunction()'s two routes to MIR (design §4.6, D17): the emitter, built
+# mir_compile()'s two routes to MIR (design §4.6, D17): the emitter, built
 # with MIR's API, against the text route, read by MIR's scanner. The text
 # route is the oracle: the same module printed by MIR_output, and the same
 # results; and both against R.
@@ -98,7 +98,7 @@ test_that("both routes return what R returns", {
         (inherits(e$value, "error") &&
           identical(conditionMessage(e$value), conditionMessage(t$value)))
       expect(same, paste("routes differ:", rf_show(f), rf_show(args)))
-      # Where rfunction() answers, it answers as R does.
+      # Where mir_compile() answers, it answers as R does.
       if (!inherits(e$value, "zumir_runtime_error")) {
         d <- compare_with_r(f, ge, args)
         expect(is.null(d), paste(rf_show(f), rf_show(args), d))
@@ -107,9 +107,9 @@ test_that("both routes return what R returns", {
   }
 })
 
-test_that("the emitter route is rfunction()'s default", {
+test_that("the emitter route is mir_compile()'s default", {
   skip_if(zumir_tier() == "none", "no tier runs here")
-  g <- rfunction(function(a) a + 1)
+  g <- mir_compile(function(a) a + 1)
   expect_identical(attr(g, "route"), "emitter")
   expect_identical(g(1), 2)
   expect_identical(
@@ -163,7 +163,7 @@ test_that("each of MIR's allocations failed in the emitter: an error, no arena l
   expect_lte(.Call(zumir_test_live_arenas), base)
 })
 
-test_that("an R error while rfunction() lowers leaves no context behind", {
+test_that("an R error while mir_compile() lowers leaves no context behind", {
   skip_if(zumir_tier() == "none", "no tier runs here")
   gc()
   base <- .Call(zumir_test_live_arenas)
@@ -180,7 +180,7 @@ test_that("an R error while rfunction() lowers leaves no context behind", {
     run <- function() {
       setTimeLimit(elapsed = k / 1000, transient = TRUE)
       on.exit(setTimeLimit())
-      rfunction(big)
+      mir_compile(big)
     }
     tryCatch(run(), error = function(e) NULL)
   }

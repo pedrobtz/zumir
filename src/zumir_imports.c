@@ -6,7 +6,7 @@
  *                            memcmp, strlen (cfunction(), mir_function());
  *   ZUMIR_IMPORTS_CONSUMER   D6's list, plus what the consumer registered
  *                            in that context with zumir_import() (D14);
- *   ZUMIR_IMPORTS_RFUNCTION  rfunction()'s internal list: part of the math
+ *   ZUMIR_IMPORTS_RFUNCTION  mir_compile()'s internal list: part of the math
  *                            library, R_pow, zumir's C ports of R's %%,
  *                            %/%, min and max, and the interrupt poll (D18,
  *                            D23). User source never names these.
@@ -39,7 +39,7 @@ SEXP zumir_set_long_double(SEXP on) {
 }
 
 /* Set by zumir_r_fmod where R warns "probable complete loss of accuracy in
- * modulus"; rfunction()'s wrapper reads and clears it (Stage 6). */
+ * modulus"; mir_compile()'s wrapper reads and clears it (Stage 6). */
 _Thread_local int zumir_r_fmod_warned;
 
 static double c_eps(void) {
@@ -106,7 +106,7 @@ double zumir_r_max2(double x1, double x2) {
   return z;
 }
 
-/* ---- R's math1 for rfunction()'s math table ----
+/* ---- R's math1 for mir_compile()'s math table ----
  *
  * R 4.6 wraps several functions with small-argument shortcuts (src/main/
  * arithmetic.c: Rexp, Rexpm1, Rlog1p, Rsin, Rcos, Rtan, Rsqrt) and calls
@@ -122,7 +122,7 @@ SEXP zumir_set_r46(SEXP on) {
   return R_NilValue;
 }
 
-/* Set where R would warn "NaNs produced"; rfunction()'s wrapper reads and
+/* Set where R would warn "NaNs produced"; mir_compile()'s wrapper reads and
  * clears it. */
 _Thread_local int zumir_r_nan_warned;
 
@@ -290,7 +290,7 @@ void zumir_imports_load(MIR_context_t ctx, int kind, const zumir_import_entry *e
 }
 #endif
 
-/* Test entry: one of rfunction()'s math wrappers called directly on x,
+/* Test entry: one of mir_compile()'s math wrappers called directly on x,
  * returning list(value, warned) for comparison with R's function. */
 SEXP zumir_test_math(SEXP which, SEXP x) {
   const char *w = CHAR(STRING_ELT(which, 0));
@@ -337,7 +337,7 @@ SEXP zumir_test_port(SEXP which, SEXP x, SEXP y) {
   return out;
 }
 
-/* The names in a list, for tests: kind 0 D6, 2 rfunction. */
+/* The names in a list, for tests: kind 0 D6, 2 mir_compile(). */
 SEXP zumir_test_import_names(SEXP kind) {
   size_t n;
   const zumir_import_entry *list = zumir_import_list(Rf_asInteger(kind), &n);

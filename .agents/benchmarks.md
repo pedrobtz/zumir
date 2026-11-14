@@ -4,9 +4,9 @@ Each row says what was measured, on what, and the command that measured
 it, so it can be run again. Numbers come from one machine and one run.
 Read them as ratios, not as absolutes.
 
-## rfunction() compile time, by route (Stage 7, D17)
+## mir_compile() compile time, by route (Stage 7, D17)
 
-`Rscript tools/bench-rfunction-routes.R 200`, from the package root with
+`Rscript tools/bench-mir-compile-routes.R 200`, from the package root with
 the package installed. It uses 200 random functions from the tests'
 generator: median 156 lines of MIR text, at most 617. The time is
 `rf_context()` alone: the module built by the emitter, or read by MIR's

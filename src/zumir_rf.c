@@ -1,5 +1,5 @@
-/* rfunction()'s two C entries (design §4.6): compile the MIR text the R
- * walker emits, with rfunction()'s import list (D18), and call it. The
+/* mir_compile()'s two C entries (design §4.6): compile the MIR text the R
+ * walker emits, with mir_compile()'s import list (D18), and call it. The
  * generated function is
  *
  *   int64 rf (double *K, double *S, double **VP, int64 *VL, int64 *R)
@@ -151,7 +151,7 @@ static MIR_item_t ref_item(rf_emit *e, const char *name) {
 }
 
 static void bad_operand(rf_emit *e, const char *a) {
-  MIR_get_error_func(e->ctx)(MIR_wrong_type_error, "rfunction(): unknown operand %s", a);
+  MIR_get_error_func(e->ctx)(MIR_wrong_type_error, "mir_compile(): unknown operand %s", a);
 }
 
 static MIR_reg_t reg_named(rf_emit *e, const char *name, size_t len) {
@@ -210,7 +210,7 @@ static MIR_op_t operand(rf_emit *e, const char *a) {
 static MIR_insn_code_t code_named(rf_emit *e, const char *op) {
   for (int c = 0; c < MIR_INSN_BOUND; c++)
     if (strcmp(MIR_insn_name(e->ctx, (MIR_insn_code_t) c), op) == 0) return (MIR_insn_code_t) c;
-  MIR_get_error_func(e->ctx)(MIR_wrong_type_error, "rfunction(): unknown opcode %s", op);
+  MIR_get_error_func(e->ctx)(MIR_wrong_type_error, "mir_compile(): unknown opcode %s", op);
   return MIR_INSN_BOUND;
 }
 

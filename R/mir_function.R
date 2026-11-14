@@ -43,7 +43,7 @@ mir_function <- function(text, name, tier = NULL) {
   build_mir_function(text, name, tier, imports = 0L)
 }
 
-# Internal: mir_function() with another import set (2: rfunction()'s), for
+# Internal: mir_function() with another import set (2: mir_compile()'s), for
 # the tests of zumir's ports of R's arithmetic.
 build_mir_function <- function(text, name, tier, imports) {
   # MIR's scanner needs the last line to end in a newline.

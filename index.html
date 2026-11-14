@@ -58,22 +58,94 @@
 </h1></div>
 <!-- badges: start -->
 
-<p>The goal of zumir is to …</p>
+<div class="section level2">
+<h2 id="overview">Overview<a class="anchor" aria-label="anchor" href="#overview"></a>
+</h2>
+<p>A loop over a numeric vector is often the slow part of an R program. The usual fix is to rewrite it in C or C++, and that needs a toolchain: Rtools on Windows, the Xcode command-line tools on macOS, <code>gcc</code> elsewhere. Locked-down laptops, Shiny servers and slim containers often have none.</p>
+<p>zumir brings <a href="https://github.com/vnmakarov/mir" class="external-link">MIR</a>, Vladimir Makarov’s small just-in-time compiler, to R. It is vendored, so a numeric R function or a short C function becomes native code from R itself, with nothing else installed.</p>
+<ul>
+<li>
+<strong>No toolchain.</strong> <code><a href="reference/mir_compile.html">mir_compile()</a></code> compiles an R function, and <code><a href="reference/cfunction.html">cfunction()</a></code> a C function, in memory, in milliseconds.</li>
+<li>
+<strong>R’s answers, or an error.</strong> A function compiled by <code><a href="reference/mir_compile.html">mir_compile()</a></code> returns what R returns, every number bit for bit. Where matching R would be costly, it refuses, and names the construct.</li>
+<li>
+<strong>The same C everywhere.</strong> <code><a href="reference/cfunction.html">cfunction()</a></code> reads no system header and links only the C maths library and a few memory and string functions, so a source behaves the same on every machine.</li>
+<li>
+<strong>MIR never ends your session.</strong> A compile error, a bad module, or MIR running out of memory becomes an R condition you can catch.</li>
+<li>
+<strong>A compiler for packages too.</strong> Packages that generate code link to zumir’s versioned C interface (<code>LinkingTo: zumir</code>) and get native function pointers back.</li>
+</ul>
+</div>
 <div class="section level2">
 <h2 id="installation">Installation<a class="anchor" aria-label="anchor" href="#installation"></a>
 </h2>
-<p>You can install the development version of zumir from <a href="https://github.com/" class="external-link">GitHub</a> with:</p>
+<p>zumir is not on CRAN yet. Install the development version from GitHub with:</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># install.packages("pak")</span></span>
 <span><span class="fu">pak</span><span class="fu">::</span><span class="fu"><a href="https://pak.r-lib.org/reference/pak.html" class="external-link">pak</a></span><span class="op">(</span><span class="st">"pedrobtz/zumir"</span><span class="op">)</span></span></code></pre></div>
+<p>Installing it from source needs a C compiler once; using it never does.</p>
 </div>
 <div class="section level2">
-<h2 id="example">Example<a class="anchor" aria-label="anchor" href="#example"></a>
+<h2 id="usage">Usage<a class="anchor" aria-label="anchor" href="#usage"></a>
 </h2>
-<p>This is a basic example which shows you how to solve a common problem:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pedrobtz.github.io/zumir/">zumir</a></span><span class="op">)</span></span>
-<span><span class="co">## basic example code</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://pedrobtz.github.io/zumir/">zumir</a></span><span class="op">)</span></span></code></pre></div>
+<p>Here is a cumulative sum written as an R loop. <code><a href="reference/mir_compile.html">mir_compile()</a></code> turns it into native code with the same arguments.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">csum_r</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span></span>
+<span>  <span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span>  <span class="va">acc</span> <span class="op">&lt;-</span> <span class="fl">0</span></span>
+<span>  <span class="kw">for</span> <span class="op">(</span><span class="va">i</span> <span class="kw">in</span> <span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_along</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span> <span class="op">{</span></span>
+<span>    <span class="va">acc</span> <span class="op">&lt;-</span> <span class="va">acc</span> <span class="op">+</span> <span class="va">x</span><span class="op">[</span><span class="va">i</span><span class="op">]</span></span>
+<span>    <span class="va">y</span><span class="op">[</span><span class="va">i</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="va">acc</span></span>
+<span>  <span class="op">}</span></span>
+<span>  <span class="va">y</span></span>
+<span><span class="op">}</span></span>
+<span><span class="va">csum</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/mir_compile.html">mir_compile</a></span><span class="op">(</span><span class="va">csum_r</span><span class="op">)</span></span>
+<span><span class="fu">csum</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span>, <span class="fl">4</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  1  3  6 10</span></span></code></pre></div>
+<p>It answers as R does, missing values included.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="cn">NA</span>, <span class="fl">4</span><span class="op">)</span></span>
+<span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  1  3 NA NA</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum_r</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>What it cannot match it refuses when it compiles, never by giving another answer. Here R would return a character vector.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/mir_compile.html">mir_compile</a></span><span class="op">(</span><span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="fu"><a href="https://rdrr.io/r/base/paste.html" class="external-link">paste</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Error:</span></span>
+<span><span class="co">#&gt; ! mir_compile(): `paste` is not in the subset in `paste(x)`.</span></span></code></pre></div>
+<p>When an R loop is not enough, <code><a href="reference/cfunction.html">cfunction()</a></code> compiles one C function. An argument named in <code>out</code> is allocated for the call and returned, and <code>n</code> receives the inputs’ length.</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="fu"><a href="reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
+<span><span class="st">  double dot(int n, const double *x, const double *y) {</span></span>
+<span><span class="st">    double s = 0;</span></span>
+<span><span class="st">    for (int i = 0; i &lt; n; i++) s += x[i] * y[i];</span></span>
+<span><span class="st">    return s;</span></span>
+<span><span class="st">  }"</span>, n <span class="op">=</span> <span class="st">"n"</span><span class="op">)</span></span>
+<span><span class="fu">dot</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span>, y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">4</span>, <span class="fl">5</span>, <span class="fl">6</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] 32</span></span></code></pre></div>
+<p>On a loop over a million doubles, <code><a href="reference/mir_compile.html">mir_compile()</a></code>’s code ran about 35 times faster than R’s byte-compiled function, and within 1.3 times of <code><a href="reference/cfunction.html">cfunction()</a></code>’s. If generated code fails the check zumir runs when it loads, both fall back to MIR’s interpreter, which gives the same answers more slowly. Where MIR has no code generator for the processor, or the system refuses memory that is both writable and executable, nothing can be compiled. <code><a href="reference/zumir_info.html">zumir_tier()</a></code> says which of these holds in this session.</p>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="reference/zumir_info.html">zumir_tier</a></span><span class="op">(</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "native"</span></span></code></pre></div>
+</div>
+<div class="section level2">
+<h2 id="learn-more">Learn more<a class="anchor" aria-label="anchor" href="#learn-more"></a>
+</h2>
+<ul>
+<li>
+<a href="https://pedrobtz.github.io/zumir/articles/zumir.html">Get started</a> walks through the three compilers and the tiers.</li>
+<li>
+<a href="https://pedrobtz.github.io/zumir/articles/mir-compile.html">What <code>mir_compile()</code> accepts</a> lists the R subset and every case where it errors instead of answering.</li>
+<li>The <a href="https://pedrobtz.github.io/zumir/reference/">reference index</a> documents every function.</li>
+</ul>
+</div>
+<div class="section level2">
+<h2 id="acknowledgements">Acknowledgements<a class="anchor" aria-label="anchor" href="#acknowledgements"></a>
+</h2>
+<p>zumir is built on <a href="https://github.com/vnmakarov/mir" class="external-link">MIR</a> by Vladimir Makarov: its generator, interpreter and <code>c2mir</code> C compiler, from a fork that carries zumir’s patches (<a href="https://github.com/pedrobtz/mir" class="external-link">pedrobtz/mir</a>). <code><a href="reference/cfunction.html">cfunction()</a></code> is checked against MIR’s own <code>c-tests</code> corpus, and <code><a href="reference/mir_compile.html">mir_compile()</a></code> against R itself.</p>
 </div>
 </div>
   </main><aside class="col-md-3"><div class="links">
@@ -111,6 +183,7 @@
 <div class="dev-status">
 <h2 data-toc-skip>Dev status</h2>
 <ul class="list-unstyled">
+<li><a href="https://lifecycle.r-lib.org/articles/stages.html#experimental" class="external-link"><img src="https://img.shields.io/badge/lifecycle-experimental-orange.svg" alt="Lifecycle: experimental"></a></li>
 <li><a href="https://github.com/pedrobtz/zumir/actions/workflows/R-CMD-check.yaml" class="external-link"><img src="https://github.com/pedrobtz/zumir/actions/workflows/R-CMD-check.yaml/badge.svg" alt="R-CMD-check"></a></li>
 <li><a href="https://github.com/pedrobtz/zumir/actions/workflows/coverage.yaml" class="external-link"><img src="https://raw.githubusercontent.com/pedrobtz/zumir/gh-pages/badges/coverage.svg" alt="coverage"></a></li>
 </ul>

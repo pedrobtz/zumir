@@ -109,8 +109,10 @@ f(1, 2)
 
 ## Native code or the interpreter
 
-Where MIR has no code generator for the CPU, zumir falls back to MIR’s
-interpreter. Results are the same, only slower.
+zumir checks generated code when it loads. If that check fails, it falls
+back to MIR’s interpreter: results are the same, only slower. Where MIR
+has no code generator for the CPU, or the system refuses memory that is
+both writable and executable, no tier runs and nothing can be compiled.
 [`zumir_tier()`](https://pedrobtz.github.io/zumir/reference/zumir_info.md)
 says which tier this session uses, and
 [`zumir_info()`](https://pedrobtz.github.io/zumir/reference/zumir_info.md)

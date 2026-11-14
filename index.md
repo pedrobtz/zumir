@@ -1,11 +1,42 @@
 # zumir
 
-The goal of zumir is to …
+## Overview
+
+A loop over a numeric vector is often the slow part of an R program. The
+usual fix is to rewrite it in C or C++, and that needs a toolchain:
+Rtools on Windows, the Xcode command-line tools on macOS, `gcc`
+elsewhere. Locked-down laptops, Shiny servers and slim containers often
+have none.
+
+zumir brings [MIR](https://github.com/vnmakarov/mir), Vladimir Makarov’s
+small just-in-time compiler, to R. It is vendored, so a numeric R
+function or a short C function becomes native code from R itself, with
+nothing else installed.
+
+- **No toolchain.**
+  [`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
+  compiles an R function, and
+  [`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
+  a C function, in memory, in milliseconds.
+- **R’s answers, or an error.** A function compiled by
+  [`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
+  returns what R returns, every number bit for bit. Where matching R
+  would be costly, it refuses, and names the construct.
+- **The same C everywhere.**
+  [`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
+  reads no system header and links only the C maths library and a few
+  memory and string functions, so a source behaves the same on every
+  machine.
+- **MIR never ends your session.** A compile error, a bad module, or MIR
+  running out of memory becomes an R condition you can catch.
+- **A compiler for packages too.** Packages that generate code link to
+  zumir’s versioned C interface (`LinkingTo: zumir`) and get native
+  function pointers back.
 
 ## Installation
 
-You can install the development version of zumir from
-[GitHub](https://github.com/) with:
+zumir is not on CRAN yet. Install the development version from GitHub
+with:
 
 ``` r
 
@@ -13,12 +44,109 @@ You can install the development version of zumir from
 pak::pak("pedrobtz/zumir")
 ```
 
-## Example
+Installing it from source needs a C compiler once; using it never does.
 
-This is a basic example which shows you how to solve a common problem:
+## Usage
 
 ``` r
 
 library(zumir)
-## basic example code
 ```
+
+Here is a cumulative sum written as an R loop.
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
+turns it into native code with the same arguments.
+
+``` r
+
+csum_r <- function(x) {
+  y <- numeric(length(x))
+  acc <- 0
+  for (i in seq_along(x)) {
+    acc <- acc + x[i]
+    y[i] <- acc
+  }
+  y
+}
+csum <- mir_compile(csum_r)
+csum(c(1, 2, 3, 4))
+#> [1]  1  3  6 10
+```
+
+It answers as R does, missing values included.
+
+``` r
+
+x <- c(1, 2, NA, 4)
+csum(x)
+#> [1]  1  3 NA NA
+identical(csum(x), csum_r(x))
+#> [1] TRUE
+```
+
+What it cannot match it refuses when it compiles, never by giving
+another answer. Here R would return a character vector.
+
+``` r
+
+mir_compile(function(x) paste(x))
+#> Error:
+#> ! mir_compile(): `paste` is not in the subset in `paste(x)`.
+```
+
+When an R loop is not enough,
+[`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
+compiles one C function. An argument named in `out` is allocated for the
+call and returned, and `n` receives the inputs’ length.
+
+``` r
+
+dot <- cfunction("
+  double dot(int n, const double *x, const double *y) {
+    double s = 0;
+    for (int i = 0; i < n; i++) s += x[i] * y[i];
+    return s;
+  }", n = "n")
+dot(x = c(1, 2, 3), y = c(4, 5, 6))
+#> [1] 32
+```
+
+On a loop over a million doubles,
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)’s
+code ran about 35 times faster than R’s byte-compiled function, and
+within 1.3 times of
+[`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)’s.
+If generated code fails the check zumir runs when it loads, both fall
+back to MIR’s interpreter, which gives the same answers more slowly.
+Where MIR has no code generator for the processor, or the system refuses
+memory that is both writable and executable, nothing can be compiled.
+[`zumir_tier()`](https://pedrobtz.github.io/zumir/reference/zumir_info.md)
+says which of these holds in this session.
+
+``` r
+
+zumir_tier()
+#> [1] "native"
+```
+
+## Learn more
+
+- [Get started](https://pedrobtz.github.io/zumir/articles/zumir.html)
+  walks through the three compilers and the tiers.
+- [What `mir_compile()`
+  accepts](https://pedrobtz.github.io/zumir/articles/mir-compile.html)
+  lists the R subset and every case where it errors instead of
+  answering.
+- The [reference index](https://pedrobtz.github.io/zumir/reference/)
+  documents every function.
+
+## Acknowledgements
+
+zumir is built on [MIR](https://github.com/vnmakarov/mir) by Vladimir
+Makarov: its generator, interpreter and `c2mir` C compiler, from a fork
+that carries zumir’s patches
+([pedrobtz/mir](https://github.com/pedrobtz/mir)).
+[`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
+is checked against MIR’s own `c-tests` corpus, and
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
+against R itself.

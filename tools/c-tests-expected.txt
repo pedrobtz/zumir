@@ -1,7 +1,8 @@
 # MIR's c-tests corpus through zumir's compile path (tests/c/c-tests-runner.c,
 # #20): the tests expected to fail, one per line, "<test> <why>", the same on
-# both tiers. "<test> [<platform>,...] <why>" is expected only on those
-# platforms: macos-x86_64, macos-arm64, ubuntu-x86_64, ubuntu-aarch64. tools/ci/platform.sh fails when a test fails that is not listed
+# both tiers. "<test> [<tag>,...] <why>" is expected only where a tag holds:
+# a platform (macos-x86_64, macos-arm64, ubuntu-x86_64, ubuntu-aarch64), or
+# a platform and a tier (ubuntu-aarch64:gen). tools/ci/platform.sh fails when a test fails that is not listed
 # here, or passes while listed, so a regression is seen and a fix updates
 # this list. Generated from the runner's output; the reasons fall into:
 #
@@ -78,4 +79,4 @@ new/va-struct-args.c [macos-arm64] exit 3, expected 0: structs through varargs o
 gcc/20020216-1.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
 gcc/pr19606.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
 lacc/bitwise-sign-extend.c [ubuntu-aarch64] exit 48, expected 46: expects plain char signed, unsigned on Linux aarch64
-lacc/struct-comma-call.c [ubuntu-aarch64] link: the aarch64 generator stops on a struct call in a comma expression (#44)
+lacc/struct-comma-call.c [ubuntu-aarch64:gen] link: the aarch64 generator stops on a struct call in a comma expression (#44)

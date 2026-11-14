@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   4fb6f621b36536ea954d96cd57669638fde4eaec
+  Fork commit:   06104552b719120a07f7056ae5f9d6aa4ec996e6
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -36,6 +36,7 @@ interpreter and the C compiler c2mir)
                  55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy
                  feacf4fe Stop at the end of the unit after a ## concatenation
                  4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path
+                 06104552 Empty the buffer when a macro argument has no start marker
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -146,6 +147,10 @@ The patches, with the fork branch that carries each one alone:
             a long double (-Warray-bounds, a stack overrun); get_result_type
             and the Windows timers are no longer unused there (Rtools gcc).
             fix/c2mir-windows-warnings; upstream: not filed yet (#30).
+  06104552  add_arg_tokens truncated a buffer to -1 (SIZE_MAX) when malformed
+            input left no T_BOA marker, so the next push wrote before the
+            array (libFuzzer in CI, UBSan). fix/c2mir-arg-without-marker;
+            upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

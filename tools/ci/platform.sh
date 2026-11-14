@@ -191,19 +191,20 @@ if [ "$os" != windows ]; then
   runner_flags="-Isrc -Isrc/vendor/mir -DNDEBUG -DZUMIR_C2MIR_TEST_HEADERS"
   $cc_cmd $r_cflags $runner_flags $runner_srcs -o "$tmp/c-tests-runner" -lm
   dirs="havoc new andrewchambers_c gcc lacc"
-  # A line "<test> [<platform>,...] <why>" is expected only on the platforms
-  # it names, <os>-<arch> as below; a line without brackets, everywhere.
+  # A line "<test> [<tag>,...] <why>" is expected only where a tag holds:
+  # <os>-<arch> as below, or <os>-<arch>:<tier>; a line without brackets,
+  # everywhere.
   arch=$(uname -m)
   case "$arch" in arm64) [ "$os" = macos ] || arch=aarch64 ;; esac
   platform="$os-$arch"
   echo "platform: $platform"
-  grep -v '^#' tools/c-tests-expected.txt | awk -v p="$platform" '
-    NF == 0 { next }
-    $2 ~ /^\[/ { list = $2; gsub(/[][]/, "", list); n = split(list, ps, ",");
-                  for (i = 1; i <= n; i++) if (ps[i] == p) { print $1; next }
-                  next }
-    { print $1 }' | sort > "$tmp/c-expected"
   for tier in gen interp; do
+    grep -v '^#' tools/c-tests-expected.txt | awk -v p="$platform" -v t="$tier" '
+      NF == 0 { next }
+      $2 ~ /^\[/ { list = $2; gsub(/[][]/, "", list); n = split(list, ps, ",");
+                    for (i = 1; i <= n; i++) if (ps[i] == p || ps[i] == p ":" t) { print $1; next }
+                    next }
+      { print $1 }' | sort > "$tmp/c-expected"
     "$tmp/c-tests-runner" "$mir/c-tests" "$tier" $dirs > "$tmp/c-$tier.txt"
     tail -1 "$tmp/c-$tier.txt"
     awk '$2 == "fail" {print $1}' "$tmp/c-$tier.txt" | sort > "$tmp/c-$tier-failed"
@@ -224,6 +225,12 @@ if [ "$os" != windows ]; then
     { echo "FAIL: a broken .expect was not reported" >&2; exit 1; }
   echo "ok: a broken .expect is reported"
   if [ "$os" = ubuntu ] && [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+    grep -v '^#' tools/c-tests-expected.txt | awk -v p="$platform" -v t=gen '
+      NF == 0 { next }
+      $2 ~ /^\[/ { list = $2; gsub(/[][]/, "", list); n = split(list, ps, ",");
+                    for (i = 1; i <= n; i++) if (ps[i] == p || ps[i] == p ":" t) { print $1; next }
+                    next }
+      { print $1 }' | sort > "$tmp/c-expected"
     $cc_cmd -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=all $runner_flags \
       $runner_srcs -o "$tmp/c-tests-runner-asan" -lm
     # A child the sanitizers stop shows as a failure; the list must still

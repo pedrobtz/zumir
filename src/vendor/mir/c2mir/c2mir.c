@@ -2766,10 +2766,12 @@ static void add_arg_tokens (VARR (token_t) * to, VARR (token_t) * from) {
 
   for (start = (int) VARR_LENGTH (token_t, from) - 1; start >= 0; start--)
     if (VARR_GET (token_t, from, start)->code == T_BOA) break;
-  assert (start >= 0);
+  /* Malformed input can leave no T_BOA: then every token is the argument's,
+     and from is emptied. Truncating to -1 made its length SIZE_MAX, and the
+     next push wrote before the array. */
   for (size_t i = start + 1; i < VARR_LENGTH (token_t, from); i++)
     add_token (to, VARR_GET (token_t, from, i));
-  VARR_TRUNC (token_t, from, start);
+  VARR_TRUNC (token_t, from, start < 0 ? 0 : (size_t) start);
 }
 
 static void add_tokens (VARR (token_t) * to, VARR (token_t) * from) {

@@ -109,9 +109,13 @@ test_that("both routes return what R returns", {
 
 test_that("the emitter route is rfunction()'s default", {
   skip_if(zumir_tier() == "none", "no tier runs here")
-  # rfunction() is rf_make() on the emitter route.
-  expect_identical(body(rfunction)[[2]], quote(rf_make(f, tier, "emitter")))
-  expect_identical(rfunction(function(a) a + 1)(1), 2)
+  g <- rfunction(function(a) a + 1)
+  expect_identical(attr(g, "route"), "emitter")
+  expect_identical(g(1), 2)
+  expect_identical(
+    attr(rf_make(function(a) a + 1, route = "text"), "route"),
+    "text"
+  )
 })
 
 test_that("each of MIR's allocations failed in the emitter: an error, no arena left", {
@@ -154,7 +158,9 @@ test_that("each of MIR's allocations failed in the emitter: an error, no arena l
   expect_gt(failed, 60L)
   rm(res)
   gc()
-  expect_identical(.Call(zumir_test_live_arenas), base)
+  # At most the baseline: contexts other tests left may be collected
+  # meanwhile, and a leak here keeps dozens.
+  expect_lte(.Call(zumir_test_live_arenas), base)
 })
 
 test_that("an R error while rfunction() lowers leaves no context behind", {
@@ -179,5 +185,5 @@ test_that("an R error while rfunction() lowers leaves no context behind", {
     tryCatch(run(), error = function(e) NULL)
   }
   gc()
-  expect_identical(.Call(zumir_test_live_arenas), base)
+  expect_lte(.Call(zumir_test_live_arenas), base)
 })

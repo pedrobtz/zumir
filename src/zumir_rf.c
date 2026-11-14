@@ -75,9 +75,11 @@ SEXP zumir_rf_new(SEXP text, SEXP tier, SEXP path) {
 /* ---- The emitter route (D17) ----
  *
  * The same lowering, built with MIR's API instead of read from text. R
- * passes the function's registers (names and types), its imports, and its
- * lines: an opcode and its operands, or a label (opcode ""). An operand is
- * written as in MIR's text, in the small grammar the walker emits:
+ * passes the function's registers (names and types), its imports, and the
+ * body's lines, each "  opcode operand, operand, ..." or "label:"; they
+ * are split here, before the trap (no regex: R's regex engine crashes when
+ * malloc fails, which alloc-failure found). An operand is written as in
+ * MIR's text, in the small grammar the walker emits:
  *
  *   123, -8                  an integer
  *   z3, vp1, K               a register
@@ -248,8 +250,53 @@ static const char *string_at(SEXP x, R_xlen_t i) {
   return CHAR(STRING_ELT(x, i));
 }
 
-/* spec: list(reg_names, reg_types ("d" or "i64"), imports, ops, args), ops
- * and args one per line. */
+static char *copy_span(const char *p, size_t n) {
+  char *s = R_alloc(n + 1, 1);
+  memcpy(s, p, n);
+  s[n] = '\0';
+  return s;
+}
+
+/* "  op a, b(c, d, e)" or "label:" into l, with R_alloc'd copies. */
+static void split_line(const char *line, rf_line *l) {
+  while (*line == ' ') line++;
+  size_t n = strlen(line);
+  while (n > 0 && line[n - 1] == ' ') n--;
+  if (n > 0 && line[n - 1] == ':') {
+    l->op = "";
+    l->nargs = 1;
+    l->args = (const char **) R_alloc(1, sizeof(char *));
+    l->args[0] = copy_span(line, n - 1);
+    return;
+  }
+  size_t k = 0;
+  while (k < n && line[k] != ' ') k++;
+  l->op = copy_span(line, k);
+  /* At most one operand per comma, plus one. */
+  int max = 1;
+  for (size_t i = k; i < n; i++)
+    if (line[i] == ',') max++;
+  l->args = (const char **) R_alloc((size_t) max, sizeof(char *));
+  l->nargs = 0;
+  size_t i = k;
+  while (i < n) {
+    while (i < n && line[i] == ' ') i++;
+    if (i >= n) break;
+    size_t start = i;
+    int depth = 0;
+    while (i < n && (depth > 0 || line[i] != ',')) {
+      if (line[i] == '(') depth++;
+      if (line[i] == ')') depth--;
+      i++;
+    }
+    size_t end = i;
+    while (end > start && line[end - 1] == ' ') end--;
+    l->args[l->nargs++] = copy_span(line + start, end - start);
+    if (i < n) i++; /* the comma */
+  }
+}
+
+/* spec: list(reg_names, reg_types ("d" or "i64"), imports, body). */
 SEXP zumir_rf_build(SEXP spec, SEXP tier, SEXP path) {
   int t = tier_of(tier);
   SEXP x = PROTECT(zumir_rctx_new_sexp(t, ZUMIR_IMPORTS_RFUNCTION));
@@ -260,7 +307,7 @@ SEXP zumir_rf_build(SEXP spec, SEXP tier, SEXP path) {
   SEXP st;
   zumir_rctx *z = zumir_rctx_get(x, 1, &st);
   SEXP names = VECTOR_ELT(spec, 0), types = VECTOR_ELT(spec, 1), imports = VECTOR_ELT(spec, 2),
-       ops = VECTOR_ELT(spec, 3), args = VECTOR_ELT(spec, 4);
+       body = VECTOR_ELT(spec, 3);
   rf_build b;
   memset(&b, 0, sizeof b);
   /* R_alloc can raise; the context is already owned by x, whose finalizer
@@ -276,16 +323,11 @@ SEXP zumir_rf_build(SEXP spec, SEXP tier, SEXP path) {
   b.imports = (const char **) R_alloc((size_t) b.nimports + 1, sizeof(char *));
   b.import_items = (MIR_item_t *) R_alloc((size_t) b.nimports + 1, sizeof(MIR_item_t));
   for (int i = 0; i < b.nimports; i++) b.imports[i] = string_at(imports, i);
-  b.nlines = (int) XLENGTH(ops);
+  b.nlines = (int) XLENGTH(body);
   b.lines = (rf_line *) R_alloc((size_t) b.nlines + 1, sizeof(rf_line));
   for (int i = 0; i < b.nlines; i++) {
-    SEXP a = VECTOR_ELT(args, i);
-    rf_line *l = &b.lines[i];
-    l->op = string_at(ops, i);
-    l->nargs = (int) XLENGTH(a);
-    l->args = (const char **) R_alloc((size_t) l->nargs + 1, sizeof(char *));
-    for (int k = 0; k < l->nargs; k++) l->args[k] = string_at(a, k);
-    if (l->nargs > b.maxargs) b.maxargs = l->nargs;
+    split_line(string_at(body, i), &b.lines[i]);
+    if (b.lines[i].nargs > b.maxargs) b.maxargs = b.lines[i].nargs;
   }
   b.label_names = (const char **) R_alloc((size_t) b.nlines + 1, sizeof(char *));
   b.labels = (MIR_insn_t *) R_alloc((size_t) b.nlines + 1, sizeof(MIR_insn_t));

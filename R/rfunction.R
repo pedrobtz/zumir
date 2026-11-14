@@ -77,6 +77,7 @@ rf_make <- function(f, tier = NULL, route = "emitter") {
     g,
     class = c("zumir_rfunction", "function"),
     tier = tier,
+    route = route,
     mir = prog$text
   )
 }
@@ -490,7 +491,16 @@ rf_expr <- function(st, e) {
     if (n != 1L || !is.null(names(e))) {
       rf_refuse(sprintf("`%s` takes one unnamed argument here", h), e)
     }
-    x <- rf_as_double(st, rf_expr(st, e[[2]]), e)
+    v <- rf_expr(st, e[[2]])
+    # abs() alone keeps an integer or logical argument's type in R
+    # (typeof(abs(1L)) is "integer"); the rest of the table returns double.
+    if (h == "abs" && v$t != "d") {
+      rf_refuse(
+        "`abs()` of an integer or logical is an integer in R; use as.double()",
+        e
+      )
+    }
+    x <- rf_as_double(st, v, e)
     r <- rf_reg(st, "d")
     rf_ins(st, sprintf("call p_d1, %s, %s, %s", rf_math1[[h]], r, x))
     return(list(t = "d", r = r))
@@ -1294,22 +1304,14 @@ rf_finish <- function(st) {
   )
 }
 
-# The emitter route's input (D17): the same registers, imports and lines,
-# each line an opcode and its operands (opcode "" for a label), for
-# zumir_rf_build() to make with MIR's API. Operands keep MIR's text
-# syntax; a memory operand's commas are inside its parentheses.
+# The emitter route's input (D17): the same registers, imports and body
+# lines, for zumir_rf_build() to split and make with MIR's API.
 rf_spec <- function(reg_names, reg_types, imports, body) {
-  label <- grepl(":$", body)
-  ins <- trimws(body)
-  ops <- ifelse(label, "", sub(" .*", "", ins))
-  rest <- ifelse(label, sub(":$", "", ins), sub("^[^ ]+ ?", "", ins))
-  args <- regmatches(rest, gregexpr("[^,( ][^,(]*(\\([^)]*\\))?", rest))
   list(
     reg_names = reg_names,
     reg_types = reg_types,
     imports = imports,
-    ops = ops,
-    args = lapply(args, trimws)
+    body = body
   )
 }
 

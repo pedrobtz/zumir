@@ -98,6 +98,9 @@ compare_with_r <- function(f, g, args, na_nan = "inputs") {
       conditionMessage(z$value)
     ))
   }
+  if (!identical(typeof(r$value), typeof(z$value))) {
+    return(sprintf("type %s, R's %s", typeof(z$value), typeof(r$value)))
+  }
   if (!same_value(r$value, z$value, na_nan_free(args, na_nan))) {
     return(sprintf(
       "value %s, R's %s",

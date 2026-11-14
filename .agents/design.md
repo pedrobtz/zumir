@@ -483,8 +483,11 @@ instruction is an opcode and its operands in MIR's operand syntax: an
 integer, a register, a label, a prototype or import, or a memory operand
 `t:disp(base[, index, scale])`. The text route joins these into a module
 for MIR's scanner. The emitter route (`zumir_rf_build`, `src/zumir_rf.c`)
-passes them, with the registers and imports, through one `.Call`, which
-builds the same items in the same order with MIR's API
+passes the same lines, with the registers and imports, through one
+`.Call`. It splits each line into opcode and operands in C, with no regex:
+R's regex engine crashes when `malloc` fails, which the alloc-failure
+sweep found. It then builds the same items in the same order with MIR's
+API
 (`MIR_new_func_arr`, `MIR_new_func_reg`, `MIR_new_insn_arr`, labels made
 where they first appear). It does not use the scanner. Every string is
 read out of R, and every scratch array allocated with `R_alloc`, before
@@ -493,8 +496,8 @@ kept, internal, as its oracle. The bridge does not use the §4.3 inline
 helpers: the walker's lowering already names every operand, so one
 generic instruction builder replaces a helper call per kind. Decided
 2026-11-14, so the two routes cannot drift apart. Compile time, in
-`.agents/benchmarks.md`: the same on the native tier, where linking
-dominates, and 16% less on the interpreter.
+`.agents/benchmarks.md`: within 5% on the native tier, where linking
+dominates, and 10% to 16% less on the interpreter.
 
 **Imports (D18).** Generated code calls a fixed internal list, resolved
 only for `rfunction()`: `exp`, `log`, `log1p`, `expm1`, `sqrt`, `fabs`,

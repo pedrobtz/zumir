@@ -50,7 +50,7 @@ memory access crashes R, as it would in a package's C code.
 ## See also
 
 Other compilers:
-[`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
 
 ## Examples
 

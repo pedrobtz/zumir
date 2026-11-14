@@ -18,7 +18,7 @@
   compiles a function from MIR’s textual form, natively or on MIR’s
   interpreter, and returns an R function that calls it.
 
-- [`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+- [`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
   compiles a numeric R function, in a subset of R, to native code that
   returns exactly what R returns, warnings and errors included. Where
   matching R is not cheap it refuses, at compile time or at the call,

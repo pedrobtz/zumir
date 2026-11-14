@@ -14,7 +14,7 @@ library(zumir)
 
 ## Compile an R function
 
-[`rfunction()`](https://pedrobtz.github.io/zumir/reference/rfunction.md)
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
 takes a numeric R function and compiles it to native code. The result
 has the same arguments and returns exactly what the R function returns.
 It accepts doubles, loops over indices, conditions and the usual maths;
@@ -31,7 +31,7 @@ csum_r <- function(x) {
   }
   y
 }
-csum <- rfunction(csum_r)
+csum <- mir_compile(csum_r)
 
 x <- c(1, 2, NA, 4)
 csum(x)
@@ -112,7 +112,7 @@ says why. You can also ask for the interpreter yourself.
 zumir_tier()
 zumir_info()
 
-csum_interp <- rfunction(csum_r, tier = "interp")
+csum_interp <- mir_compile(csum_r, tier = "interp")
 ```
 
 ## Next

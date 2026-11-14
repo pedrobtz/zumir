@@ -1,12 +1,12 @@
-# Compile time of rfunction()'s two routes (design §4.6, D17), for
+# Compile time of mir_compile()'s two routes (design §4.6, D17), for
 # .agents/benchmarks.md. Run from the package root with the package
-# installed: Rscript tools/bench-rfunction-routes.R [n]. Each of n random
+# installed: Rscript tools/bench-mir-compile-routes.R [n]. Each of n random
 # functions from the tests' generator is lowered once, then built by each
 # route on each tier; the times are of rf_context() alone (MIR's scanner or
 # the emitter, then linking), median of 5 rounds.
 library(zumir)
 ns <- asNamespace("zumir")
-for (f in list.files("tests/testthat", "^helper-(rfunction|child)", full.names = TRUE)) {
+for (f in list.files("tests/testthat", "^helper-(mir-compile|child)", full.names = TRUE)) {
   sys.source(f, environment())
 }
 n <- as.integer(commandArgs(TRUE)[1])

@@ -44,12 +44,12 @@ three ways:
 2. **C without a toolchain** for R users: `cfunction()` compiles a short
    C function with MIR's own C compiler and returns an R function that
    calls it. No Rtools, no Xcode command-line tools, no `gcc`.
-3. **Native code from R itself**: `rfunction()` compiles a numeric R
+3. **Native code from R itself**: `mir_compile()` compiles a numeric R
    function, a subset of R written as R, to native code and returns an R
    function with the same arguments and the same results. R's parser
    reads it; nothing else is needed.
 
-`cfunction()` and `rfunction()` are what the package offers R users; the
+`cfunction()` and `mir_compile()` are what the package offers R users; the
 provider is what the family builds on.
 
 MIR's README measures its generator at about 250 µs for a small C
@@ -72,7 +72,7 @@ What it is not:
 - **Not a full C compiler.** `c2mir` implements C11 with gaps (open
   issues #394 and #286), and `cfunction()` takes plain numeric functions,
   not programs (§5, D5).
-- **Not a compiler for all of R.** `rfunction()` takes numeric kernels
+- **Not a compiler for all of R.** `mir_compile()` takes numeric kernels
   (§4.6): doubles, loops, conditions and a math table, not data frames,
   closures, environments or calls into other R functions.
 - **Not a sandbox.** Code compiled by `cfunction()` runs in the R process
@@ -99,7 +99,7 @@ In v0.1.0:
   an R function, for tests, teaching, and checking a lowering by hand.
 - **`cfunction()`**: C source with numeric signatures, compiled by
   `c2mir` and wrapped as an R function (§5).
-- **`rfunction()`**: a numeric R function compiled to MIR through the
+- **`mir_compile()`**: a numeric R function compiled to MIR through the
   same emitter consumers use (§4.6), with R itself as its test oracle.
 - **Two tiers**, native and interpreter, chosen automatically with
   override, reported by `zumir_info()`. Both need executable memory; where
@@ -107,7 +107,7 @@ In v0.1.0:
 
 Out of v0.1.0 (§13): caching generated code between sessions, MIR's
 parallel generator branch, a Python package, `mir2c`, C code that
-includes R's headers or calls R's API, and `rfunction()` beyond §4.6's
+includes R's headers or calls R's API, and `mir_compile()` beyond §4.6's
 subset (element-wise vector arithmetic, integer and logical results).
 
 ## 3. Position in the `zu*` family
@@ -115,7 +115,7 @@ subset (element-wise vector arithmetic, integer and logical results).
 | | zumir |
 | --- | --- |
 | Role | provider and tool |
-| R prefix | `mir_`, with `cfunction()` and `rfunction()` |
+| R prefix | `mir_`, with `cfunction()` and `mir_compile()` |
 | Info function | `zumir_info()` |
 | Root condition class | `zumir_error` |
 | Public C prefix | `zumir_`, and MIR's own `MIR_` names through the table |
@@ -355,7 +355,7 @@ offset from a pointer argument (`y[i]`, `par[k]`), the four operations,
 negation, constants, comparisons and branches, and calls to the math
 table by name with their prototypes made once per module. It is the
 spike's emitter, made general; `zupmxode`'s lowering becomes a loop over
-its IR with one helper call per instruction, and `rfunction()` (§4.6) is
+its IR with one helper call per instruction, and `mir_compile()` (§4.6) is
 built on the same helpers.
 
 **Imports.** A consumer registers its own C functions in its context
@@ -367,7 +367,7 @@ import resolver for that context accepts them beside D6's list (D14).
 **Lifetimes.** A function pointer from `zumir_compile()` is valid
 while its context lives, and only then. Whoever holds the context keeps
 it alive for as long as the pointer can be called: in R, the closures
-`mir_function()`, `cfunction()` and `rfunction()` return hold the
+`mir_function()`, `cfunction()` and `mir_compile()` return hold the
 context's external pointer. A consumer's import (`zumir_import()`) is a
 pointer into the consumer's own shared object. The consumer owns the
 context, so it frees the context before that object can unload. An
@@ -383,8 +383,8 @@ compiles, then runs: no MIR call is made on a context while code from
 it may be running, because generation redirects the thunks that code
 calls through. Second, generated code may be called from any thread
 when its module writes no MIR data item and its imports are safe to
-call from any thread. D6's list and `rfunction()`'s list are, except
-for `rfunction()`'s interrupt poll (§4.6), which runs only on R's main
+call from any thread. D6's list and `mir_compile()`'s list are, except
+for `mir_compile()`'s interrupt poll (§4.6), which runs only on R's main
 thread. A consumer that compiles once and runs on many threads, as
 `zupmxode` does, needs no lock beyond its own compile step.
 **Interpreted code is not shareable:**
@@ -487,9 +487,9 @@ trap. `message_file` is the same sink as MIR's `stderr`.
 - **The D6 table** moved to `src/zumir_imports_d6.c`, which has no R in
   it, so the package and the `c-tests` runner link the same list.
 
-### 4.6 `rfunction()`
+### 4.6 `mir_compile()`
 
-`rfunction(f)` takes an R function and returns one with the same formals.
+`mir_compile(f)` takes an R function and returns one with the same formals.
 R's parser has already read `f`; an R walker checks its body against the
 subset below, infers each argument's shape, and lowers it to one MIR
 function. Anything outside the subset is a compile error naming the
@@ -517,7 +517,7 @@ API
 (`MIR_new_func_arr`, `MIR_new_func_reg`, `MIR_new_insn_arr`, labels made
 where they first appear). It does not use the scanner. Every string is
 read out of R, and every scratch array allocated with `R_alloc`, before
-the trap is set. The emitter is `rfunction()`'s route. The text route is
+the trap is set. The emitter is `mir_compile()`'s route. The text route is
 kept, internal, as its oracle. The bridge does not use the §4.3 inline
 helpers: the walker's lowering already names every operand, so one
 generic instruction builder replaces a helper call per kind. Decided
@@ -526,7 +526,7 @@ generic instruction builder replaces a helper call per kind. Decided
 dominates, and 10% to 16% less on the interpreter.
 
 **Imports (D18).** Generated code calls a fixed internal list, resolved
-only for `rfunction()`: `exp`, `log`, `log1p`, `expm1`, `sqrt`, `fabs`,
+only for `mir_compile()`: `exp`, `log`, `log1p`, `expm1`, `sqrt`, `fabs`,
 `floor`, `ceil`, `trunc`, `sin`, `cos`, `tan` as R calls them (on R 4.6
 and later, ports of R's own wrappers, `Rexp`, `Rexpm1` and the rest,
 which differ from the C library's on some inputs and platforms; before
@@ -651,7 +651,7 @@ included, on every platform (§7 on FMA). Where a NaN results from an `NA`
 and a `NaN` together, R itself documents that either may come out; the
 same holds here. Every other NaN or `NA` result is the one R gives.
 
-**Oracle.** R itself: every test calls `f` and `rfunction(f)` on the
+**Oracle.** R itself: every test calls `f` and `mir_compile(f)` on the
 same inputs, random and chosen (`NA`, `NaN`, `±Inf`, `-0`, subnormals,
 empty vectors), and compares with `identical(num.eq = FALSE)`. That
 compares non-NaN doubles bit for bit, so `0` and `-0` differ, and tells
@@ -668,12 +668,12 @@ which comes out is the operand order the compiler chose, and `is.nan()`
 can turn that choice into a different answer. An unoptimised gcc build
 of the interpreter gave `NaN` where generated code gave `-2` (the
 coverage job, 2026-11-14). That is R's own freedom (`?NA`), not a defect,
-and it is documented for `rfunction()`'s users. R's side runs in R's AST evaluator, an uncompiled copy of `f`
+and it is documented for `mir_compile()`'s users. R's side runs in R's AST evaluator, an uncompiled copy of `f`
 with the JIT off: R 4.6's byte compiler folds `s <- 0; -(0 * 0)` to the
 `0` already in its constant pool, which cannot tell `0` from `-0`, so
 R's own answer changes once the JIT compiles `f` (found by the random
 differential, 2026-11-13). The AST evaluator is the language's meaning,
-and `rfunction()` follows it. The value, its type and attributes, the warnings and the error
+and `mir_compile()` follows it. The value, its type and attributes, the warnings and the error
 class are separate assertions, so a failure says which one differs.
 
 ## 5. Public R API (complete v0.1.0 surface)
@@ -711,14 +711,14 @@ f(1, 2)                      # 3
 # cannot hold exactly (an i32 of INT_MIN, a 64-bit integer past 2^53) is
 # an error, not a rounding. A tier that does not run is a zumir_tier_error.
 
-ss <- rfunction(function(x) {
+ss <- mir_compile(function(x) {
   s <- 0
   for (i in seq_along(x)) s <- s + x[i] * x[i]
   s
 })
 ss(c(1, 2, 3))               # 14, identical to the R function's answer
 
-csum <- rfunction(function(x) {
+csum <- mir_compile(function(x) {
   y <- numeric(length(x))
   acc <- 0
   for (i in seq_along(x)) {
@@ -731,7 +731,7 @@ csum <- rfunction(function(x) {
 zumir_info()                 # MIR commit, targets, tier, patches, memory
 zumir_tier()                 # "native" or "interp" for this session
 cfunction(src, tier = "interp")
-rfunction(f, tier = "interp")
+mir_compile(f, tier = "interp")
 ```
 
 Argument types: `int`, `double`, `const int *`, `const double *`,
@@ -755,7 +755,7 @@ that never ends is not interrupted.
 
 ## 6. Errors
 
-- `rfunction()` refuses a construct outside §4.6 at compile time, with
+- `mir_compile()` refuses a construct outside §4.6 at compile time, with
   the construct named and its position in the source; errors at run time
   (§4.6) are `zumir_error` conditions with R's own wording where R has
   one.
@@ -786,7 +786,7 @@ that never ends is not interrupted.
   untested. It installs as "Elsewhere" below.
 - **Elsewhere**: the package installs with MIR left out of the build
   (§4.2), reports that MIR has no target, and `cfunction()`,
-  `rfunction()` and the provider API return an error condition and a
+  `mir_compile()` and the provider API return an error condition and a
   status code.
 - **Executable memory**: both tiers need it (§4.4). On macOS it works
   because CRAN's R binary carries the `allow-jit` entitlement that
@@ -809,7 +809,7 @@ that never ends is not interrupted.
   rules (`.expect` outputs and exit status), with a test-only import list
   for `printf`, `abort` and `exit`. On every leg, on both tiers.
 - Every `cfunction()` example against a reference written in R.
-- `rfunction()` against R itself (§4.6): each construct of the subset,
+- `mir_compile()` against R itself (§4.6): each construct of the subset,
   and a generator of random functions within the subset run on random
   and chosen inputs, compared with `identical(num.eq = FALSE)`; every
   refused construct refused with its name. About 10² random functions
@@ -846,9 +846,9 @@ Measured by `tools/run-benchmarks`, recorded in `.agents/benchmarks.md`.
 | generated code on a numeric kernel against `gcc -O2` | within 1.5× |
 | interpreter on the same kernel | recorded |
 | `cfunction()` call overhead against `.Call` of compiled C | within 1.2× |
-| `rfunction()` on a loop kernel against the same kernel by `cfunction()` | within 1.5× |
-| `rfunction()` against R's byte-compiled function on the same kernel | recorded |
-| `rfunction()` compile time, emitter bridge against MIR text | recorded |
+| `mir_compile()` on a loop kernel against the same kernel by `cfunction()` | within 1.5× |
+| `mir_compile()` against R's byte-compiled function on the same kernel | recorded |
+| `mir_compile()` compile time, emitter bridge against MIR text | recorded |
 | interpreter with `MIR_DIRECT_DISPATCH` against computed goto | recorded |
 
 ## 10. Roadmap
@@ -874,7 +874,7 @@ decides it and the maintainer may overturn it.
 
 - **D1 (M), 2026-11-12; amended 2026-11-13.** One package does both
   jobs: it vendors MIR for the family and gives R users `cfunction()` and
-  `rfunction()`, its two selling points. The provider alone would
+  `mir_compile()`, its two selling points. The provider alone would
   have no use outside the family; `cfunction()` is what makes the
   package worth publishing by itself, and it shares every line of the
   vendoring and the error trap.
@@ -985,11 +985,16 @@ decides it and the maintainer may overturn it.
   (RFC 0047 D13), only the step from IR to MIR is shared.
 - **D14 (C), 2026-11-13.** Consumers register their own imports per
   context; `cfunction()` keeps D6's fixed list.
-- **D15 (M), 2026-11-13.** `rfunction()` ships in v0.1.0, named without
+- **D15 (M), 2026-11-13.** `mir_compile()` ships in v0.1.0, named without
   the `mir_` prefix for the reason D8 gives `cfunction()`. Its v0.1.0
   subset is §4.6: scalar doubles, indexed vectors in loops, conditions,
   the math table, and R's `NA` rules exactly. Element-wise vector
   arithmetic with recycling, integer and logical results wait (§13).
+  Renamed 2026-11-14, the maintainer's: `rfunction()` became
+  `mir_compile()`, its result's class `zumir_rfunction` became
+  `zumir_compiled`. `rfunction` read as "an R function" rather than what
+  it does; the `mir_` prefix pairs it with `mir_function()`. Free before
+  0.1.0: no sibling package calls it (`zupmxode` uses the C API).
 - **D16 (C), 2026-11-13.** Where the subset cannot match R cheaply, it
   errors rather than answering differently: out-of-range and non-integer
   indices, sizes and `seq_len()` or `a:b` bounds that are not whole
@@ -999,20 +1004,20 @@ decides it and the maintainer may overturn it.
   other than one, formals with defaults, assignment to an argument,
   vector locals made outside the top level or assigned whole, a local
   not assigned on every path, and a name rebound away from base's
-  function (D22). An `rfunction()` result is either R's answer or an
+  function (D22). An `mir_compile()` result is either R's answer or an
   error. The user-facing documentation lists every one of these.
-- **D17 (M), 2026-11-13.** `rfunction()` reaches MIR by two routes: MIR
+- **D17 (M), 2026-11-13.** `mir_compile()` reaches MIR by two routes: MIR
   text first, then a `.Call` bridge to the §4.3 emitter, each its own
   stage. The text route is the bridge's oracle (the same module printed,
   the same results) and its compile-time benchmark.
-- **D18 (C), 2026-11-13.** `rfunction()`'s imports are a fixed internal
+- **D18 (C), 2026-11-13.** `mir_compile()`'s imports are a fixed internal
   list (§4.6): the C library's math, `R_pow`, zumir's C ports of R's
   `%%`, `%/%`, `min` and `max`, and the interrupt poll (D23). `R_pow`
   being in reach while D6 keeps `cfunction()` away from R's symbols is
   no contradiction: this lowering is zumir's own code, and no user
   source names an import. The import resolver, with D6's list,
   consumer imports (D14) and this one, is built with the C API, before
-  `rfunction()` and `c2mir` need it. Built in Stage 5 (2026-11-13): the
+  `mir_compile()` and `c2mir` need it. Built in Stage 5 (2026-11-13): the
   ports are R's `myfmod`, `myfloor` and the `do_summary` combine step for
   doubles, and they use `long double` only when R does, which R's headers
   do not say: `.onLoad` passes `capabilities("long.double")` in, so a
@@ -1034,7 +1039,7 @@ decides it and the maintainer may overturn it.
   If, in its stage, it fails the `c-tests` subset that `cfunction()`'s
   numeric functions need, or the fuzz target finds crashes upstream does
   not fix, TinyCC (§3) is weighed as the front end of `cfunction()` alone,
-  with its LGPL as the cost. The provider and `rfunction()` stay on MIR.
+  with its LGPL as the cost. The provider and `mir_compile()` stay on MIR.
 - **D20 (C), 2026-11-13.** Every table entry is a recovery point because
   every `MIR_` entry is a shim that traps, records an error in its
   context and returns. A context with an error is failed: later calls
@@ -1050,14 +1055,14 @@ decides it and the maintainer may overturn it.
   only the ABI number protects the opcodes and structs consumers
   compile in from `mir.h`. CRAN does not rebuild a consumer's binary
   when `zumir` updates.
-- **D22 (C), 2026-11-13.** `rfunction()`'s values follow R's semantics
+- **D22 (C), 2026-11-13.** `mir_compile()`'s values follow R's semantics
   by restriction, not by imitation (§4.6): arguments have no attributes
   and are never assigned, names must resolve to base's functions,
   vector locals are made once at the top level and never assigned
   whole, and every local is definitely assigned. Each rule removes a
   case where hoisting allocations, sharing a vector or binding a name
   early would give an answer R does not.
-- **D23 (C), 2026-11-13.** Loops compiled by `rfunction()` poll for
+- **D23 (C), 2026-11-13.** Loops compiled by `mir_compile()` poll for
   interrupts every 2¹⁶ iterations, through `R_ToplevelExec()`, and
   return at once when one is pending. R code can always be interrupted,
   so a compiled version that cannot be would be a difference in
@@ -1072,7 +1077,7 @@ decides it and the maintainer may overturn it.
 
 ## 13. Later versions, in the order they are expected
 
-- **`rfunction()` beyond the subset**: element-wise vector arithmetic
+- **`mir_compile()` beyond the subset**: element-wise vector arithmetic
   with recycling, integer and logical results, several outputs as a
   list, and R's own `Rmath` functions (`gammafn`, `dnorm`, …) where their
   warnings can be kept from unwinding through generated code.
@@ -1124,7 +1129,7 @@ decides it and the maintainer may overturn it.
   maintainer decides it at the start of the stage that builds tier
   detection (2026-11-13); option (a) touches every code write in
   `mir.c`, since MIR's code allocator has no address to write through.
-- **Q6.** Should `rfunction()` take argument shapes from use, as §4.6
+- **Q6.** Should `mir_compile()` take argument shapes from use, as §4.6
   proposes, or from an explicit `types =` argument? **Decided
   2026-11-13: inference.** Stage 6's random differential found one case
   inference got wrong, an argument the body never reads, now given no

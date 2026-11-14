@@ -1,6 +1,6 @@
 #' Compile a numeric R function to native code
 #'
-#' `rfunction()` takes an R function written in a small numeric subset of R
+#' `mir_compile()` takes an R function written in a small numeric subset of R
 #' and returns a function with the same arguments that runs compiled code.
 #' It returns exactly what the R function returns, or an error: never a
 #' different answer.
@@ -34,27 +34,27 @@
 #' compile error naming the construct.
 #'
 #' Where an `NA` and a `NaN` meet in one operation, R leaves open which
-#' comes out (see [NA]), and so does `rfunction()`: the answer can differ
+#' comes out (see [NA]), and so does `mir_compile()`: the answer can differ
 #' between R, the two tiers and builds, and `is.nan()` of such a value
 #' can take a different branch. `is.na()` is `TRUE` either way.
 #'
 #' @param f A function.
 #' @param tier `"native"` or `"interp"`; by default [zumir_tier()].
-#' @returns A function of class `zumir_rfunction`, with `f`'s arguments.
+#' @returns A function of class `zumir_compiled`, with `f`'s arguments.
 #' @family compilers
 #' @export
 #' @examplesIf zumir_tier() != "none"
-#' ss <- rfunction(function(x) {
+#' ss <- mir_compile(function(x) {
 #'   s <- 0
 #'   for (i in seq_along(x)) s <- s + x[i] * x[i]
 #'   s
 #' })
 #' ss(c(1, 2, 3))
-rfunction <- function(f, tier = NULL) {
+mir_compile <- function(f, tier = NULL) {
   rf_make(f, tier, "emitter")
 }
 
-# rfunction() by either route (D17); tests compare the two.
+# mir_compile() by either route (D17); tests compare the two.
 rf_make <- function(f, tier = NULL, route = "emitter") {
   if (!is.function(f) || is.primitive(f)) {
     rf_refuse("`f` must be an R function, not a primitive", NULL)
@@ -80,7 +80,7 @@ rf_make <- function(f, tier = NULL, route = "emitter") {
   environment(g) <- new.env(parent = asNamespace("zumir"))
   structure(
     g,
-    class = c("zumir_rfunction", "function"),
+    class = c("zumir_compiled", "function"),
     tier = tier,
     route = route,
     mir = prog$text
@@ -88,9 +88,9 @@ rf_make <- function(f, tier = NULL, route = "emitter") {
 }
 
 #' @export
-print.zumir_rfunction <- function(x, ...) {
+print.zumir_compiled <- function(x, ...) {
   cat(sprintf(
-    "<zumir_rfunction(%s), %s>\n",
+    "<zumir_compiled(%s), %s>\n",
     paste(names(formals(x)), collapse = ", "),
     attr(x, "tier")
   ))
@@ -103,7 +103,7 @@ rf_refuse <- function(what, expr) {
   where <- if (is.null(expr)) "" else paste0(" in `", rf_deparse(expr), "`")
   stop(structure(
     class = c("zumir_compile_error", "zumir_error", "error", "condition"),
-    list(message = paste0("rfunction(): ", what, where, "."), call = NULL)
+    list(message = paste0("mir_compile(): ", what, where, "."), call = NULL)
   ))
 }
 

@@ -55,7 +55,7 @@ test_that("a name outside the context's list is a link error", {
       info = fn
     )
   }
-  # rfunction()'s list has R_pow and the ports, and not memcpy.
+  # mir_compile()'s list has R_pow and the ports, and not memcpy.
   pw <- build_mir_function(call2_text("R_pow"), "f", zumir_tier(), imports = 2L)
   expect_identical(pw(2, 0.5), 2^0.5)
   expect_identical(pw(NA_real_, 0), NA_real_^0)

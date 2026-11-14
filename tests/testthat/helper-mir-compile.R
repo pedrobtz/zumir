@@ -1,9 +1,9 @@
-# The rfunction() oracle (#21): R itself. run_r() and run_z() evaluate a
+# The mir_compile() oracle (#21): R itself. run_r() and run_z() evaluate a
 # function on the same arguments and return what happened; same_as_r()
 # compares them: the value with identical(num.eq = FALSE), which tells 0
 # from -0 and NA from NaN, allowing only R's own NA-or-NaN freedom (?NA:
 # where a NaN is involved, either may result); the warnings as a set of messages (R may warn more
-# than once in a loop, rfunction() once per kind); the error by message.
+# than once in a loop, mir_compile() once per kind); the error by message.
 
 run_capture <- function(fun, args) {
   warnings <- character()
@@ -73,13 +73,13 @@ compare_with_r <- function(f, g, args, na_nan = "inputs") {
   if (inherits(r$value, "error")) {
     if (!inherits(z$value, "error")) {
       return(sprintf(
-        "R errors (%s), rfunction() returns",
+        "R errors (%s), mir_compile() returns",
         conditionMessage(r$value)
       ))
     }
     if (!inherits(z$value, "zumir_error")) {
       return(sprintf(
-        "rfunction()'s error is not a zumir_error: %s",
+        "mir_compile()'s error is not a zumir_error: %s",
         conditionMessage(z$value)
       ))
     }
@@ -94,7 +94,7 @@ compare_with_r <- function(f, g, args, na_nan = "inputs") {
   }
   if (inherits(z$value, "error")) {
     return(sprintf(
-      "rfunction() errors (%s), R returns",
+      "mir_compile() errors (%s), R returns",
       conditionMessage(z$value)
     ))
   }
@@ -119,7 +119,7 @@ compare_with_r <- function(f, g, args, na_nan = "inputs") {
 }
 
 expect_same_as_r <- function(f, ..., tier = zumir_tier(), info = NULL) {
-  g <- rfunction(f, tier = tier)
+  g <- mir_compile(f, tier = tier)
   args <- list(...)
   d <- compare_with_r(f, g, args)
   expect(
@@ -200,7 +200,7 @@ rf_gen_leaf <- function(env) {
   }
 
   # x is indexed only by a seq_along(x) variable: any other index can fall
-  # outside x, where R reads NA and rfunction() refuses (D16).
+  # outside x, where R reads NA and mir_compile() refuses (D16).
   if (k == 3 && length(env$alongvars)) {
     return(call("[", quote(x), as.name(sample(env$alongvars, 1))))
   }
@@ -397,7 +397,7 @@ rf_random_seed <- function() {
 }
 
 rf_save_reproducer <- function(seed, f, args, what) {
-  path <- file.path(tempdir(), sprintf("rfunction-random-%d.R", seed))
+  path <- file.path(tempdir(), sprintf("mir-compile-random-%d.R", seed))
   writeLines(
     c(
       sprintf("# %s; seed %d", what, seed),

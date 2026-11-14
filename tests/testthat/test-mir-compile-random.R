@@ -1,4 +1,4 @@
-# Random functions in rfunction()'s subset against R itself (design §4.6,
+# Random functions in mir_compile()'s subset against R itself (design §4.6,
 # D16), and native against the interpreter. Each function k is drawn from
 # seed + k; a difference prints the seed and saves the function and its
 # arguments under tempdir(). ZUMIR_RF_SEED replays a run.
@@ -12,7 +12,7 @@ test_that("random functions return what R returns", {
     seed <- base + k
     set.seed(seed)
     f <- rf_gen_function()
-    g <- tryCatch(rfunction(f), zumir_compile_error = function(e) NULL)
+    g <- tryCatch(mir_compile(f), zumir_compile_error = function(e) NULL)
     if (is.null(g)) {
       next
     }
@@ -51,13 +51,13 @@ test_that("native and interpreted random functions agree", {
     set.seed(seed)
     f <- rf_gen_function(na = FALSE)
     n <- tryCatch(
-      rfunction(f, tier = "native"),
+      mir_compile(f, tier = "native"),
       zumir_compile_error = function(e) NULL
     )
     if (is.null(n)) {
       next
     }
-    i <- rfunction(f, tier = "interp")
+    i <- mir_compile(f, tier = "interp")
     args <- rf_gen_args(na = FALSE)
     a <- run_capture(n, args)
     b <- run_capture(i, args)

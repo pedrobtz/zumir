@@ -24,7 +24,7 @@ ways. First, as a provider: family packages (`zupmxode` first) use
 back native function pointers, or MIR's interpreter where MIR has no code
 generator for the CPU. Both tiers need executable memory (design §4.4, Q5). Second, as `cfunction()`: R users compile a short numeric C function
 with MIR's own `c2mir` compiler, with no Rtools, Xcode tools or `gcc` needed.
-Third, as `rfunction()`: a numeric R function, in the subset of design §4.6,
+Third, as `mir_compile()`: a numeric R function, in the subset of design §4.6,
 compiled to native code that returns exactly what R returns.
 There are no `Imports`, only `Suggests: testthat`. MIR is vendored, and the
 whole package is one shared object. It is not a full C compiler, not a sandbox
@@ -45,8 +45,8 @@ load-time tier probe, and the first exports, `zumir_info()` and
 runs and `zumir_tier()` is `"none"`. Stage 5 added the C API table
 (`inst/include/zumir.h`, `src/zumir_api.c`), the import resolver with
 zumir's ports of R's arithmetic (`src/zumir_imports.c`), and
-`mir_function()` (`src/zumir_mirf.c`). Stage 6 added `rfunction()`: an R
-walker in `R/rfunction.R` that emits MIR text, the `.Call` bridge
+`mir_function()` (`src/zumir_mirf.c`). Stage 6 added `mir_compile()`: an R
+walker in `R/mir_compile.R` that emits MIR text, the `.Call` bridge
 `src/zumir_rf.c`, and ports of R 4.6's math wrappers. Stage 8 vendored
 c2mir (`src/zumir_c2mir.c`, with the fork's `C2MIR_NO_FILE_INCLUDES`)
 and the compile path `c2mir_compile()` (`src/zumir_cfun.c`, with the
@@ -136,7 +136,7 @@ These are fixed by the design before any code exists:
 - **The interpreter is not shareable across threads** (D10): one interpreted
   function called from eight threads gave wrong answers in the spike. On that
   tier each thread compiles in its own context; native code is shared.
-- **`rfunction()` answers as R does or errors** (D16): every non-NaN result
+- **`mir_compile()` answers as R does or errors** (D16): every non-NaN result
   equals R's bit for bit, and where matching R is not cheap it refuses. Its
   tests compare with R through `identical(num.eq = FALSE)` (#21).
 - **`cfunction()` reads no system header** (D5): no header at all is read
@@ -158,19 +158,19 @@ corpus runs through the same compile path in
 `tests/c/c-tests-runner.c` (`platform.sh`), and must fail exactly the
 tests in `tools/c-tests-expected.txt`; `tests/fuzz/fuzz-c2mir.c` is the
 libFuzzer target (`fuzz.yaml`).
-`rfunction()`'s oracle is R itself, through `compare_with_r()` in
-`helper-rfunction.R`: `identical(num.eq = FALSE)`, with R's side run
+`mir_compile()`'s oracle is R itself, through `compare_with_r()` in
+`helper-mir-compile.R`: `identical(num.eq = FALSE)`, with R's side run
 uncompiled and with the JIT off (R 4.6's byte compiler can turn `-0`
-into `0`). `test-rfunction-ops.R` (each construct),
-`test-rfunction-errors.R` (run-time errors, warnings, limits and the time
-limit in a child process), `test-rfunction-refuse.R` (compile-time
+into `0`). `test-mir-compile-ops.R` (each construct),
+`test-mir-compile-errors.R` (run-time errors, warnings, limits and the time
+limit in a child process), `test-mir-compile-refuse.R` (compile-time
 refusals beside R running the same function) and
-`test-rfunction-random.R` (random functions from the helper's
+`test-mir-compile-random.R` (random functions from the helper's
 generator; 10² per run, 10⁴ when `R_ACTIONS_PROFILE=full`;
 `ZUMIR_RF_SEED=<n>` replays one, and a difference is saved under
-`tempdir()`), and `test-rfunction-routes.R` (the two routes print the same
+`tempdir()`), and `test-mir-compile-routes.R` (the two routes print the same
 module and give R's results; each of MIR's allocations failed in the
-emitter). `tools/bench-rfunction-routes.R` times the routes for
+emitter). `tools/bench-mir-compile-routes.R` times the routes for
 `.agents/benchmarks.md`.
 `test-load.R`: the installed package loads in a child R process with
 dynamic symbol lookup off, and unloading it removes its DLL.
@@ -218,7 +218,7 @@ which holds a write token and is pinned to a commit:
 - `alloc-failure.yaml`: weekly, on dispatch and on `full-ci` pull
   requests, fails each allocation in turn while `tools/alloc-exercise.R`
   runs one section per job (`ZUMIR_ALLOC_EXERCISE`): the error trap's
-  three invalid modules, and `rfunction()` through the emitter. The
+  three invalid modules, and `mir_compile()` through the emitter. The
   sweep is capped at 3,000 allocations, hence a job each.
 - `fuzz.yaml`: libFuzzer over `tests/fuzz/fuzz-c2mir.c`, seeded by
   `tests/fuzz/corpus`; brief on pull requests, long on the schedule.

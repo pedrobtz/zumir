@@ -25,11 +25,13 @@ test_that("random functions return what R returns", {
       if (!is.null(d)) {
         path <- rf_save_reproducer(seed, f, args, d)
         fail(sprintf(
-          "seed %d (ZUMIR_RF_SEED=%d): %s; saved in %s",
+          "seed %d (ZUMIR_RF_SEED=%d): %s; saved in %s\nf: %s\nargs: %s",
           seed,
           base,
           d,
-          path
+          path,
+          rf_show(f),
+          rf_show(args)
         ))
         return()
       }
@@ -61,11 +63,17 @@ test_that("native and interpreted random functions agree bit for bit", {
     b <- run_capture(i, args)
     if (!identical(a, b, num.eq = FALSE)) {
       path <- rf_save_reproducer(seed, f, args, "native and interp differ")
+      # The runner's tempdir() is gone after the job, so the message
+      # carries the reproducer and both results.
       fail(sprintf(
-        "seed %d (ZUMIR_RF_SEED=%d): native and interp differ; saved in %s",
+        "seed %d (ZUMIR_RF_SEED=%d): native and interp differ; saved in %s\nf: %s\nargs: %s\nnative: %s\ninterp: %s",
         seed,
         base,
-        path
+        path,
+        rf_show(f),
+        rf_show(args),
+        rf_show(a),
+        rf_show(b)
       ))
       return()
     }

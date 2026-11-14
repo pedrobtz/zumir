@@ -375,3 +375,8 @@ rf_save_reproducer <- function(seed, f, args, what) {
   )
   path
 }
+
+# One line of R that rebuilds x, every double to 17 digits.
+rf_show <- function(x) {
+  paste(deparse(x, control = c("keepNA", "digits17", "niceNames")), collapse = " ")
+}

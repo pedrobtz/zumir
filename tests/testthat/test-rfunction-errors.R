@@ -245,19 +245,23 @@ test_that("a time limit stops compiled loops, and the session goes on", {
       "library(zumir)",
       "inf <- rfunction(function(a) { s <- 0; while (TRUE) s <- s + a; s })",
       "big <- rfunction(function(n) { s <- 0; for (i in seq_len(n)) s <- s + 1; s })",
+      # 10^12 iterations: no runner finishes them inside the limit.
+      "nest <- rfunction(function(n) { s <- 0; for (i in seq_len(n)) for (j in seq_len(n)) s <- s + 1; s })",
       "run <- function(g, x) { setTimeLimit(elapsed = 1, transient = TRUE); g(x) }",
-      "for (g in list(inf, big)) {",
+      "for (g in list(inf, nest)) {",
       "  t0 <- proc.time()[[3]]",
-      "  e <- tryCatch(run(g, 1e9), error = function(e) e)",
+      "  e <- tryCatch(run(g, 1e6), error = function(e) e)",
       "  cat('stopped', inherits(e, 'error'), proc.time()[[3]] - t0 < 30, '\\n')",
       "  cat('message', identical(conditionMessage(e),",
       "    tryCatch(run(function(x) repeat {}, 0), error = conditionMessage)), '\\n')",
       "}",
       "cat('again', big(10), big(65537), '\\n')"
-    )
+    ),
+    timeout = 120
   )
-  expect_identical(out$status, 0L)
-  expect_identical(sum(out$output == "stopped TRUE TRUE "), 2L)
-  expect_identical(sum(out$output == "message TRUE "), 2L)
-  expect_true("again 10 65537 " %in% out$output)
+  info <- paste(out$output, collapse = "\n")
+  expect_identical(out$status, 0L, info = info)
+  expect_identical(sum(out$output == "stopped TRUE TRUE "), 2L, info = info)
+  expect_identical(sum(out$output == "message TRUE "), 2L, info = info)
+  expect_true("again 10 65537 " %in% out$output, info = info)
 })

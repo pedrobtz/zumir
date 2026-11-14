@@ -49,8 +49,10 @@ rfunction <- function(f, tier = NULL) {
   if (!is.function(f) || is.primitive(f)) {
     rf_refuse("`f` must be an R function, not a primitive", NULL)
   }
-  tier <- resolve_tier(tier)
+  # The subset check needs no tier, so a refusal is the same everywhere,
+  # on a build without MIR too.
   prog <- rf_compile(f)
+  tier <- resolve_tier(tier)
   ctx <- zumir_check(.Call(zumir_rf_new, prog$text, tier))
   argn <- names(formals(f))
   g <- function() NULL

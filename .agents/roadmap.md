@@ -31,8 +31,8 @@ between pull requests and the full profile.
 | 6 | [rfunction()](#stage-6--rfunction) | full | [#17](https://github.com/pedrobtz/zumir/issues/17) | [#36](https://github.com/pedrobtz/zumir/pull/36) | 2026-11-14 |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | [#39](https://github.com/pedrobtz/zumir/pull/39) | 2026-11-14 |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | [#43](https://github.com/pedrobtz/zumir/pull/43) | 2026-11-14 |
-| 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | 2026-11-14 |
-| 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
+| 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | [#46](https://github.com/pedrobtz/zumir/pull/46) | 2026-11-14 |
+| 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | 2026-11-14 |
 | 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
 | 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
 | 13 | [v0.1.0 readiness](#stage-13--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
@@ -758,6 +758,13 @@ pointers for user code, with copies for outputs: valgrind (with
 
 - Every §9 row has a measured value on at least Linux x86-64, macOS arm64
   and Windows.
+
+**Deviation (2026-11-14).** Two §9 targets are measured and missed:
+generated code on aarch64 (2.0 to 2.75× the C compiler, which fuses
+multiply-adds that MIR must not) and `cfunction()`'s call overhead (about
+2× a package's `.Call` wrapper, after the argument checks moved into C in
+this stage). Both are recorded in §9 and `.agents/benchmarks.md`; the
+exit criterion, a measured value per row and leg, holds.
 
 **Design.** [§9](design.md#9-performance-targets).
 

@@ -345,3 +345,25 @@ test_that("results do not change in a hostile session", {
   expect_identical(cfunction(src)(1), want)
   expect_identical(want, 1 / 3 + 1234567.891)
 })
+
+test_that("15, 16 and 17 parameters arrive in order (the slots' stack buffer)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  for (k in 15:17) {
+    params <- paste0("double a", seq_len(k), collapse = ", ")
+    terms <- paste0(seq_len(k), " * a", seq_len(k), collapse = " + ")
+    f <- cfunction(
+      sprintf(
+        "double wsum(%s, int m, double *y) { y[0] = m; return %s; }",
+        params,
+        terms
+      ),
+      out = c(y = 1)
+    )
+    args <- as.list(sqrt(seq_len(k) + 0.5))
+    names(args) <- paste0("a", seq_len(k))
+    r <- do.call(f, c(args, list(m = 7L)))
+    # Left to right in doubles, as C adds (sum() may use long double).
+    expect_identical(r$wsum, Reduce(`+`, seq_len(k) * unlist(args)), info = k)
+    expect_identical(r$y, 7, info = k)
+  }
+})

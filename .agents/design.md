@@ -441,7 +441,10 @@ works because CRAN's R carries the `allow-jit` entitlement; an R built or
 embedded without it was not tested and must be detected by the same
 probe. The interpreter's figures above were measured with computed-goto
 dispatch; the `-pedantic` patch switches it to `MIR_DIRECT_DISPATCH`,
-whose cost is measured again with the benchmarks (§9).
+whose cost is measured again with the benchmarks (§9). Measured
+2026-11-14: the switch is 1.1 to 2× slower than computed goto on MIR's
+sieve benchmark, most under clang. It stays: computed goto is what
+`-pedantic` reports, and the interpreter is the fallback tier.
 
 ### 4.5 `cfunction()`
 
@@ -877,6 +880,20 @@ Measured by `tools/run-benchmarks`, recorded in `.agents/benchmarks.md`.
 | `mir_compile()` against R's byte-compiled function on the same kernel | recorded |
 | `mir_compile()` compile time, emitter bridge against MIR text | recorded |
 | interpreter with `MIR_DIRECT_DISPATCH` against computed goto | recorded |
+
+Measured 2026-11-14 (Stage 10) on Linux x86-64 and aarch64, macOS arm64
+and x86-64, and Windows; every figure, and the reasons for the misses, in
+`.agents/benchmarks.md`. Every target is met except two:
+
+- **Generated code against `gcc -O2`** is within 1.04 to 1.14× on
+  x86-64, but 2.0 to 2.75× on aarch64, where the C compilers fuse
+  `a*b + c` and MIR, which must agree with R bitwise (§7), does not. The
+  target stands for x86-64 and is recorded, not met, for aarch64.
+- **`cfunction()` call overhead** is about 2× (1.9 to 2.8×) a package's
+  byte-compiled `.Call` wrapper, 0.5 to 1 µs a call. Stage 10 moved the
+  argument checks into C (from 25.7 µs a call); the rest is R calling a
+  closure its JIT does not compile, and 1.2× would need `compiler` in
+  `Imports`. Recorded as missed, 2026-11-14.
 
 ## 10. Roadmap
 

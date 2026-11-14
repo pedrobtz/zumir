@@ -39,6 +39,13 @@ echo "CC = $cc_cmd"
 echo "CFLAGS = $r_cflags"
 $cc_cmd --version | head -1
 uname -m
+# The CPU, and on macOS whether this is Rosetta (Stage 10: the macOS
+# x86-64 runner's interpreter is about 8 times slower than every other
+# leg's, MIR's own benchmarks included).
+if [ "$os" = macos ]; then
+  sysctl -n machdep.cpu.brand_string || true
+  echo "translated: $(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)"
+fi
 endgroup
 
 # ---------------------------------------------------------------------------

@@ -175,7 +175,9 @@ SEXP zumir_test_call_rhs(SEXP x, SEXP model, SEXP y, SEXP par) {
   SEXP dy = PROTECT(Rf_allocVector(REALSXP, m->neq));
   double work[16];
   memset(REAL(dy), 0, sizeof(double) * (size_t) m->neq);
-  ((rhs_fn) z->fn)(0.5, REAL(y), REAL(dy), REAL(par), work);
+  rhs_fn fn;
+  memcpy(&fn, &z->fn, sizeof fn); /* no ISO C cast to a function pointer */
+  fn(0.5, REAL(y), REAL(dy), REAL(par), work);
   UNPROTECT(1);
   return dy;
 }

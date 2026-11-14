@@ -46,6 +46,11 @@
 #' })
 #' ss(c(1, 2, 3))
 rfunction <- function(f, tier = NULL) {
+  rf_make(f, tier, "emitter")
+}
+
+# rfunction() by either route (D17); tests compare the two.
+rf_make <- function(f, tier = NULL, route = "emitter") {
   if (!is.function(f) || is.primitive(f)) {
     rf_refuse("`f` must be an R function, not a primitive", NULL)
   }
@@ -53,7 +58,9 @@ rfunction <- function(f, tier = NULL) {
   # on a build without MIR too.
   prog <- rf_compile(f)
   tier <- resolve_tier(tier)
-  ctx <- zumir_check(.Call(zumir_rf_new, prog$text, tier))
+  ctx <- rf_context(prog, tier, route)
+  # The call needs neither form of the module again.
+  prog$spec <- NULL
   argn <- names(formals(f))
   g <- function() NULL
   formals(g) <- stats_setNames(rep(list(quote(expr = )), length(argn)), argn)
@@ -1238,6 +1245,17 @@ rf_finish <- function(st) {
   exits <- unlist(lapply(names(rf_status)[-1], function(nm) {
     c(sprintf("Lst%d:", rf_status[[nm]]), sprintf("  ret %d", rf_status[[nm]]))
   }))
+  imports <- c(
+    unname(rf_math1),
+    "zumir_r_isna",
+    "R_pow",
+    "zumir_r_fmod",
+    "zumir_r_intdiv",
+    "zumir_r_min2",
+    "zumir_r_max2",
+    "zumir_r_poll"
+  )
+  body <- c(entry, st$lines, "  ret 0", exits)
   regs <- st$regs
   decl <- vapply(names(regs), function(n) sprintf("%s:%s", regs[[n]], n), "")
   locals <- if (length(decl)) {
@@ -1256,34 +1274,17 @@ rf_finish <- function(st) {
     "p_d2: proto d, d:x, d:y",
     "p_id: proto i64, d:x",
     "p_i0: proto i64",
-    paste0(
-      "  import ",
-      paste(
-        c(
-          unname(rf_math1),
-          "zumir_r_isna",
-          "R_pow",
-          "zumir_r_fmod",
-          "zumir_r_intdiv",
-          "zumir_r_min2",
-          "zumir_r_max2",
-          "zumir_r_poll"
-        ),
-        collapse = ", "
-      )
-    ),
+    paste0("  import ", paste(imports, collapse = ", ")),
     "rf: func i64, p:K, p:S, p:VP, p:VL, p:R",
     unname(locals),
-    entry,
-    st$lines,
-    "  ret 0",
-    exits,
+    body,
     "  endfunc",
     "endmodule",
     ""
   )
   list(
     text = paste(text, collapse = "\n"),
+    spec = rf_spec(names(regs), unname(regs), imports, body),
     consts = st$consts,
     sargs = st$sargs,
     vargs = st$vargs,
@@ -1291,6 +1292,36 @@ rf_finish <- function(st) {
     sizes = st$sizes,
     result = st$result
   )
+}
+
+# The emitter route's input (D17): the same registers, imports and lines,
+# each line an opcode and its operands (opcode "" for a label), for
+# zumir_rf_build() to make with MIR's API. Operands keep MIR's text
+# syntax; a memory operand's commas are inside its parentheses.
+rf_spec <- function(reg_names, reg_types, imports, body) {
+  label <- grepl(":$", body)
+  ins <- trimws(body)
+  ops <- ifelse(label, "", sub(" .*", "", ins))
+  rest <- ifelse(label, sub(":$", "", ins), sub("^[^ ]+ ?", "", ins))
+  args <- regmatches(rest, gregexpr("[^,( ][^,(]*(\\([^)]*\\))?", rest))
+  list(
+    reg_names = reg_names,
+    reg_types = reg_types,
+    imports = imports,
+    ops = ops,
+    args = lapply(args, trimws)
+  )
+}
+
+# A compiled context for prog: by the emitter (the default) or by MIR's
+# text scanner, the emitter's oracle. `path`, when given, receives the
+# module as MIR prints it.
+rf_context <- function(prog, tier, route = "emitter", path = NULL) {
+  if (route == "emitter") {
+    zumir_check(.Call(zumir_rf_build, prog$spec, tier, path))
+  } else {
+    zumir_check(.Call(zumir_rf_new, prog$text, tier, path))
+  }
 }
 
 # ---- Calling ----

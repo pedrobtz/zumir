@@ -59,7 +59,8 @@ SEXP zumir_mir_roundtrip(SEXP text, SEXP path);
 void zumir_api_register(void);
 SEXP zumir_set_r46(SEXP on);
 SEXP zumir_test_math(SEXP which, SEXP x);
-SEXP zumir_rf_new(SEXP text, SEXP tier);
+SEXP zumir_rf_new(SEXP text, SEXP tier, SEXP path);
+SEXP zumir_rf_build(SEXP spec, SEXP tier, SEXP path);
 SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_result);
 
 static const R_CallMethodDef zumir_call_methods[] = {
@@ -95,7 +96,8 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_mir_roundtrip", (DL_FUNC) &zumir_mir_roundtrip, 2},
   {"zumir_set_r46", (DL_FUNC) &zumir_set_r46, 1},
   {"zumir_test_math", (DL_FUNC) &zumir_test_math, 2},
-  {"zumir_rf_new", (DL_FUNC) &zumir_rf_new, 2},
+  {"zumir_rf_new", (DL_FUNC) &zumir_rf_new, 3},
+  {"zumir_rf_build", (DL_FUNC) &zumir_rf_build, 3},
   {"zumir_rf_call", (DL_FUNC) &zumir_rf_call, 5},
   {NULL, NULL, 0}
 };

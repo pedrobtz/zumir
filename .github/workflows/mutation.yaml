@@ -1,0 +1,33 @@
+# Mutation testing of zumir's R-free C (Stage 11): Mull changes the trap,
+# the arena allocator, MIR's stderr buffer and D6's list one operator at a
+# time, and tests/c/test-glue.c must notice. It covers the trap on one
+# thread; test-trap-threads, which platform.sh runs, adds only the second,
+# so Mull would report what it misses as survivors. The C that calls R (the compilers' entries, the contexts R holds, the C API) is
+# loaded by R and can't be run by mull-runner; its oracles are the R suite's
+# (.agents/assurance.md). Reported, never gated: the survivors want
+# reading. Slow, so weekly and on dispatch only.
+on:
+  schedule:
+    - cron: "17 9 * * 6"
+  workflow_dispatch:
+
+name: mutation
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  mutation:
+    uses: pedrobtz/r-actions/.github/workflows/mutation.yml@v1
+    with:
+      build: sh tools/ci/mutation-build.sh
+      tests: build/mutation/test-glue
+      include: |
+        .*/src/zumir_trap\.c
+        .*/src/zumir_mir_glue\.c
+        .*/src/zumir_mir_stdio\.c
+        .*/src/zumir_imports_d6\.c

@@ -17,8 +17,15 @@ void zumir_trap_push(zumir_trap *t) {
 }
 
 void zumir_trap_pop(zumir_trap *t) {
-  /* Pops t and anything pushed above it that was not popped. */
-  if (top == t) top = t->prev;
+  /* Pops t and anything pushed above it that was not popped, so no trap
+   * left on the stack outlives the frame that pushed it; a trap not on the
+   * stack (popped already, or by a raise) changes nothing. */
+  for (zumir_trap *p = top; p != NULL; p = p->prev) {
+    if (p == t) {
+      top = t->prev;
+      return;
+    }
+  }
 }
 
 int zumir_trap_depth(void) {

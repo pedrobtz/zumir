@@ -40,6 +40,9 @@ jobs:
       seed-corpus: tests/fuzz/corpus
       profile: auto
       max-total-time: 1800
+      # 75.4% on 2026-11-14 (Stage 11); a harness change that stops
+      # reaching zumir's glue goes red.
+      reach-floor: 70
 
   # A red scheduled run otherwise notifies only whoever last edited the cron
   # line: one issue per distinct finding, labelled fuzz, with the report and

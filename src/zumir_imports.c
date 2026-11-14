@@ -290,34 +290,6 @@ void zumir_imports_load(MIR_context_t ctx, int kind, const zumir_import_entry *e
 }
 #endif
 
-/* Test entry: one of mir_compile()'s math wrappers called directly on x,
- * returning list(value, warned) for comparison with R's function. */
-SEXP zumir_test_math(SEXP which, SEXP x) {
-  const char *w = CHAR(STRING_ELT(which, 0));
-  static const struct {
-    const char *name;
-    double (*f)(double);
-  } fns[] = {{"exp", zumir_r_exp},     {"expm1", zumir_r_expm1}, {"log1p", zumir_r_log1p},
-             {"sin", zumir_r_sin},     {"cos", zumir_r_cos},     {"tan", zumir_r_tan},
-             {"sqrt", zumir_r_sqrt},   {"log", zumir_r_log},     {"floor", zumir_r_floor},
-             {"ceiling", zumir_r_ceil}, {"trunc", zumir_r_trunc}, {"abs", zumir_r_abs}};
-  double (*f)(double) = NULL;
-  for (size_t i = 0; i < sizeof(fns) / sizeof(fns[0]); i++)
-    if (strcmp(fns[i].name, w) == 0) f = fns[i].f;
-  if (f == NULL) Rf_error("unknown function");
-  R_xlen_t n = XLENGTH(x);
-  SEXP out = PROTECT(Rf_allocVector(REALSXP, n));
-  zumir_r_nan_warned = 0;
-  for (R_xlen_t i = 0; i < n; i++) REAL(out)[i] = f(REAL(x)[i]);
-  const char *names[] = {"value", "warned", ""};
-  SEXP res = PROTECT(Rf_mkNamed(VECSXP, names));
-  SET_VECTOR_ELT(res, 0, out);
-  SET_VECTOR_ELT(res, 1, Rf_ScalarLogical(zumir_r_nan_warned));
-  zumir_r_nan_warned = 0;
-  UNPROTECT(2);
-  return res;
-}
-
 /* Test entry: the C ports called directly, for comparison with R
  * (tests/testthat/test-imports.R). `which`: "fmod", "intdiv", "min2",
  * "max2". Vectorised over x and y of one length. */

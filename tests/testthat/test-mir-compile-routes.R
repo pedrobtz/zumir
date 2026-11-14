@@ -187,3 +187,42 @@ test_that("an R error while mir_compile() lowers leaves no context behind", {
   gc()
   expect_lte(.Call(zumir_test_live_arenas), base)
 })
+
+test_that("an operand the emitter cannot read is a MIR error, never a guess", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  ns <- asNamespace("zumir")
+  prog <- ns$rf_compile(function(x) {
+    s <- 0
+    for (i in seq_along(x)) {
+      s <- s + x[i]
+    }
+    s
+  })
+  first <- prog$spec$body[[1]]
+  expect_match(first, "mov vp1, i64:0(VP)", fixed = TRUE)
+  long_reg <- strrep("r", 70)
+  bad <- c(
+    "q:0(VP)", # a memory type other than d or i64
+    "i64:0 VP", # no parenthesis after the displacement
+    "i64:0(VP", # no closing parenthesis
+    "i64:0(VP)x", # text after it
+    "i64:0(VP, vl1)", # an index with no scale
+    sprintf("i64:0(%s)", long_reg), # a register name longer than 63
+    "i64:0()", # no base register
+    "12x" # an integer with text after it
+  )
+  for (b in bad) {
+    p <- prog
+    p$spec$body[[1]] <- sub("i64:0(VP)", b, first, fixed = TRUE)
+    for (tier in c("native", "interp")) {
+      expect_error(
+        ns$rf_context(p, tier, "emitter"),
+        class = "zumir_mir_error",
+        info = paste(b, tier)
+      )
+    }
+  }
+  # Untouched, it builds.
+  ctx <- ns$rf_context(prog, "interp", "emitter")
+  expect_identical(ns$rf_call(prog, ctx, list(x = c(1, 2))), 3)
+})

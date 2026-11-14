@@ -33,10 +33,6 @@ context_link <- function(ctx, name) {
   invisible(zumir_check(.Call(zumir_ctx_link, ctx, name)))
 }
 
-context_call_d <- function(ctx, x) {
-  zumir_check(.Call(zumir_ctx_call_d, ctx, as.double(x)))
-}
-
 # Test-only: the spike's model right-hand sides (src/zumir_test_models.c).
 context_emit_model <- function(ctx, model) {
   invisible(zumir_check(.Call(zumir_test_emit_model, ctx, as.integer(model))))

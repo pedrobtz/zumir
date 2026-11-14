@@ -191,7 +191,10 @@ an internal entry (`test_invalid_module()`), an error inside
 each kind with RSS flat, and every one of MIR's first 260 allocations
 failed in turn (`.Call(zumir_test_fail_alloc, n)`) with no crash and no
 arena left. `tests/c/test-trap-threads.c` (built without R by
-`platform.sh`): the trap on two threads at once. `test-mir-stdio.R`: writes
+`platform.sh`): the trap on two threads at once. `tests/c/test-glue.c`
+(the same, and Mull's test in `mutation.yaml`): the R-free C against
+exact answers: the trap's stack, MIR's stderr buffer and `exit`, the
+arena through every allocation failure, MIR's and c2mir's, and D6's list. `test-mir-stdio.R`: writes
 to MIR's `stderr` reach the buffer, other
 `FILE`s are untouched, and `exit` becomes an R error, through an internal
 entry compiled under the same macros. `test-no-target.R`: MIR is compiled
@@ -228,7 +231,13 @@ which holds a write token and is pinned to a commit:
   three invalid modules, and `mir_compile()` through the emitter. The
   sweep is capped at 3,000 allocations, hence a job each.
 - `fuzz.yaml`: libFuzzer over `tests/fuzz/fuzz-c2mir.c`, seeded by
-  `tests/fuzz/corpus`; brief on pull requests, long on the schedule.
+  `tests/fuzz/corpus`; brief on pull requests, long on the schedule;
+  `reach-floor: 70` (75.4% on 2026-11-14).
+- `mutation.yaml`: Mull, weekly and on dispatch, over the R-free C
+  (`zumir_trap.c`, `zumir_mir_glue.c`, `zumir_mir_stdio.c`,
+  `zumir_imports_d6.c`) with `tests/c/test-glue.c`, built by
+  `tools/ci/mutation-build.sh`. Reported, never gated; the survivors
+  are read in `.agents/assurance.md`.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`

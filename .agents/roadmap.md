@@ -32,8 +32,8 @@ between pull requests and the full profile.
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | [#39](https://github.com/pedrobtz/zumir/pull/39) | 2026-11-14 |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | [#43](https://github.com/pedrobtz/zumir/pull/43) | 2026-11-14 |
 | 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | [#46](https://github.com/pedrobtz/zumir/pull/46) | 2026-11-14 |
-| 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | 2026-11-14 |
-| 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
+| 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | [#49](https://github.com/pedrobtz/zumir/pull/49) | 2026-11-14 |
+| 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | 2026-11-14 |
 | 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
 | 13 | [v0.1.0 readiness](#stage-13--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
 | 14 | [Review](#stage-14--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
@@ -872,6 +872,11 @@ exit criterion, a measured value per row and leg, holds.
   generator, a Python package, `mir2c`. None is needed by `zupmxode` 0.1.0.
 - ppc64le, s390x and riscv64 (D7): built when the host matches, not tested
   or promised.
+- [#24](https://github.com/pedrobtz/zumir/issues/24): the C `int` length
+  limit at `limit - 1` and `limit`. Both need a vector of 2³¹ − 1 elements
+  handed to C, 8 to 16 GB once materialised, which no CI runner has;
+  `limit + 1` is refused before any data pointer, with an ALTREP sequence,
+  and is tested. Moved here by Stage 11, 2026-11-14.
 
 ## Blocking open questions
 

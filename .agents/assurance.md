@@ -39,7 +39,7 @@ call to r-actions.
 | gctorture     | done    | gctorture.yaml     |
 | analyzers     | done    | native-checks.yaml |
 | alloc-failure | done    | alloc-failure.yaml |
-| mutation      | gap #11 |                    |
+| mutation      | done    | mutation.yaml      |
 | fuzz          | done    | fuzz.yaml          |
 | fuzz-reach    | done    | fuzz.yaml          |
 
@@ -50,6 +50,51 @@ with nothing to instrument, so it joined with MIR in Stage 2 (#4). Stage 3
 `alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
 Stage 11 (#11) schedules `mutation` over the C tests.
+
+**Mutation (Stage 11, 2026-11-14).** `mutation.yaml` runs Mull weekly over
+zumir's R-free C (`zumir_trap.c`, `zumir_mir_glue.c`, `zumir_mir_stdio.c`,
+`zumir_imports_d6.c`) with `tests/c/test-glue.c`, built by
+`tools/ci/mutation-build.sh`. In an Ubuntu 24.04 container with Mull
+0.35.0 and LLVM 18, `test-glue.c`'s first version killed 65% (42 of 65);
+extended against those survivors, it kills 83% (52 of 62).
+It found that `zumir_trap_pop()` did not pop traps left above the one
+popped, as its comment says it does, leaving the stack pointing into a
+frame that had returned (fixed; no path in the package was seen to leave
+one), that the arena's block count was never read, and that `exit()`
+stripped newlines `zumir_trap_raise()` strips again (both removed). The
+10 survivors, read one by one:
+
+- equivalent: `fail_at > 0` as `>= 0` (`alloc_count` starts above 0);
+  `n > room` and `n > 0` as `>=` in the stderr buffer (equal sizes copy
+  the same); `map_errno` set on a successful `mprotect` (errno is 0
+  there); `finished && ctx != NULL` as `ctx == NULL` in `zumir_mir_free()`
+  (a context that failed in `zumir_mir_new()` has no mapping yet);
+- unreachable through c2mir, the only caller: `zm_calloc()`'s overflow
+  guard (four mutants) and its block size as `num / size`, which only a
+  sanitizer would see;
+- `zumir_trap_raise()`'s `n > 0` as `n >= 0`: reads the byte before the
+  message, an out-of-bounds read that only ASan sees.
+
+The C that calls R (the compilers' entries, the contexts R holds, the C
+API: about 2,500 lines) is loaded by R, which mull-runner can't run; its
+oracles are the R suite's and the consumer's, in the tables below.
+
+**Gap lists (Stage 11, 2026-11-14).** Native coverage
+(`coverage.yaml`) and fuzz reach (`fuzz.yaml`, 75.4% of the lines of its
+zumir sources; `reach-floor: 70`) were read. What they showed and what
+was done:
+
+- `zumir_api.c`, the C API, at 13% of lines: its tests are
+  `tests/consumer`'s, in `platforms.yaml`, which the coverage job does not
+  run. Measured as untested; tested by the consumer on every runner.
+- `bad_operand()` in the emitter never entered: now 8 malformed operands,
+  each a `zumir_mir_error` on both tiers
+  (tests/testthat/test-mir-compile-routes.R).
+- `zumir_test_math()` and `zumir_ctx_call_d()`, entries no test called:
+  removed.
+- fuzz reach: what no input enters is test hooks and the stderr paths,
+  which the harness's inputs (C source) cannot reach;
+  `tests/c/test-glue.c` covers them.
 
 ## Boundaries
 
@@ -74,6 +119,7 @@ One row per boundary the package crosses. An oracle knows the answer:
 | MIR interpreter | native code on the same module, bitwise, on the three spike right-hand sides (50 random draws each, and 0, -0, ±Inf, NaN, NA, subnormal and the largest double) | tests/testthat/test-tiers.R |
 | Error trap: invalid modules | MIR's own error type (syntax, operand mode, undeclared reference) as a `zumir_mir_error` each time, the context finished and no trap left; in a child process 10³ failures of each kind all caught, the session alive and RSS growth under 4 MB for the second 10³ (a leaked context per failure is about 97 MB) | tests/testthat/test-error-trap.R |
 | Allocation failure inside MIR | each of MIR's first 260 allocations failed in turn through zumir's allocator hook: a `zumir_mir_error` of `MIR_alloc_error` or the module's own type every time, never a crash, and no arena left (`zumir_test_live_arenas`); the weekly `alloc-failure` sweep fails R's allocations too | tests/testthat/test-error-trap.R; alloc-failure.yaml |
+| zumir's R-free C: the trap, MIR's stderr and exit, the arena, code generation, D6 | the trap's stack (nesting, an unpopped trap, a raise with none), the stderr buffer byte for byte, `exit` as a raise, the arena's live counts through a context's life and through every allocation failure in turn, MIR's and c2mir's, on both tiers, `hyp(3, 4)` compiled by c2mir equal to 7, D6's names against the design's list and its pointers against the platform's functions; under ASan and UBSan on Linux; and under Mull | tests/c/test-glue.c, in tools/ci/platform.sh and mutation.yaml |
 | Error trap on threads | each of two threads gets its own 500 errors, with its own MIR error type, and leaves no trap behind; under ASan and UBSan on Linux | tests/c/test-trap-threads.c, in tools/ci/platform.sh |
 | MIR's exit, abort and stderr | what MIR writes to stderr reaches zumir's buffer, a caller's FILE is untouched, exit and abort land in the trap or, with none, become an R error | tests/testthat/test-mir-stdio.R |
 | Executable memory refused (Linux) | under a seccomp filter in a child R process: tier `"none"`, `compile` false on both tiers with MIR's code-memory error and `EACCES`, and the process alive | tests/testthat/test-tier.R, on ubuntu-latest (R CMD check) and ubuntu-24.04-arm (platform.sh) |
@@ -127,5 +173,8 @@ One row per limit the package enforces. "Straddled by" is the test of
 | `mir_compile()` `numeric()` size and `seq_len()` argument, a whole number from 0 | elements | -1, 0, 1, `NA`, 2.5 and `Inf`: tests/testthat/test-mir-compile-errors.R |
 | `mir_compile()` integer counter arithmetic, `.Machine$integer.max` | integer value | `limit - 1`, `limit`, `limit + 1` upward and downward, and `46340L * 46340L` against `46341L * 46341L`: tests/testthat/test-mir-compile-errors.R |
 | `mir_compile()` interrupt poll, every 2¹⁶ loop iterations (D23) | iterations | `2^16 - 1`, `2^16` and `2^16 + 1` iterations of `for` and `while`: tests/testthat/test-mir-compile-errors.R |
+| MIR's stderr buffer: 1023 bytes a write, 4095 in all | bytes | writes of 1023, 1024 and 1025 bytes then one more, and six writes of 1999: tests/c/test-glue.c |
+| Trap message, 1023 bytes | bytes | a 2999-byte message cut to 1023: tests/c/test-glue.c |
+| `cfunction()` slots on the stack, under 16 parameters | parameters | 15, 16 and 17 parameters, every argument in its place: tests/testthat/test-cfunction.R |
 | C API table size, read before any appended field (D21) | bytes; table version | the table's size is the header's `sizeof`; versions 0, 1 and 2 refused, served, refused: tests/consumer |
 <!-- markdownlint-enable MD013 -->

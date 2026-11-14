@@ -3,28 +3,6 @@
 # seed + k; a difference prints the seed and saves the function and its
 # arguments under tempdir(). ZUMIR_RF_SEED replays a run.
 
-rf_random_count <- function() {
-  if (identical(Sys.getenv("R_ACTIONS_PROFILE"), "full")) 10000L else 100L
-}
-
-rf_random_seed <- function() {
-  s <- suppressWarnings(as.integer(Sys.getenv("ZUMIR_RF_SEED")))
-  if (is.na(s)) sample.int(1e6, 1) else s
-}
-
-rf_save_reproducer <- function(seed, f, args, what) {
-  path <- file.path(tempdir(), sprintf("rfunction-random-%d.R", seed))
-  writeLines(
-    c(
-      sprintf("# %s; seed %d", what, seed),
-      paste("f <-", paste(deparse(f), collapse = "\n")),
-      paste("args <-", paste(deparse(args), collapse = "\n"))
-    ),
-    path
-  )
-  path
-}
-
 test_that("random functions return what R returns", {
   skip_if(zumir_tier() == "none", "no tier runs here")
   base <- rf_random_seed()

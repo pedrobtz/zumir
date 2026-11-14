@@ -42,6 +42,7 @@ test_that("a result R would type as integer or logical is refused", {
     expect_error(rfunction(f), class = "zumir_compile_error")
     expect_false(is.double(f(1)))
   }
+  skip_if(zumir_tier() == "none", "no tier runs here")
   expect_identical(rfunction(function(a) as.double(a > 0))(1), 1)
 })
 
@@ -156,4 +157,18 @@ test_that("a loop variable read after its loop is refused", {
   expect_identical(f(3), 3L)
   expect_null(f(0))
   expect_error(rfunction(f), class = "zumir_compile_error")
+})
+
+test_that("with no tier, rfunction() is a zumir_tier_error", {
+  skip_if(zumir_tier() != "none", "a tier runs here")
+  expect_error(rfunction(function(a) a + 1), class = "zumir_tier_error")
+})
+
+test_that("tier = must name a tier", {
+  for (t in list("jit", 1, NA_character_, c("native", "interp"))) {
+    expect_error(
+      rfunction(function(a) a + 1, tier = t),
+      class = "zumir_argument_error"
+    )
+  }
 })

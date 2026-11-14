@@ -344,3 +344,34 @@ rf_gen_args <- function() {
   }
   list(a = pick(1), b = pick(1), x = pick(sample(0:5, 1)))
 }
+
+# ---- The random differential's run: count, seed and reproducer ----
+
+# 10^2 functions, or 10^4 on the full profile's R CMD check legs. Under a
+# memory tool (valgrind, gctorture, the sanitizers), which runs R 20 to 100
+# times slower, the full profile keeps 10^2: those legs check memory, and
+# the check legs carry the differential's breadth.
+rf_random_count <- function() {
+  full <- identical(Sys.getenv("R_ACTIONS_PROFILE"), "full")
+  tool <- Sys.getenv("R_ACTIONS_WORKFLOW") %in%
+    c("valgrind", "gctorture", "sanitizers")
+  if (full && !tool) 10000L else 100L
+}
+
+rf_random_seed <- function() {
+  s <- suppressWarnings(as.integer(Sys.getenv("ZUMIR_RF_SEED")))
+  if (is.na(s)) sample.int(1e6, 1) else s
+}
+
+rf_save_reproducer <- function(seed, f, args, what) {
+  path <- file.path(tempdir(), sprintf("rfunction-random-%d.R", seed))
+  writeLines(
+    c(
+      sprintf("# %s; seed %d", what, seed),
+      paste("f <-", paste(deparse(f), collapse = "\n")),
+      paste("args <-", paste(deparse(args), collapse = "\n"))
+    ),
+    path
+  )
+  path
+}

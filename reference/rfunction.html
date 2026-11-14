@@ -94,6 +94,10 @@ an argument that is not a double, has attributes, or is a scalar of
 another length. Names must mean base R's functions in <code>environment(f)</code>.
 Loops can be interrupted, as R's can. Code outside the subset is a
 compile error naming the construct.</p>
+<p>Where an <code>NA</code> and a <code>NaN</code> meet in one operation, R leaves open which
+comes out (see <a href="https://rdrr.io/r/base/NA.html" class="external-link">NA</a>), and so does <code>rfunction()</code>: the answer can differ
+between R, the two tiers and builds, and <code><a href="https://rdrr.io/r/base/is.finite.html" class="external-link">is.nan()</a></code> of such a value
+can take a different branch. <code><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na()</a></code> is <code>TRUE</code> either way.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

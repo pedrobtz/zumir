@@ -65,6 +65,13 @@ has attributes, or is a scalar of another length. Names must mean base
 R's functions in `environment(f)`. Loops can be interrupted, as R's can.
 Code outside the subset is a compile error naming the construct.
 
+Where an `NA` and a `NaN` meet in one operation, R leaves open which
+comes out (see [NA](https://rdrr.io/r/base/NA.html)), and so does
+`rfunction()`: the answer can differ between R, the two tiers and
+builds, and [`is.nan()`](https://rdrr.io/r/base/is.finite.html) of such
+a value can take a different branch.
+[`is.na()`](https://rdrr.io/r/base/NA.html) is `TRUE` either way.
+
 ## See also
 
 Other compilers:

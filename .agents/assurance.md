@@ -80,7 +80,7 @@ One row per boundary the package crosses. An oracle knows the answer:
 | Tier probe | each tier's four capabilities, `arith` against `x * 2 + 1` and `ext` against libm's `exp`, bitwise; `zumir_tier()` from them | tests/testthat/test-tier.R |
 | C API table v1 | a consumer package that links it, emits three right-hand sides, and compares them with C; links no CRAN-flagged symbol; the header compiles alone as C99 and C++11 with -pedantic -Werror | tests/consumer; tools/ci/platform.sh |
 | C API compatibility (D21) | a unit built against the frozen v1 header runs; another MIR ABI number or a newer version gets `NULL` and a reason | tests/consumer (src/frozen/zumir_v1.h); tests/testthat/test-imports.R |
-| Generated code's memory accesses | valgrind with `--smc-check=all` on the native tier, ASan on the interpreter tier, over the `rfunction()` and `cfunction()` suites | gap #11 |
+| Generated code's memory accesses | valgrind with `--smc-check=all` on the native tier, ASan on the interpreter tier, over the `rfunction()` and `cfunction()` suites | `rfunction()`: valgrind with `--smc-check=all` (native-checks.yaml) and ASan over the suite, whose random and route tests run both tiers; `cfunction()`: gap #11 |
 | Double-expression emitter | the three right-hand sides written with it, bitwise against C; each comparison and branch helper against C on every pair of -Inf, -1, -0, 0, 1, Inf, NaN, NA | tests/consumer |
 | Consumer imports | an import resolves in the context that registered it, is a link error in one that did not, and is not under D6's list (`mir_function()`) | tests/consumer; `cfunction()` isolation gap #9: tests/testthat/test-cfunction.R |
 | `mir_function()`: MIR text in | MIR's 17 `mir-tests/*.mir` read and written back to a fixed point; hand-computed values of test1, test2, test6 and test7 on both tiers; argument limits straddled per integer type | tests/testthat/test-mir-function.R |
@@ -93,7 +93,7 @@ One row per boundary the package crosses. An oracle knows the answer:
 | `rfunction()`, constructs | each operator, math function, loop form and logical rule against R on signed zeros, subnormals, `±Inf`, `NA`, `NaN` and empty vectors, and under a hostile session | tests/testthat/test-rfunction-ops.R |
 | `rfunction()`, random functions | R on generated functions within the subset, on random inputs, seed printed and the function saved; 10² per leg, 10⁴ on the full profile; native against interpreter bitwise | tests/testthat/test-rfunction-random.R |
 | `rfunction()`, refusals | each construct outside §4.6 refused with its name; each D22 rule beside R running the same function | tests/testthat/test-rfunction-refuse.R |
-| `rfunction()` through the emitter | the MIR-text route: the same module printed with `MIR_output`, and the same results | gap #26: tests/testthat/test-rfunction-routes.R |
+| `rfunction()` through the emitter | the MIR-text route: the same module printed with `MIR_output` for every construct and random function, and the same results, both routes against R | tests/testthat/test-rfunction-routes.R |
 <!-- markdownlint-enable MD013 -->
 
 ## Objects

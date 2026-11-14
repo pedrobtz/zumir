@@ -109,6 +109,9 @@ test_that("the prelude's headers and c2mir's own are found", {
   expect_identical(inf(), Inf)
   nan <- c2mir_fn("double f(void) { return NAN; }")
   expect_true(is.nan(nan()))
+  # The prelude's constants are R's, to the last bit.
+  expect_identical(c2mir_fn("double f(void) { return M_PI; }")(), pi)
+  expect_identical(c2mir_fn("double f(void) { return M_E; }")(), exp(1))
 })
 
 test_that("a function the source does not define is an argument error", {

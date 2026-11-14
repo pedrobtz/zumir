@@ -9,7 +9,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   schedule:
-    - cron: "19 9 * * 6"
+    - cron: "19 9 * * 0"  # weekly, Sundays
   workflow_dispatch:
 
 name: fuzz

@@ -1,0 +1,58 @@
+# libFuzzer over cfunction()'s compile path (Stage 8): tests/fuzz/fuzz-c2mir.c
+# compiles each input with c2mir after the prelude, reading no header file,
+# links it on the interpreter against D6's list, and checks that the same
+# input gives the same verdict and module twice and leaves no arena and no
+# trap behind. Built without R from the vendored MIR and c2mir and zumir's
+# R-free files. A pull request fuzzes briefly (profile quick); the weekly
+# schedule, a dispatch and a full-ci pull request run the long campaign.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  schedule:
+    - cron: "19 9 * * 6"
+  workflow_dispatch:
+
+name: fuzz
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    # Decided without a runner (ci.md, Labels); the gate inside repeats it.
+    if: >-
+      github.event_name != 'pull_request'
+      || contains(github.event.pull_request.labels.*.name, 'full-ci')
+      || !(contains(github.event.pull_request.labels.*.name, 'ci:docs')
+        || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
+        || contains(github.event.pull_request.labels.*.name, 'skip-ci:fuzz'))
+    uses: pedrobtz/r-actions/.github/workflows/fuzz.yml@v1
+    with:
+      harness: tests/fuzz/fuzz-c2mir.c
+      sources: >-
+        src/zumir_mir.c src/zumir_mir_gen.c src/zumir_c2mir.c src/zumir_prelude.c
+        src/zumir_imports_d6.c src/zumir_mir_glue.c src/zumir_mir_stdio.c src/zumir_trap.c
+      cflags: -Isrc -Isrc/vendor/mir -DNDEBUG
+      seed-corpus: tests/fuzz/corpus
+      profile: auto
+      max-total-time: 1800
+
+  # A red scheduled run otherwise notifies only whoever last edited the cron
+  # line: one issue per distinct finding, labelled fuzz, with the report and
+  # the input; a finding's issue is closed by its fix, never by a green run.
+  report:
+    needs: fuzz
+    if: ${{ always() && github.event_name == 'schedule' && needs.fuzz.result != 'skipped' }}
+    permissions:
+      issues: write
+    uses: pedrobtz/r-actions/.github/workflows/report.yml@v1
+    with:
+      name: fuzz
+      result: ${{ needs.fuzz.result }}
+      finding: ${{ needs.fuzz.outputs.finding }}
+      key: ${{ needs.fuzz.outputs.finding-key }}
+      details: ${{ needs.fuzz.outputs.report }}

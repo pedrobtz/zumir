@@ -1,6 +1,7 @@
 # Files vendored from vnmakarov/mir into src/vendor/mir/, by upstream path.
-# Core, generator and interpreter, for the five targets MIR has. c2mir comes
-# with Stage 8. Not vendored: tests, benchmarks, llvm2mir, mir2c, drivers.
+# Core, generator and interpreter, for the five targets MIR has, and c2mir
+# (Stage 8) with its per-target headers. Not vendored: tests, benchmarks,
+# llvm2mir, mir2c, the drivers (c2mir-driver.c), c2mir's README and figure.
 LICENSE
 mir.c
 mir.h
@@ -33,3 +34,56 @@ mir-gen-s390x.c
 mir-riscv64.c
 mir-riscv64.h
 mir-gen-riscv64.c
+c2mir/c2mir.c
+c2mir/c2mir.h
+c2mir/mirc.h
+c2mir/mirc_iso646.h
+c2mir/mirc_stdalign.h
+c2mir/mirc_stdbool.h
+c2mir/mirc_stdnoreturn.h
+c2mir/x86_64/cx86_64-ABI-code.c
+c2mir/x86_64/cx86_64-code.c
+c2mir/x86_64/cx86_64.h
+c2mir/x86_64/mirc_x86_64_float.h
+c2mir/x86_64/mirc_x86_64_limits.h
+c2mir/x86_64/mirc_x86_64_linux.h
+c2mir/x86_64/mirc_x86_64_stdarg.h
+c2mir/x86_64/mirc_x86_64_stddef.h
+c2mir/x86_64/mirc_x86_64_stdint.h
+c2mir/x86_64/mirc_x86_64_win.h
+c2mir/aarch64/caarch64-ABI-code.c
+c2mir/aarch64/caarch64-code.c
+c2mir/aarch64/caarch64.h
+c2mir/aarch64/mirc_aarch64_float.h
+c2mir/aarch64/mirc_aarch64_limits.h
+c2mir/aarch64/mirc_aarch64_linux.h
+c2mir/aarch64/mirc_aarch64_stdarg.h
+c2mir/aarch64/mirc_aarch64_stddef.h
+c2mir/aarch64/mirc_aarch64_stdint.h
+c2mir/ppc64/cppc64-ABI-code.c
+c2mir/ppc64/cppc64-code.c
+c2mir/ppc64/cppc64.h
+c2mir/ppc64/mirc_ppc64_float.h
+c2mir/ppc64/mirc_ppc64_limits.h
+c2mir/ppc64/mirc_ppc64_linux.h
+c2mir/ppc64/mirc_ppc64_stdarg.h
+c2mir/ppc64/mirc_ppc64_stddef.h
+c2mir/ppc64/mirc_ppc64_stdint.h
+c2mir/s390x/cs390x-ABI-code.c
+c2mir/s390x/cs390x-code.c
+c2mir/s390x/cs390x.h
+c2mir/s390x/mirc_s390x_float.h
+c2mir/s390x/mirc_s390x_limits.h
+c2mir/s390x/mirc_s390x_linux.h
+c2mir/s390x/mirc_s390x_stdarg.h
+c2mir/s390x/mirc_s390x_stddef.h
+c2mir/s390x/mirc_s390x_stdint.h
+c2mir/riscv64/criscv64-ABI-code.c
+c2mir/riscv64/criscv64-code.c
+c2mir/riscv64/criscv64.h
+c2mir/riscv64/mirc_riscv64_float.h
+c2mir/riscv64/mirc_riscv64_limits.h
+c2mir/riscv64/mirc_riscv64_linux.h
+c2mir/riscv64/mirc_riscv64_stdarg.h
+c2mir/riscv64/mirc_riscv64_stddef.h
+c2mir/riscv64/mirc_riscv64_stdint.h

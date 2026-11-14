@@ -66,11 +66,13 @@ while read -r f; do
   fi
   count=$((count + 1))
 done < "$WORK/paths"
-for local in src/vendor/mir/*; do
-  b=$(basename "$local")
+# Every file under the tree, subdirectories (c2mir/) included.
+find src/vendor/mir -type f | sort > "$WORK/local"
+while read -r local; do
+  b=${local#src/vendor/mir/}
   case "$b" in *.o | *.so | *.dll | *.dylib | *.a) continue ;; esac
   grep -qx "$b" "$WORK/paths" || fail "src/vendor/mir/$b is not in tools/mir-files.txt"
-done
+done < "$WORK/local"
 
 # 4. The consumer-visible part of mir.h is the one recorded (D21), at the
 # ZUMIR_MIR_ABI inst/include/zumir.h declares; consumers get exactly the

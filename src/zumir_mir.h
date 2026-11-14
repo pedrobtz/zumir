@@ -30,7 +30,17 @@
   "1c4b1cca Declare MIR_insn's operands as a flexible array member",\
   "c65e7044 Report code-memory failures through the error function",\
   "3e643e83 Spill float arguments in the Win64 interpreter shim",\
-  "ca84f3e4 End MIR_output_item's expr data case"
+  "ca84f3e4 End MIR_output_item's expr data case",\
+  "0068c2fd Drop the semicolons after DEF_* macros at file scope in c2mir",\
+  "df2df6f5 Remove a variable c2mir declares and never uses",\
+  "3762da20 Use snprintf with the buffer's size in c2mir",\
+  "3bfb8d45 Let an embedder give headers in memory and forbid header files",\
+  "7f6c4a03 Allocate and free all of c2mir's memory with MIR's allocator",\
+  "f7672f28 Fold constant shifts without undefined behaviour in c2mir",\
+  "96763195 Read a declaration's decl_spec only when the node is a declaration",\
+  "b6e92b74 Fold integer constants by MIR's wrapping rules, without undefined behaviour",\
+  "2ad09397 Read call offsets and addresses in x86-64 code with memcpy",\
+  "55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

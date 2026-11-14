@@ -15,6 +15,7 @@ enum add_arg_class { NO_CLASS = MIR_T_BOUND + 1, X87UP_CLASS };
 #define MAX_QWORDS 1
 #endif
 
+#ifndef _WIN32 /* used only by the System V aggregate classification */
 static MIR_type_t get_result_type (MIR_type_t arg_type1, MIR_type_t arg_type2) {
   if (arg_type1 == arg_type2) return arg_type1;
   if ((enum add_arg_class) arg_type1 == NO_CLASS) return arg_type2;
@@ -33,6 +34,7 @@ static MIR_type_t get_result_type (MIR_type_t arg_type1, MIR_type_t arg_type2) {
 
   return MIR_T_D;
 }
+#endif
 
 static int classify_arg (c2m_ctx_t c2m_ctx, struct type *type, MIR_type_t types[MAX_QWORDS],
                          int bit_field_p MIR_UNUSED) {
@@ -112,8 +114,13 @@ static int classify_arg (c2m_ctx_t c2m_ctx, struct type *type, MIR_type_t types[
   case MIR_T_D: types[0] = MIR_T_D; return 1;
   case MIR_T_LD:
     types[0] = MIR_T_LD;
+#ifndef _WIN32
     types[1] = (MIR_type_t) X87UP_CLASS;
     return 2;
+#else
+    /* types has MAX_QWORDS (1) elements here: writing types[1] overran it */
+    return 1;
+#endif
   default: types[0] = MIR_T_I64; return 1;
   }
 }

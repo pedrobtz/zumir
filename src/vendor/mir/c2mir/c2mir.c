@@ -2743,8 +2743,12 @@ static token_t token_concat (c2m_ctx_t c2m_ctx, token_t t1, token_t t2) {
   set_string_stream (c2m_ctx, VARR_ADDR (char, temp_string), t1->pos, NULL);
   t = get_next_pptoken (c2m_ctx);
   next = get_next_pptoken (c2m_ctx);
-  while (next->code == T_EOU) next = get_next_pptoken (c2m_ctx);
-  if (next->code != T_EOFILE) {
+  /* When the string stream was the last stream, its end is the end of the
+     unit: given back to the caller, which ends there. Reading on would read
+     the stream the end of the unit freed. */
+  if (next->code == T_EOU) {
+    unget_next_pptoken (c2m_ctx, next);
+  } else if (next->code != T_EOFILE) {
     error (c2m_ctx, t1->pos, "wrong result of ##: %s", reverse (temp_string));
     remove_string_stream (c2m_ctx);
   }

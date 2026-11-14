@@ -655,9 +655,18 @@ system header, with only the allowed library names resolving.
   through zumir's own compile path, not `c2m`'s. Its harness headers
   also give `assert` (through `abort`) and `NULL`, which the corpus's
   tests take from the headers they include.
-- **Out of scope.** One ASan finding on the interpreter tier, a small
-  struct over-read in `c2mir`'s argument lowering, is #42. The corpus
-  check runs under the sanitizers on the generator tier.
+- **Out of scope.**
+  - One ASan finding on the interpreter tier, a small struct over-read
+    in `c2mir`'s argument lowering, is #42. The corpus check runs under
+    the sanitizers on the generator tier.
+  - The corpus fails differently by platform, for `char`'s signedness,
+    `stdint.h`'s types and Arm-only tests. So the expected list is
+    tagged per platform. Arm's three real failures are #44.
+- **More patches from CI.** The first full run found two more: a
+  use-after-free in `##` token pasting, from the libFuzzer target; and
+  on Windows, a `long double` written past a one-element array, plus
+  Rtools gcc warnings. `<windows.h>`'s `IGNORE`, `CONST` and `VOID`
+  macros are undefined before `c2mir.c`.
 
 ## Stage 9 — cfunction()
 

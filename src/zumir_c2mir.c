@@ -28,6 +28,13 @@ extern const char zumir_test_stdio_h[], zumir_test_stdlib_h[], zumir_test_assert
   ZUMIR_C2MIR_TEST_INCLUDES
 #include "zumir_mir_gcc.h"
 #include "zumir_mir_stdio.h"
+/* zumir_mir_stdio.h includes <windows.h> on Windows, whose IGNORE, CONST
+ * and VOID macros would rename c2mir's node codes (N_IGNORE, N_CONST,
+ * N_VOID, made by pasting through its REP macros). c2mir uses none of
+ * them, and every system header is already included. */
+#undef IGNORE
+#undef CONST
+#undef VOID
 #include "vendor/mir/c2mir/c2mir.c"
 #else
 /* ISO C forbids an empty translation unit. */

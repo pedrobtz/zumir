@@ -1,6 +1,7 @@
 # MIR's c-tests corpus through zumir's compile path (tests/c/c-tests-runner.c,
 # #20): the tests expected to fail, one per line, "<test> <why>", the same on
-# both tiers. tools/ci/platform.sh fails when a test fails that is not listed
+# both tiers. "<test> [<platform>,...] <why>" is expected only on those
+# platforms: macos-x86_64, macos-arm64, ubuntu-x86_64, ubuntu-aarch64. tools/ci/platform.sh fails when a test fails that is not listed
 # here, or passes while listed, so a regression is seen and a fix updates
 # this list. Generated from the runner's output; the reasons fall into:
 #
@@ -19,7 +20,7 @@
 #                                   not give (NULL from a header it does not
 #                                   include; no float functions in D6)
 #   no main                         defines main in a file it does not include
-new/bf2.c repeated declaration uint64_t
+new/bf2.c [macos-x86_64,macos-arm64] repeated declaration uint64_t (macOS defines it as unsigned long long)
 new/issue18.c import of undefined item puts
 new/issue199.c import of undefined item free
 new/issue227-2.c import of undefined item malloc
@@ -30,7 +31,7 @@ new/mike.c no header inttypes.h: headers are not read from files here
 new/setjmp.c no header setjmp.h: headers are not read from files here
 new/setjmp2.c no header setjmp.h: headers are not read from files here
 new/var-size-in-var-initializer.c import of undefined item malloc
-new/vararg-sse-struct.c import of undefined item strcmp
+new/vararg-sse-struct.c [macos-x86_64,ubuntu-x86_64] import of undefined item strcmp (an x86-64 test)
 gcc/20000112-1.c import of undefined item strchr
 gcc/20000914-1.c import of undefined item malloc
 gcc/20010915-1.c import of undefined item strcmp
@@ -71,3 +72,10 @@ lacc/token.c import of undefined item puts
 lacc/typedef-function.c import of undefined item atoi
 lacc/typedef.c import of undefined item puts
 lacc/unsigned-sign-extend.c import of undefined item putchar
+
+new/hfa-vararg-host.c [macos-arm64,ubuntu-aarch64] import of undefined item strcmp (an aarch64 test)
+new/va-struct-args.c [macos-arm64] exit 3, expected 0: structs through varargs on macOS arm64 (#44)
+gcc/20020216-1.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
+gcc/pr19606.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
+lacc/bitwise-sign-extend.c [ubuntu-aarch64] exit 48, expected 46: expects plain char signed, unsigned on Linux aarch64
+lacc/struct-comma-call.c [ubuntu-aarch64] link: the aarch64 generator stops on a struct call in a comma expression (#44)

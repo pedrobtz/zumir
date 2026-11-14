@@ -40,7 +40,9 @@
   "96763195 Read a declaration's decl_spec only when the node is a declaration",\
   "b6e92b74 Fold integer constants by MIR's wrapping rules, without undefined behaviour",\
   "2ad09397 Read call offsets and addresses in x86-64 code with memcpy",\
-  "55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy"
+  "55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy",\
+  "feacf4fe Stop at the end of the unit after a ## concatenation",\
+  "4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

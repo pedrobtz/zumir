@@ -1012,10 +1012,14 @@ decides it and the maintainer may overturn it.
   `noLD` R gets the double version, as R itself computes.
 - **D19 (C), 2026-11-13; settled 2026-11-14, Stage 8.** `c2mir` stays
   the front end of `cfunction()`. Through zumir's compile path it passes
-  1,017 of the 1,069 `c-tests`, the same set on both tiers. All 52
-  failures are environment, not miscompilation: library names outside
-  D6, system headers, the prelude's names, or files included from the
-  corpus. Its crashes were fixed on the fork, the generator's and
+  1,017 of the 1,069 `c-tests` on x86-64, the same set on both tiers.
+  All 52 failures there are environment, not miscompilation: library
+  names outside D6, system headers, the prelude's names, or files
+  included from the corpus. Arm adds three real failures, tracked in
+  #44: on Linux aarch64, `signed char` conversions where plain `char`
+  is unsigned, and an internal check in the generator; on macOS arm64,
+  structs passed through varargs. `tools/c-tests-expected.txt` lists
+  them per platform. Its crashes were fixed on the fork, the generator's and
   interpreter's undefined behaviour included, and no crash is open:
   every corpus file passes the fuzz harness under ASan and UBSan. TinyCC
   is not needed. Kept as first written: `c2mir` stays the front end of

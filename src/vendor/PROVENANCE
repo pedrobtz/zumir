@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   550478396bb1eb5155f740cb33b5e8980c45e612
+  Fork commit:   4fb6f621b36536ea954d96cd57669638fde4eaec
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -34,6 +34,8 @@ interpreter and the C compiler c2mir)
                  b6e92b74 Fold integer constants by MIR's wrapping rules, without undefined behaviour
                  2ad09397 Read call offsets and addresses in x86-64 code with memcpy
                  55047839 Interpret integer operations by MIR's wrapping rules, and memory with memcpy
+                 feacf4fe Stop at the end of the unit after a ## concatenation
+                 4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -136,6 +138,14 @@ The patches, with the fork branch that carries each one alone:
             modulo the width, and loads and stores use memcpy. UBSan signed
             overflow, shifts and misaligned accesses on c-tests.
             fix/interp-wrapping-memcpy; upstream: not filed yet (#30).
+  feacf4fe  token_concat gives back the end of the unit instead of reading
+            past it (a heap-use-after-free in the preprocessor, found by the
+            libFuzzer target in CI). fix/c2mir-concat-end-of-unit; upstream:
+            not filed yet (#30).
+  4fb6f621  On Windows, classify_arg wrote types[1] of a one-element array for
+            a long double (-Warray-bounds, a stack overrun); get_result_type
+            and the Windows timers are no longer unused there (Rtools gcc).
+            fix/c2mir-windows-warnings; upstream: not filed yet (#30).
 
 Not patched, built differently instead (design §4.2):
 

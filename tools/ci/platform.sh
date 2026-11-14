@@ -191,7 +191,18 @@ if [ "$os" != windows ]; then
   runner_flags="-Isrc -Isrc/vendor/mir -DNDEBUG -DZUMIR_C2MIR_TEST_HEADERS"
   $cc_cmd $r_cflags $runner_flags $runner_srcs -o "$tmp/c-tests-runner" -lm
   dirs="havoc new andrewchambers_c gcc lacc"
-  grep -v '^#' tools/c-tests-expected.txt | awk 'NF {print $1}' | sort > "$tmp/c-expected"
+  # A line "<test> [<platform>,...] <why>" is expected only on the platforms
+  # it names, <os>-<arch> as below; a line without brackets, everywhere.
+  arch=$(uname -m)
+  case "$arch" in arm64) [ "$os" = macos ] || arch=aarch64 ;; esac
+  platform="$os-$arch"
+  echo "platform: $platform"
+  grep -v '^#' tools/c-tests-expected.txt | awk -v p="$platform" '
+    NF == 0 { next }
+    $2 ~ /^\[/ { list = $2; gsub(/[][]/, "", list); n = split(list, ps, ",");
+                  for (i = 1; i <= n; i++) if (ps[i] == p) { print $1; next }
+                  next }
+    { print $1 }' | sort > "$tmp/c-expected"
   for tier in gen interp; do
     "$tmp/c-tests-runner" "$mir/c-tests" "$tier" $dirs > "$tmp/c-$tier.txt"
     tail -1 "$tmp/c-$tier.txt"

@@ -661,7 +661,14 @@ allowed: on chosen inputs, where the arguments hold both an `NA` and a
 inside (`0/0`) and a comparison with it gives an `NA`, so the inputs do
 not show whether the two met (decided 2026-11-14, when CI's gctorture and
 ASan legs saw the native tier give `NA` and the interpreter `NaN` for
-`(x >= NaN) + NaN`). Native against interpreter follows the same rule. R's side runs in R's AST evaluator, an uncompiled copy of `f`
+`(x >= NaN) + NaN`). Native against interpreter is held to more: bit
+for bit, on random functions in which no value is ever `NA` (no `NA`
+argument, no arithmetic on a logical). Where an `NA` and a `NaN` meet,
+which comes out is the operand order the compiler chose, and `is.nan()`
+can turn that choice into a different answer. An unoptimised gcc build
+of the interpreter gave `NaN` where generated code gave `-2` (the
+coverage job, 2026-11-14). That is R's own freedom (`?NA`), not a defect,
+and it is documented for `rfunction()`'s users. R's side runs in R's AST evaluator, an uncompiled copy of `f`
 with the JIT off: R 4.6's byte compiler folds `s <- 0; -(0 * 0)` to the
 `0` already in its constant pool, which cannot tell `0` from `-0`, so
 R's own answer changes once the JIT compiles `f` (found by the random

@@ -247,7 +247,11 @@ rf_gen_expr <- function(depth, env) {
     fn <- sample(c("min", "max"), 1)
     return(call(fn, rf_gen_expr(depth - 1, env), rf_gen_expr(depth - 1, env)))
   }
-  # A logical in arithmetic, as R's 0, 1 or NA.
+  # A logical in arithmetic, as R's 0, 1 or NA. Not without NA (env$na):
+  # a comparison with a NaN is NA, and this is how it becomes a number.
+  if (!env$na) {
+    return(rf_gen_leaf(env))
+  }
   call("+", call("(", rf_gen_cond(depth - 1, env)), rf_gen_expr(depth - 1, env))
 }
 
@@ -327,14 +331,20 @@ rf_gen_block <- function(depth, env) {
   ))
 }
 
-rf_gen_function <- function() {
+# With na = FALSE no value is ever NA: no arithmetic on a logical (with
+# rf_gen_args(na = FALSE), no NA argument). An NA and a NaN then never
+# meet, where R leaves open which comes out (?NA), and where is.nan() can
+# turn that choice into different control flow: native against
+# interpreter is bitwise only there.
+rf_gen_function <- function(na = TRUE) {
   locals <- paste0("s", seq_len(sample(1:3, 1)))
   # The scope is a list, copied into each loop; the while counter is shared.
   env <- list(
     locals = character(),
     loopvars = character(),
     alongvars = character(),
-    count = new.env()
+    count = new.env(),
+    na = na
   )
   env$count$n <- 1L
   init <- list()
@@ -357,9 +367,12 @@ rf_gen_function <- function() {
   f
 }
 
-rf_gen_args <- function() {
+rf_gen_args <- function(na = TRUE) {
   pick <- function(n) {
     v <- c(odd_doubles(), rnorm(4), round(rnorm(4) * 10), 1e-310)
+    if (!na) {
+      v <- v[!(is.na(v) & !is.nan(v))]
+    }
     sample(v, n, replace = TRUE)
   }
   list(a = pick(1), b = pick(1), x = pick(sample(0:5, 1)))

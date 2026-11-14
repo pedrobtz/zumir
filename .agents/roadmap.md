@@ -31,7 +31,7 @@ between pull requests and the full profile.
 | 6 | [rfunction()](#stage-6--rfunction) | full | [#17](https://github.com/pedrobtz/zumir/issues/17) | [#36](https://github.com/pedrobtz/zumir/pull/36) | 2026-11-14 |
 | 7 | [rfunction() through the emitter](#stage-7--rfunction-through-the-emitter) | full | [#26](https://github.com/pedrobtz/zumir/issues/26) | [#39](https://github.com/pedrobtz/zumir/pull/39) | 2026-11-14 |
 | 8 | [c2mir and the prelude](#stage-8--c2mir-and-the-prelude) | full | [#8](https://github.com/pedrobtz/zumir/issues/8) | [#43](https://github.com/pedrobtz/zumir/pull/43) | 2026-11-14 |
-| 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | |
+| 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | | 2026-11-14 |
 | 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | | |
 | 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | |
 | 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
@@ -868,8 +868,5 @@ pointers for user code, with copies for outputs: valgrind (with
 
 ## Blocking open questions
 
-- [Q2](design.md#14-open-questions) blocks Stage 9: one function per
-  `cfunction()` source, or several. It meets D24 in the same wrapper,
-  so the maintainer reads both before the stage starts.
 - [Q4](design.md#14-open-questions) decides whether Stage 13 ends in a
   CRAN submission; the board's `CRAN intent` answers it.

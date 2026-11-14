@@ -66,7 +66,10 @@ static void body_scan_find(zumir_rctx *z, void *arg) {
     }
 }
 
-static void body_wrapper(zumir_rctx *z, void *arg) {
+/* Builds the _zumir_call wrapper around `arg`, a function item; under a
+ * trap. Shared with cfunction() (zumir_cfun.c), whose pointer arguments are
+ * 8-byte integers here. */
+void zumir_mirf_wrapper(zumir_rctx *z, void *arg) {
   MIR_item_t target = arg;
   MIR_context_t ctx = z->ctx;
   MIR_func_t tf = target->u.func;
@@ -119,10 +122,10 @@ static void body_wrapper(zumir_rctx *z, void *arg) {
   ops[1] = MIR_new_ref_op(ctx, imp);
   size_t nops = 2;
   if (nres == 1) ops[nops++] = MIR_new_reg_op(ctx, res);
+  /* ops[3 + i] were placed for nres == 1; this loop moves them down one
+   * when there is no result (a second shift here once put the arguments of
+   * a void function in the wrong order). */
   for (size_t i = 0; i < nargs; i++) ops[nops++] = ops[3 + i];
-  /* ops[3 + i] were placed for nres == 1; shift when there is no result. */
-  if (nres == 0)
-    for (size_t i = 0; i < nargs; i++) ops[2 + i] = ops[3 + i];
   MIR_append_insn(ctx, w, MIR_new_insn_arr(ctx, MIR_CALL, nops, ops));
   if (nres == 1) {
     MIR_op_t slot_d = MIR_new_mem_op(ctx, MIR_T_D, 0, rr, 0, 1);
@@ -202,7 +205,7 @@ SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
     UNPROTECT(1);
     return zumir_status("argument", 0, why);
   }
-  if (!zumir_rctx_run(z, body_wrapper, f.func)) {
+  if (!zumir_rctx_run(z, zumir_mirf_wrapper, f.func)) {
     UNPROTECT(1);
     return zumir_status("mir", z->type, z->message);
   }

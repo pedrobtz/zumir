@@ -1,0 +1,502 @@
+#' Compile a C function and call it from R
+#'
+#' `cfunction()` compiles one C function with MIR's own C compiler, `c2mir`,
+#' in memory, and returns an R function that calls it. No toolchain is
+#' needed: no Rtools, Xcode tools or `gcc`.
+#'
+#' The source is C11 after a small prelude, which declares the C maths
+#' library (`exp`, `sin`, `pow`, `fma`, `lgamma`, …) and `memcpy`,
+#' `memmove`, `memset`, `memcmp` and `strlen`, and gives `stddef.h`,
+#' `stdint.h`, `stdbool.h`, `stdarg.h`, `float.h` and `limits.h`. No header
+#' is read from a file, so `#include <stdio.h>` is an error, and the same
+#' source compiles the same everywhere. Calls to any other function are
+#' link errors. The function is generated on the session's tier
+#' ([zumir_tier()]) unless `tier` says otherwise.
+#'
+#' The source must define exactly one non-`static` function; `static`
+#' helpers beside it are fine. Its parameters may be `int`, `double`,
+#' `const int *`, `const double *`, `int *` and `double *`, and it returns
+#' `void`, `int` or `double`.
+#'
+#' * A `const` pointer is an input, passed without a copy: an integer or
+#'   double vector (an integer vector is converted for a `const double *`).
+#' * A non-`const` pointer is an output and must be named in `out`. When
+#'   the call supplies a value, the C function gets a copy of it; when it
+#'   does not, a zero-filled vector. Either way the caller's vector is
+#'   never changed, and the written copy is returned.
+#' * `n` names an `int` parameter that receives a length. When the call
+#'   does not give it, it is the common length of the pointer inputs; when
+#'   it does, it may not exceed any of them. Outputs have length `n`,
+#'   unless `out` gives them a fixed length, as in `out = c(y = 3)`.
+#'
+#' The R function returns the C function's value, or its one output, or,
+#' when there are several, a named list: the value first, named after the
+#' function, then the outputs by parameter name.
+#'
+#' Code compiled by `cfunction()` runs with `.Call()`'s rights: it can
+#' read and write any memory a C function can, and a loop that never ends
+#' is not interrupted.
+#'
+#' @param code One string of C.
+#' @param out Names of the output (non-`const` pointer) parameters, or a
+#'   named integer vector giving each a fixed length.
+#' @param n The name of an `int` parameter that receives the length, or
+#'   `NULL`.
+#' @param tier `"native"` or `"interp"`; by default [zumir_tier()].
+#' @returns A function of class `zumir_cfunction`, whose arguments are the
+#'   C function's parameters.
+#' @family compilers
+#' @export
+#' @examplesIf zumir_tier() != "none"
+#' sq <- cfunction("
+#'   void sq(int n, const double *x, double *y) {
+#'     for (int i = 0; i < n; i++) y[i] = x[i] * x[i];
+#'   }", out = "y", n = "n")
+#' sq(x = c(1, 2, 3))
+#'
+#' dot <- cfunction("
+#'   double dot(int n, const double *x, const double *y) {
+#'     double s = 0;
+#'     for (int i = 0; i < n; i++) s += x[i] * y[i];
+#'     return s;
+#'   }", n = "n")
+#' dot(x = c(1, 2, 3), y = c(4, 5, 6))
+cfunction <- function(code, out = character(), n = NULL, tier = NULL) {
+  if (!is.character(code) || length(code) != 1L || is.na(code)) {
+    cf_stop("argument", "`code` must be one string of C")
+  }
+  out <- cf_out(out)
+  if (!is.null(n) && !(is.character(n) && length(n) == 1L && !is.na(n))) {
+    cf_stop("argument", "`n` must be one parameter name, or NULL")
+  }
+  tier <- resolve_tier(tier)
+  res <- zumir_check(.Call(zumir_cfun_new, code, tier, "cfunction"))
+  sig <- cf_signature(code, res$name)
+  cf_check_signature(sig, res)
+  spec <- cf_spec(sig, out, n)
+  g <- function() NULL
+  formals(g) <- spec$formals
+  call_args <- as.call(c(
+    quote(list),
+    stats_setNames(lapply(sig$params$name, as.name), sig$params$name)
+  ))
+  body(g) <- bquote(cf_call(.(spec), .(res$context), .(call_args)))
+  environment(g) <- new.env(parent = asNamespace("zumir"))
+  structure(
+    g,
+    class = c("zumir_cfunction", "function"),
+    tier = tier,
+    name = res$name
+  )
+}
+
+#' @export
+print.zumir_cfunction <- function(x, ...) {
+  cat(sprintf(
+    "<zumir_cfunction %s(%s), %s>\n",
+    attr(x, "name"),
+    paste(names(formals(x)), collapse = ", "),
+    attr(x, "tier")
+  ))
+  invisible(x)
+}
+
+# out as given (names; named lengths; or a list of both, as
+# list("y", z = 3)) to list(names, fixed): fixed a named vector of the
+# fixed lengths.
+cf_out <- function(out) {
+  if (is.character(out) && is.null(names(out))) {
+    return(list(names = out, fixed = stats_setNames(numeric(), character())))
+  }
+  if (is.numeric(out) && !is.null(names(out)) && all(nzchar(names(out)))) {
+    return(list(
+      names = names(out),
+      fixed = stats_setNames(as.numeric(out), names(out))
+    ))
+  }
+  if (is.list(out)) {
+    nms <- if (is.null(names(out))) rep("", length(out)) else names(out)
+    keys <- character()
+    fixed <- stats_setNames(numeric(), character())
+    for (i in seq_along(out)) {
+      v <- out[[i]]
+      if (
+        !nzchar(nms[[i]]) && is.character(v) && length(v) == 1L && !is.na(v)
+      ) {
+        keys <- c(keys, v)
+      } else if (nzchar(nms[[i]]) && is.numeric(v) && length(v) == 1L) {
+        keys <- c(keys, nms[[i]])
+        fixed[[nms[[i]]]] <- v
+      } else {
+        cf_stop("argument", "`out` must be parameter names, or named lengths")
+      }
+    }
+    return(list(names = keys, fixed = fixed))
+  }
+  cf_stop("argument", "`out` must be parameter names, or named lengths")
+}
+
+cf_stop <- function(kind, message) {
+  class <- switch(
+    kind,
+    argument = "zumir_argument_error",
+    compile = "zumir_compile_error"
+  )
+  stop(structure(
+    class = c(class, "zumir_error", "error", "condition"),
+    list(message = paste0("cfunction(): ", message, "."), call = NULL)
+  ))
+}
+
+# The definition of `name` in the source: its return type and parameters,
+# read from the text c2mir compiled. Comments are removed first; a
+# signature the patterns do not read is refused, never guessed.
+cf_signature <- function(code, name) {
+  text <- gsub("/\\*.*?\\*/", " ", code, perl = TRUE)
+  text <- gsub("//[^\n]*", " ", text, perl = TRUE)
+  text <- gsub("[[:space:]]+", " ", text, perl = TRUE)
+  # The word before the name is the return type (qualifiers before it are
+  # not read: what c2mir compiled is checked against this afterwards).
+  pattern <- sprintf(
+    "\\b([A-Za-z_][A-Za-z0-9_]*)( ?\\*)? ?\\b%s ?\\(([^()]*)\\) ?\\{",
+    name
+  )
+  m <- regmatches(text, regexec(pattern, text, perl = TRUE))[[1]]
+  if (length(m) == 0L) {
+    cf_stop("compile", sprintf("cannot read the signature of `%s`", name))
+  }
+  if (nzchar(m[[3]])) {
+    cf_stop(
+      "compile",
+      sprintf(
+        "`%s` returns a pointer; cfunction() supports void, int and double",
+        name
+      )
+    )
+  }
+  ret <- m[[2]]
+  if (!ret %in% c("void", "int", "double")) {
+    cf_stop(
+      "compile",
+      sprintf(
+        "`%s` returns `%s`; cfunction() supports void, int and double",
+        name,
+        ret
+      )
+    )
+  }
+  params <- trimws(strsplit(m[[4]], ",", fixed = TRUE)[[1]])
+  if (length(params) == 1L && params %in% c("", "void")) {
+    params <- character()
+  }
+  one <- function(p) {
+    pm <- regmatches(
+      p,
+      regexec(
+        "^(const )?(int|double) ?(\\*)? ?([A-Za-z_][A-Za-z0-9_]*)$",
+        p
+      )
+    )[[1]]
+    if (length(pm) == 0L) {
+      cf_stop(
+        "compile",
+        sprintf(
+          "parameter `%s` of `%s`: cfunction() supports int, double, const int *, const double *, int * and double *",
+          p,
+          name
+        )
+      )
+    }
+    pointer <- nzchar(pm[[4]])
+    if (nzchar(pm[[2]]) && !pointer) {
+      cf_stop(
+        "compile",
+        sprintf(
+          "parameter `%s`: a const scalar is not supported; drop const",
+          p
+        )
+      )
+    }
+    data.frame(
+      name = pm[[5]],
+      type = pm[[3]],
+      kind = if (!pointer) {
+        "scalar"
+      } else if (nzchar(pm[[2]])) {
+        "input"
+      } else {
+        "output"
+      },
+      stringsAsFactors = FALSE
+    )
+  }
+  params <- do.call(
+    rbind,
+    c(
+      list(data.frame(
+        name = character(),
+        type = character(),
+        kind = character()
+      )),
+      lapply(params, one)
+    )
+  )
+  if (anyDuplicated(params$name)) {
+    cf_stop("compile", "two parameters share a name")
+  }
+  list(name = name, ret = ret, params = params)
+}
+
+# What c2mir compiled has to be what the text says: one MIR argument per
+# parameter, of the matching kind, and the matching result.
+cf_check_signature <- function(sig, res) {
+  want <- ifelse(
+    sig$params$kind == "scalar",
+    ifelse(sig$params$type == "int", "i32", "d"),
+    "p"
+  )
+  got <- res$arg_types
+  # c2mir passes a pointer as u64 (or i64, p); the text has already
+  # refused unsigned and long parameters, so these are the pointers.
+  got[got %in% c("i64", "u64")] <- "p"
+  ret <- c(void = "", int = "i32", double = "d")[[sig$ret]]
+  if (!identical(unname(want), got) || !identical(ret, res$res_type)) {
+    cf_stop(
+      "compile",
+      sprintf(
+        "the signature read for `%s` does not match what c2mir compiled; write the definition plainly, without macros",
+        sig$name
+      )
+    )
+  }
+}
+
+# The closure's formals and how each parameter is marshalled.
+cf_spec <- function(sig, out, n) {
+  p <- sig$params
+  out_names <- out$names
+  fixed <- out$fixed
+  if (anyDuplicated(out_names)) {
+    cf_stop("argument", "`out` names a parameter twice")
+  }
+  for (o in out_names) {
+    if (!o %in% p$name) {
+      cf_stop(
+        "argument",
+        sprintf("`out` names `%s`, which is not a parameter", o)
+      )
+    }
+    if (p$kind[p$name == o] != "output") {
+      cf_stop(
+        "argument",
+        sprintf("`out` names `%s`, which is not a non-const pointer", o)
+      )
+    }
+  }
+  for (f in names(fixed)) {
+    v <- fixed[[f]]
+    if (is.na(v) || v < 0 || v != floor(v) || v > .Machine$integer.max) {
+      cf_stop(
+        "argument",
+        sprintf("the length of `%s` must be a whole number from 0", f)
+      )
+    }
+  }
+  # D24: a non-const pointer not named in out would have its writes lost.
+  lost <- p$name[p$kind == "output" & !p$name %in% out_names]
+  if (length(lost)) {
+    cf_stop(
+      "compile",
+      sprintf(
+        "`%s` is a non-const pointer, an output: name it in `out`, or make it const",
+        lost[[1]]
+      )
+    )
+  }
+  if (!is.null(n)) {
+    if (
+      !n %in% p$name ||
+        p$kind[p$name == n] != "scalar" ||
+        p$type[p$name == n] != "int"
+    ) {
+      cf_stop(
+        "argument",
+        sprintf("`n` names `%s`, which is not an int parameter", n)
+      )
+    }
+  }
+  needs_n <- setdiff(out_names, names(fixed))
+  if (length(needs_n) && is.null(n)) {
+    cf_stop(
+      "argument",
+      sprintf(
+        "output `%s` has no length: give `n`, or a fixed length in `out`",
+        needs_n[[1]]
+      )
+    )
+  }
+  formals <- lapply(p$name, function(x) {
+    if (identical(x, n) || x %in% out_names) NULL else quote(expr = )
+  })
+  names(formals) <- p$name
+  list(
+    name = sig$name,
+    ret = sig$ret,
+    params = p,
+    out = out_names,
+    fixed = fixed,
+    n = n,
+    formals = formals
+  )
+}
+
+cf_call <- function(spec, ctx, args) {
+  p <- spec$params
+  # Pointer inputs first: their lengths decide n. A long vector is refused
+  # before anything reads it (an ALTREP sequence is never expanded).
+  lens <- integer()
+  for (i in which(p$kind == "input")) {
+    v <- args[[i]]
+    if (!(is.double(v) || is.integer(v))) {
+      cf_stop("argument", sprintf("`%s` must be a numeric vector", p$name[[i]]))
+    }
+    if (length(v) > .Machine$integer.max) {
+      cf_stop(
+        "argument",
+        sprintf("`%s` is longer than .Machine$integer.max", p$name[[i]])
+      )
+    }
+    lens[[p$name[[i]]]] <- length(v)
+  }
+  n <- NULL
+  if (!is.null(spec$n)) {
+    given <- args[[spec$n]]
+    if (is.null(given)) {
+      if (length(lens) == 0L) {
+        cf_stop(
+          "argument",
+          sprintf("`%s` must be given: no input vector gives it", spec$n)
+        )
+      }
+      if (length(unique(lens)) != 1L) {
+        cf_stop(
+          "argument",
+          sprintf(
+            "the input vectors have different lengths; give `%s`",
+            spec$n
+          )
+        )
+      }
+      n <- unname(lens[[1]])
+    } else {
+      n <- cf_int(given, spec$n)
+      if (n < 0L) {
+        cf_stop("argument", sprintf("`%s` must not be negative", spec$n))
+      }
+      if (length(lens) && n > min(lens)) {
+        cf_stop(
+          "argument",
+          sprintf(
+            "`%s` is %d, longer than input `%s` (%d)",
+            spec$n,
+            n,
+            names(lens)[which.min(lens)],
+            min(lens)
+          )
+        )
+      }
+    }
+    args[[spec$n]] <- n
+  }
+  kinds <- integer(nrow(p))
+  for (i in seq_len(nrow(p))) {
+    nm <- p$name[[i]]
+    v <- args[[i]]
+    if (p$kind[[i]] == "scalar") {
+      kinds[[i]] <- if (p$type[[i]] == "int") 0L else 1L
+      args[[i]] <- if (p$type[[i]] == "int") cf_int(v, nm) else cf_double(v, nm)
+    } else if (p$kind[[i]] == "input") {
+      kinds[[i]] <- 2L
+      args[[i]] <- if (p$type[[i]] == "double") {
+        as.double(v)
+      } else {
+        cf_int_vector(v, nm)
+      }
+    } else {
+      kinds[[i]] <- 3L
+      len <- if (nm %in% names(spec$fixed)) spec$fixed[[nm]] else n
+      if (is.null(v)) {
+        v <- if (p$type[[i]] == "double") numeric(len) else integer(len)
+      } else {
+        if (!(is.double(v) || is.integer(v))) {
+          cf_stop("argument", sprintf("`%s` must be a numeric vector", nm))
+        }
+        if (length(v) > .Machine$integer.max) {
+          cf_stop(
+            "argument",
+            sprintf("`%s` is longer than .Machine$integer.max", nm)
+          )
+        }
+        if (length(v) < len) {
+          cf_stop(
+            "argument",
+            sprintf(
+              "`%s` has length %d; the function writes %d",
+              nm,
+              length(v),
+              as.integer(len)
+            )
+          )
+        }
+        v <- if (p$type[[i]] == "double") as.double(v) else cf_int_vector(v, nm)
+      }
+      args[[i]] <- v
+    }
+  }
+  res <- zumir_check(.Call(zumir_cfun_call, ctx, unname(args), kinds))
+  outs <- stats_setNames(res$outputs, p$name[p$kind == "output"])
+  items <- c(
+    if (spec$ret != "void") stats_setNames(list(res$value), spec$name),
+    outs
+  )
+  if (length(items) == 0L) {
+    return(invisible(NULL))
+  }
+  if (length(items) == 1L) items[[1]] else items
+}
+
+cf_int <- function(v, nm) {
+  if (
+    !(is.numeric(v) && length(v) == 1L) ||
+      is.na(v) ||
+      v != floor(v) ||
+      abs(v) > .Machine$integer.max
+  ) {
+    cf_stop(
+      "argument",
+      sprintf("`%s` must be one whole number that fits an int", nm)
+    )
+  }
+  as.integer(v)
+}
+
+cf_double <- function(v, nm) {
+  if (!(is.numeric(v) && length(v) == 1L)) {
+    cf_stop("argument", sprintf("`%s` must be one number", nm))
+  }
+  as.double(v)
+}
+
+cf_int_vector <- function(v, nm) {
+  if (is.integer(v)) {
+    return(v)
+  }
+  w <- v[!is.na(v)]
+  if (any(w != floor(w)) || any(abs(w) > .Machine$integer.max)) {
+    cf_stop(
+      "argument",
+      sprintf("`%s` must hold whole numbers that fit an int", nm)
+    )
+  }
+  as.integer(v)
+}

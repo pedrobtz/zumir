@@ -8,9 +8,13 @@ vignette: >
 ---
 
 ```{r, include = FALSE}
-# Not evaluated: written from .agents/design.md before the API exists.
-# Switch eval on, and check the output, once the functions are in.
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+# Evaluated wherever a tier runs; where the system refuses writable and
+# executable memory, nothing can be compiled, and the code is shown only.
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  eval = zumir::zumir_tier() != "none"
+)
 ```
 
 Making R code fast usually means rewriting it in C or C++ and installing a
@@ -29,7 +33,9 @@ library(zumir)
 `mir_compile()` takes a numeric R function and compiles it to native code.
 The result has the same arguments and returns exactly what the R function
 returns. It accepts doubles, loops over indices, conditions and the usual
-maths; anything else is refused with the construct named.
+maths; anything else is refused with the construct named. [What
+`mir_compile()` accepts](mir-compile.html) lists the subset, and every
+place it errors where R would answer differently.
 
 ```{r}
 csum_r <- function(x) {
@@ -51,11 +57,12 @@ identical(csum(x), csum_r(x))
 ## Compile a C function
 
 `cfunction()` takes the source of one C function and returns an R function
-that calls it. Arguments named in `out` are allocated for you and returned.
-Lengths come from the `int` argument you name.
+that calls it. The source defines one non-`static` function; `static`
+helpers beside it are fine. Arguments named in `out` are allocated for you
+and returned, and your own vectors are never changed. Lengths come from the
+`int` argument you name.
 
 ```{r}
-# Open: should one source hold several functions, returned as a list? (Q2)
 sq <- cfunction("
   void sq(int n, const double *x, double *y) {
     for (int i = 0; i < n; i++) y[i] = x[i] * x[i];

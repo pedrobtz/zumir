@@ -461,6 +461,33 @@ whose cost is measured again with the benchmarks (§9).
 
 Signatures are limited to what can be marshalled without R's API (§5).
 
+**Built in Stage 9 (2026-11-14), step 5.** `zumir_cfun_new()`
+(`src/zumir_cfun.c`) compiles the source, finds the module's exported
+functions (`c2mir` exports every definition with external linkage),
+requires exactly one (Q2), and builds `mir_function()`'s
+`_zumir_call (int64 *args, int64 *res)` wrapper around it. `c2mir`
+passes a pointer as `u64`, which the wrapper loads as an 8-byte integer.
+R reads the signature from the definition's text, the parameter kinds
+and `const`ness MIR does not keep, and checks it against MIR's argument
+list, so a misread is an error, never a call with the wrong types. At
+the call, `zumir_cfun_call()` fills the slots (an `int`, a double's
+bits, a vector's data pointer, `NULL` for an empty one) and duplicates
+every output before taking its pointer (D24), so a value the caller
+passed, coerced or not, is never written. Further details:
+- `n` is filled with the inputs' common length when omitted, and is
+  checked against every input's length when given.
+- An output has length `n`, or the fixed length `out` gives it, as in
+  `out = c(y = 3)` or `list("y", z = 3)`; a supplied one may be longer,
+  and keeps its tail.
+- The value comes first in a named list, named after the C function.
+- A vector longer than `.Machine$integer.max` is refused before it is
+  read.
+
+Building this found a bug in `mir_function()`'s wrapper since Stage 5:
+for a `void` function it moved the arguments down twice, so with two
+or more they arrived in the wrong order. No Stage 5 test had a `void`
+function of two arguments; test-cfunction.R now has three.
+
 **Built in Stage 8 (2026-11-14), steps 1 to 4.** `src/zumir_cfun.c`
 gives `c2mir` the prelude, the source's name and the source through one
 `getc` callback, so nothing is copied, and runs the compile under the
@@ -1067,9 +1094,9 @@ decides it and the maintainer may overturn it.
   return at once when one is pending. R code can always be interrupted,
   so a compiled version that cannot be would be a difference in
   behaviour.
-- **D24 (C), 2026-11-13.** In `cfunction()`, a non-`const` pointer is an
-  output named in `out`, optionally seeded from the caller's value by a
-  copy (§5). Writing into the caller's vector would break R's value
+- **D24 (C), 2026-11-13; confirmed by the maintainer 2026-11-14.** In
+  `cfunction()`, a non-`const` pointer is an output named in `out`,
+  optionally seeded from the caller's value by a copy (§5). Writing into the caller's vector would break R's value
   semantics, and copying without returning the copy would drop the
   writes.
 - **D25 (C), 2026-11-13.** Windows aarch64 is a "no target" platform in
@@ -1096,9 +1123,11 @@ decides it and the maintainer may overturn it.
 - **Q1.** Answered 2026-11-13: Rtools needs no build fix, only two
   one-line warning fixes and the #496 fix, all small enough for upstream
   ([spike results](https://github.com/pedrobtz/mirspike/blob/main/RESULTS.md)).
-- **Q2.** Should `cfunction()` accept several functions in one source and
-  return them as a list, or one function per call? This RFC takes one,
-  named by the source's only non-`static` function.
+- **Q2. Decided 2026-11-14, by the maintainer: one per call.** Should
+  `cfunction()` accept several functions in one source and return them as
+  a list, or one function per call? One, named by the source's only
+  non-`static` function; `static` helpers beside it are fine, and a
+  second non-`static` function is a `zumir_argument_error` naming both.
 - **Q3.** Is a second maintainer for the vendored MIR plausible, given
   that upstream has one principal author? This RFC records the risk and
   pins the commit; it does not answer it.

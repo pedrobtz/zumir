@@ -1,0 +1,21 @@
+source("common.R")
+for (tier in c("native", "interp")) { cat("=====", tier, "\n")
+show("double pi(void)", try_(cfunction("double pi(void) { return M_PI; }", tier = tier)))
+show("double pi()", try_(cfunction("double pi() { return M_PI; }", tier = tier)))
+show("void nop(void)", try_(cfunction("void nop(void) { }", tier = tier)))
+show("int one(void)", try_(cfunction("int one(void) { return 1; }", tier = tier)))
+src4 <- "static const char *doc = \"void scale(int n, const double *x) {\";\nvoid scale(int n, double *x) { for (int i = 0; i < n; i++) x[i] *= 2; }"
+f <- cfunction(src4, n = "n", tier = tier); v <- c(1, 2, 3); f(x = v); show("string decoy: caller's v", v)
+show("int returning INT_MIN", try_(cfunction("int g(int a) { return -2147483647 - 1; }", tier = tier)(1L)))
+src <- "int cnt(int d) { static int c = 0; c += d; return c; }"
+a <- cfunction(src, tier = tier); b <- cfunction(src, tier = tier)
+show("static counter a,a,b,a", c(a(1L), a(1L), b(1L), a(1L)))
+sq <- cfunction("double h(int k, double d) { return k + d; }", tier = tier)
+for (k in list(NA_integer_, NA_real_, NaN, Inf, 2147483647, 2147483648, -2147483647, -2147483648, 1.5, -0, integer(0), c(1L, 2L), "1", TRUE, NULL, 3+0i, factor("a"), 1e-320, structure(1L, class = "foo"), Sys.Date()))
+  show(paste("int k =", deparse(k)), try_(sq(k, 1)))
+for (d in list(NA_integer_, NA_real_, NaN, Inf, -0, numeric(0), c(1, 2), "1", TRUE, NULL, factor("a"), .Machine$integer.max, structure(2.5, class = "bar")))
+  show(paste("double d =", deparse(d)), try_(sq(1L, d)))
+show("missing arg", try_(sq(1L)))
+show("extra arg", try_(sq(1L, 2, 3)))
+show("named swapped", try_(sq(d = 0.5, k = 2L)))
+}

@@ -219,20 +219,23 @@ which holds a write token and is pinned to a commit:
   without `-fanalyzer`, which ran GCC out of memory on c2mir
   (pedrobtz/r-actions#113). A new wrapper that includes MIR joins the list.
 - `gctorture.yaml`: the wide step on pull requests under a 10-minute
-  budget; step 20 daily (while the roadmap is implemented) and on dispatch.
+  budget; step 20 on dispatch.
 - `platforms.yaml`: `tools/ci/platform.sh` on macOS arm64, Windows and
-  Linux x86-64 and aarch64 (macOS x86-64 too on the schedule and on
-  dispatch): MIR's own tests on the vendored copy, the symbol guards, and
-  on Linux the build with MIR forced out.
-- `alloc-failure.yaml`: weekly, on dispatch and on `full-ci` pull
-  requests, fails each allocation in turn while `tools/alloc-exercise.R`
-  runs one section per job (`ZUMIR_ALLOC_EXERCISE`): the error trap's
-  three invalid modules, and `mir_compile()` through the emitter. The
-  sweep is capped at 3,000 allocations, hence a job each.
+  Linux x86-64 and aarch64 (macOS x86-64 too on dispatch): MIR's own
+  tests on the vendored copy, the symbol guards, on Linux the build with
+  MIR forced out, and on the full profile the consumer under ASan.
+- `alloc-failure.yaml`: on dispatch and on `full-ci` pull requests,
+  fails each allocation in turn while `tools/alloc-exercise.R` runs one
+  section per job (`ZUMIR_ALLOC_EXERCISE`): the error trap's three
+  invalid modules, `mir_compile()` through the emitter, `cfunction()`,
+  `mir_function()`, and each compiler's first interpreted call. The sweep
+  is capped at 3,000 allocations, hence a job each; `min-target-hits` is
+  a floor under the measured hits.
 - `fuzz.yaml`: libFuzzer over `tests/fuzz/fuzz-c2mir.c`, seeded by
-  `tests/fuzz/corpus`; brief on pull requests, long on the schedule;
+  `tests/fuzz/corpus`; each input compiled twice on the interpreter and
+  once natively; brief on pull requests, long on dispatch and `full-ci`;
   `reach-floor: 70` (75.4% on 2026-11-14).
-- `mutation.yaml`: Mull, weekly and on dispatch, over the R-free C
+- `mutation.yaml`: Mull, on dispatch, over the R-free C
   (`zumir_trap.c`, `zumir_mir_glue.c`, `zumir_mir_stdio.c`,
   `zumir_imports_d6.c`) with `tests/c/test-glue.c`, built by
   `tools/ci/mutation-build.sh`. Reported, never gated; the survivors
@@ -246,9 +249,11 @@ which holds a write token and is pinned to a commit:
 pinned to a commit past the only one (D2), so it would always report a
 difference.
 
-Every job tests the labels in its `if:` (`ci.md`, Labels). The scheduled
-slot is Saturday 08:00 to 09:59 UTC, a different minute per workflow;
-gctorture's daily run is at 09:56. The roadmap marks Stages 2 to 9
+Every job tests the labels in its `if:` (`ci.md`, Labels). There is no
+schedule (#53 removed them before the repository went private): main's
+full set is a dispatch on its head, which the readiness and release
+commits always get. The tests resolve r-actions' `profile: auto` with
+`full_profile()` (`helper-child.R`). The roadmap marks Stages 2 to 9
 `full`, with the closing three.
 
 ## Vendored native code
@@ -279,11 +284,14 @@ file edited in place, a series that differs from the list, or a changed
 record.
 
 The patches, one commit each, are listed with their reasons in
-`src/vendor/PROVENANCE` (23 on 2026-11-14): warnings and CRAN symbols,
+`src/vendor/PROVENANCE` (38 on 2026-11-15): warnings and CRAN symbols,
 Windows code memory, init and finish paths, code-memory errors, and from
 Stage 8 c2mir's allocator, memory-only headers, and the undefined
 behaviour the c-tests corpus found under the sanitizers in c2mir, the
-generator and the interpreter.
+generator and the interpreter; from the critical review, ten fixes its
+bug hunt found (crashes, conversions, headers, aliasing) and
+`MIR_interp_prepare`, which makes the interpreter's call-time work at
+link (D27).
 Built differently instead of patched: `MIR_DIRECT_DISPATCH`, no
 `-fsigned-char` (MIR's tests pass with unsigned `char`), and symbol hiding
 by `$(C_VISIBILITY)` and `src/zumir-win.def`.

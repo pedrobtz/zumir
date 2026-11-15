@@ -34,7 +34,7 @@ between pull requests and the full profile.
 | 9 | [cfunction()](#stage-9--cfunction) | full | [#9](https://github.com/pedrobtz/zumir/issues/9) | [#46](https://github.com/pedrobtz/zumir/pull/46) | 2026-11-14 |
 | 10 | [Benchmarks and README](#stage-10--benchmarks-and-readme) | quick | [#10](https://github.com/pedrobtz/zumir/issues/10) | [#49](https://github.com/pedrobtz/zumir/pull/49) | 2026-11-14 |
 | 11 | [Assurance](#stage-11--assurance) | quick | [#11](https://github.com/pedrobtz/zumir/issues/11) | | 2026-11-14 |
-| 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | | |
+| 12 | [Full CI](#stage-12--full-ci) | full | [#12](https://github.com/pedrobtz/zumir/issues/12) | [#51](https://github.com/pedrobtz/zumir/pull/51) | 2026-11-15 |
 | 13 | [v0.1.0 readiness](#stage-13--v010-readiness) | full | [#13](https://github.com/pedrobtz/zumir/issues/13) | | |
 | 14 | [Review](#stage-14--review) | full | [#14](https://github.com/pedrobtz/zumir/issues/14) | | |
 
@@ -817,6 +817,13 @@ exit criterion, a measured value per row and leg, holds.
 - A full-profile run green on the pull request, a dispatched one green on
   the merge commit, and a step-20 gctorture run green on the pull
   request's last commit.
+
+**Record (2026-11-15).** The full set on `main` (d89c945) failed only
+`-fanalyzer`: GCC 16 ran out of memory on the c2mir wrapper. r-actions
+gained `skip` (pedrobtz/r-actions#113, v1.42.0, with the dash fix in
+v1.42.1). Vendored MIR is now compiled without the analyzer, and
+zumir's own C is analysed on every pull request and gated; its two
+findings were false positives, restructured away.
 
 ## Stage 13 — v0.1.0 readiness
 

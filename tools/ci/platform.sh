@@ -325,6 +325,35 @@ fi
 echo "ok: the consumer links no CRAN-flagged symbol"
 endgroup
 
+# The C API under ASan and UBSan (#80), full profile, Linux: zumir and the
+# consumer built instrumented, the consumer's tests run in an R with the
+# sanitizer runtime preloaded. A second zumir_ctx_free(), a NULL argument
+# or a write past an array is reported here; the plain build above passes
+# it silently.
+if [ "$os" = ubuntu ] && [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+  group "Consumer package under ASan"
+  asan_lib="$tmp/asan-lib"
+  mkdir -p "$asan_lib"
+  cat > "$tmp/Makevars.asan" <<'MK'
+CFLAGS = -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+CXXFLAGS = -g -O1 -fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer
+LDFLAGS = -fsanitize=address,undefined
+MK
+  asan_rt=$($cc_cmd -print-file-name=libasan.so)
+  for pkg in . tests/consumer; do
+    # The runtime preloaded here too: installing lazy-loads the package.
+    LD_PRELOAD="$asan_rt" ASAN_OPTIONS=detect_leaks=0 \
+      R_MAKEVARS_USER="$tmp/Makevars.asan" R_LIBS="$asan_lib${R_LIBS:+:$R_LIBS}" \
+      "$R" CMD INSTALL --preclean --no-test-load --library="$asan_lib" "$pkg" \
+      > "$tmp/asan-install.log" 2>&1 || { cat "$tmp/asan-install.log"; exit 1; }
+  done
+  LD_PRELOAD="$asan_rt" ASAN_OPTIONS=detect_leaks=0:abort_on_error=1 \
+    UBSAN_OPTIONS=print_stacktrace=1 R_LIBS="$asan_lib${R_LIBS:+:$R_LIBS}" \
+    "$Rscript" -e 'testthat::test_dir("tests/consumer/tests/testthat", package = "zumirconsumer", load_package = "installed", reporter = "summary", stop_on_failure = TRUE)'
+  echo "ok: the consumer's tests under ASan and UBSan"
+  endgroup
+fi
+
 # ---------------------------------------------------------------------------
 # The benchmarks (Stage 10, design §9), full profile only: tools/run-benchmarks
 # against the package built in step 2, its reference C built by R CMD SHLIB

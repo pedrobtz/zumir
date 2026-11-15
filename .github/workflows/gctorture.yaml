@@ -1,8 +1,9 @@
 on:
   # No `push:`. A pull request already checks its merge with main, so the
   # push after merge would check the same tree again, in every package at
-  # once. Main is checked by the schedule below, which skips a commit it has
-  # already checked (README, "Pushes to main").
+  # once. With no schedule (removed before the repository went private,
+  # #53), main's full checks are a dispatch on its head: the readiness and
+  # release commits always get one (ci.md).
   # `labeled`/`unlabeled` so that adding or removing a CI label reruns it.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -18,7 +19,7 @@ permissions:
   contents: read
 
 # Pull requests and pushes run the wide quick-step under a 10-minute budget;
-# past it the check fails. The schedule and a manual dispatch run step 20,
+# past it the check fails. A manual dispatch runs step 20,
 # the sensitive setting, which can take hours: dispatch it on a branch with
 # `gh workflow run gctorture.yaml --ref <branch>` before a release, or before
 # merging a change to PROTECTs or finalizers.
@@ -39,15 +40,15 @@ jobs:
       test-timeout-minutes: ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && 10 || 0 }}
       timeout-minutes: 240
 
-  # A scheduled failure otherwise notifies only whoever last edited the cron
-  # line. This keeps one open issue, labelled gctorture, while the scheduled
-  # run is red: it opens it, comments on it at each further failure, and
-  # closes it on the next green run.
+  # A failed run on main otherwise notifies only whoever dispatched it. This
+  # keeps one open issue, labelled gctorture, while main's dispatched run is
+  # red: it opens it, comments on it at each further failure, and closes it
+  # on the next green run. (A schedule ran it until #53 removed them.)
   report:
     needs: gctorture
     # always(), so a failed or timed-out run is reported rather than skipping
     # this job; skipped means a docs-only change and says nothing.
-    if: ${{ always() && github.event_name == 'schedule' && needs.gctorture.result != 'skipped' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.gctorture.result != 'skipped' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

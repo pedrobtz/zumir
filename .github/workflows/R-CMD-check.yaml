@@ -1,15 +1,14 @@
 on:
   # No `push:`. A pull request already checks its merge with main, so the
   # push after merge would check the same tree again, in every package at
-  # once. Main is checked by the schedule below, which skips a commit it has
-  # already checked (r-actions README, "Pushes to main").
+  # once. With no schedule (removed before the repository went private,
+  # #53), main's full checks are a dispatch on its head: the readiness and
+  # release commits always get one (ci.md).
   # `labeled`/`unlabeled` so that adding or removing a CI label (`full-ci`,
   # `ci:minimal`, `skip-ci:<workflow>`) reruns it.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # The full set runs weekly and on demand:
-  # `gh workflow run R-CMD-check.yaml --ref main`. zumir's slot is Saturday
-  # 08:00-09:59 UTC, one minute per workflow.
+  # The full set runs on demand: `gh workflow run R-CMD-check.yaml --ref main`.
   workflow_dispatch:
 
 name: R-CMD-check
@@ -30,8 +29,8 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'skip-ci:R-CMD-check'))
     uses: pedrobtz/r-actions/.github/workflows/r-cmd-check.yml@v1
     with:
-      # Quick on pull requests. Full on the weekly schedule, on a manual
-      # dispatch, and on a pull request labelled `full-ci`.
+      # Quick on pull requests. Full on a manual dispatch, and on a pull
+      # request labelled `full-ci`.
       profile: auto
       # The shared four legs plus Windows R-devel, the combination CRAN's
       # own Windows R-devel check runs and win-builder would have caught.

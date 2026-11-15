@@ -5,7 +5,7 @@
 # so Mull would report what it misses as survivors. The C that calls R (the compilers' entries, the contexts R holds, the C API) is
 # loaded by R and can't be run by mull-runner; its oracles are the R suite's
 # (.agents/assurance.md). Reported, never gated: the survivors want
-# reading. Slow, so weekly and on dispatch only.
+# reading. Slow, so on dispatch only.
 on:
   workflow_dispatch:
 

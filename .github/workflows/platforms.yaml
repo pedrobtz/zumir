@@ -16,8 +16,6 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
-  schedule:
-    - cron: "41 8 * * 6"
 
 name: platforms
 

@@ -40,8 +40,11 @@ void zumir_trap_raise(int type, int status, const char *message) {
     if (zumir_trap_unhandled != NULL) zumir_trap_unhandled(type, status, message);
     /* Unreachable in the package, whose handler raises an R error. Spinning
      * keeps MIR from running on with a context it has given up on; ending
-     * the process is the thing this file exists to prevent. */
-    for (;;) {
+     * the process is the thing this file exists to prevent. The volatile
+     * read is a side effect, so the loop is not one C11 may assume ends,
+     * nor one -fanalyzer reports as accidental. */
+    static volatile int spin = 1;
+    while (spin) {
     }
   }
   t->type = type;

@@ -51,6 +51,18 @@ with nothing to instrument, so it joined with MIR in Stage 2 (#4). Stage 3
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
 Stage 11 (#11) schedules `mutation` over the C tests.
 
+**Analyzers (Stage 12, 2026-11-15).** `-fanalyzer` covers zumir's own C and
+gates on findings, on every pull request. Vendored MIR is not analysed:
+under GCC 16 the c2mir wrapper ran the compiler out of memory, so MIR's
+tree and the three wrappers that include it (`zumir_mir.c`,
+`zumir_mir_gen.c`, `zumir_c2mir.c`) are in `skip` (pedrobtz/r-actions#113).
+MIR's code is reached instead by ASan, UBSan, valgrind, the fuzzer and
+the c-tests corpus. The first run over zumir's C reported two findings,
+both false positives, and both restructured so the code reads plainly:
+a NULL function in `zumir_mirf_new()` returned through a message string
+the analyzer could not follow, and the trap's deliberate spin is now on a
+`volatile`.
+
 **Mutation (Stage 11, 2026-11-14).** `mutation.yaml` runs Mull weekly over
 zumir's R-free C (`zumir_trap.c`, `zumir_mir_glue.c`, `zumir_mir_stdio.c`,
 `zumir_imports_d6.c`) with `tests/c/test-glue.c`, built by

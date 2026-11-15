@@ -165,3 +165,124 @@ test_that("MIR's own test functions give their hand-computed values", {
     expect_identical(ui2f(16777217), 16777216)
   }
 })
+
+test_that("a jump to a label not in the function is a MIR error (#58)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  lib <- installed_lib()
+  skip_if(is.null(lib), "zumir is not installed: run under R CMD check")
+  # In a child process: before the fix, native code segfaulted at compile
+  # and the interpreter at the call.
+  res <- run_child(
+    lib,
+    c(
+      "library(zumir)",
+      "text <- 'm: module\\nexport f\\nf: func i64\\njmp nowhere\\nret 1\\nendfunc\\nendmodule\\n'",
+      sprintf("for (tier in %s) {", deparse(tiers_here())),
+      "  cls <- tryCatch({ mir_function(text, 'f', tier = tier)(); 'none' },",
+      "    error = function(e) class(e)[1])",
+      "  cat(tier, cls, '\\n')",
+      "}"
+    ),
+    timeout = 120
+  )
+  expect_identical(res$status, 0L)
+  for (tier in tiers_here()) {
+    expect_true(paste(tier, "zumir_mir_error ") %in% res$output, info = tier)
+  }
+})
+
+test_that("the interpreter calls functions of 94 to 300 arguments (#57)", {
+  skip_if(!"interp" %in% tiers_here(), "the interpreter does not run here")
+  lib <- installed_lib()
+  skip_if(is.null(lib), "zumir is not installed: run under R CMD check")
+  # In a child process: 95 or more overflowed the descriptors, and freeing
+  # the context crashed.
+  res <- run_child(
+    lib,
+    c(
+      "library(zumir)",
+      "for (n in c(94L, 95L, 96L, 300L)) {",
+      "  args <- paste0('i64:a', seq_len(n), collapse = ', ')",
+      "  body <- paste0(' add s, s, a', seq_len(n), collapse = '\\n')",
+      "  text <- paste0('m: module\\nexport f\\nf: func i64, ', args,",
+      "    '\\n local i64:s\\n mov s, 0\\n', body, '\\n ret s\\nendfunc\\nendmodule\\n')",
+      "  g <- mir_function(text, 'f', tier = 'interp')",
+      "  r <- do.call(g, as.list(seq_len(n)))",
+      "  rm(g); invisible(gc())",
+      "  cat(n, identical(r, as.double(sum(seq_len(n)))), '\\n')",
+      "}"
+    ),
+    timeout = 120
+  )
+  expect_identical(res$status, 0L)
+  for (n in c(94, 95, 96, 300)) {
+    expect_true(paste(n, "TRUE ") %in% res$output, info = n)
+  }
+})
+
+test_that("a name in two modules is refused; a user's exp is the user's (#74, #75)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  two <- "
+    m1: module
+    export f
+    f: func d, d:a
+    ret a
+    endfunc
+    endmodule
+    m2: module
+    f: func i64, i64:a, i64:b
+    ret a
+    endfunc
+    endmodule"
+  expect_error(mir_function(two, "f"), class = "zumir_argument_error")
+  own_exp <- "
+    m: module
+    export exp
+    exp: func d, d:a
+    dadd a, a, 1.0
+    ret a
+    endfunc
+    endmodule"
+  for (tier in tiers_here()) {
+    expect_identical(
+      mir_function(own_exp, "exp", tier = tier)(1),
+      2,
+      info = tier
+    )
+  }
+})
+
+test_that("u32, i64 and u64 arguments straddle their ranges (#84)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  id <- function(type) {
+    mir_function(
+      sprintf(
+        "m: module\nexport f\nf: func %s, %s:a\nret a\nendfunc\nendmodule\n",
+        type,
+        type
+      ),
+      "f"
+    )
+  }
+  u32 <- id("u32")
+  expect_identical(u32(2^32 - 1), 2^32 - 1)
+  expect_identical(u32(0), 0)
+  expect_error(u32(2^32), class = "zumir_argument_error")
+  expect_error(u32(-1), class = "zumir_argument_error")
+  i64 <- id("i64")
+  expect_identical(i64(2^53), 2^53)
+  expect_identical(i64(-2^53), -2^53)
+  expect_error(i64(2^53 + 2), class = "zumir_error")
+  u64 <- id("u64")
+  expect_identical(u64(2^53), 2^53)
+  expect_identical(u64(0), 0)
+  expect_error(u64(-1), class = "zumir_argument_error")
+})
+
+test_that("a factor or a date is refused as an argument, as cfunction() refuses it", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  add <- mir_function(add_text(), "add")
+  expect_identical(add(1, 2), 3)
+  expect_error(add(factor("a"), 1), class = "zumir_argument_error")
+  expect_error(add(as.Date("2026-01-01"), 1), class = "zumir_argument_error")
+})

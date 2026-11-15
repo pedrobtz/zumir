@@ -15,3 +15,12 @@ zc_table <- function() .Call(zc_table_c)
 zc_expit <- function(x, register) {
   .Call(zc_expit_c, as.double(x), as.logical(register))
 }
+zc_bad_opcode <- function() .Call(zc_bad_opcode_c)
+zc_emit_limits <- function(ncalls, nargs, tier) {
+  .Call(zc_emit_limits_c, as.integer(ncalls), as.integer(nargs), tier)
+}
+zc_emit_names <- function(x, tier) .Call(zc_emit_names_c, as.double(x), tier)
+zc_tier_lock <- function() .Call(zc_tier_lock_c)
+zc_null_args <- function() .Call(zc_null_args_c)
+zc_interp_compile <- function() .Call(zc_interp_compile_c)
+zc_interp_call <- function(x, a) .Call(zc_interp_call_c, x, as.double(a))

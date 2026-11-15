@@ -2,3 +2,5 @@
 # add, since MIR does not (#18). Not a portable flag; this package is never
 # checked or released.
 PKG_CFLAGS = -ffp-contract=off
+# review.c's worker-thread case.
+PKG_LIBS = -lpthread

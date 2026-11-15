@@ -233,3 +233,28 @@ test_that("min() and max() of an integer and a double convert the integer", {
     expect_same_as_r(f, x = x)
   }
 })
+
+test_that("constants compile the same under LC_ALL=C, in a child process", {
+  lib <- installed_lib()
+  skip_if(is.null(lib), "zumir is not installed: run under R CMD check")
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  # The constant path writes doubles as text for MIR: a locale or a
+  # session that formats numbers otherwise must not change one bit.
+  code <- c(
+    "Sys.setlocale('LC_ALL', 'C')",
+    "options(OutDec = ',', scipen = -5, digits = 3)",
+    "library(zumir)",
+    "ks <- c(0.1, -0, 1e-300, 5e-324, 123456789.123456789, 2^53 + 1, pi, 1/3)",
+    "f <- function(x) x",
+    "for (k in ks) {",
+    "  body(f) <- call('+', quote(x), k)",
+    "  g <- mir_compile(f)",
+    "  cat(identical(g(0), f(0), num.eq = FALSE), '')",
+    "}",
+    "cat('\\n')"
+  )
+  res <- run_child(lib, code, timeout = 120)
+  expect_identical(res$status, 0L)
+  expect_true(any(grepl("^(TRUE )+$", res$output)))
+  expect_false(any(grepl("FALSE", res$output)))
+})

@@ -138,7 +138,10 @@ test_that("each of MIR's allocations failed in the emitter: an error, no arena l
   # About 2,400 allocations build and link this function. The full profile
   # fails each in turn; the quick one the first 60 (context and module
   # set-up) and every 37th after, still until the build succeeds.
-  full <- identical(Sys.getenv("R_ACTIONS_PROFILE"), "full")
+  # Under a memory tool, which runs R 20 to 100 times slower, the quick set.
+  tool <- Sys.getenv("R_ACTIONS_WORKFLOW") %in%
+    c("valgrind", "gctorture", "sanitizers")
+  full <- full_profile() && !tool
   points <- if (full) 1:20000 else c(1:60, seq(61, 20000, by = 37))
   for (n in points) {
     .Call(zumir_test_fail_alloc, n)
@@ -165,8 +168,7 @@ test_that("each of MIR's allocations failed in the emitter: an error, no arena l
 
 test_that("an R error while mir_compile() lowers leaves no context behind", {
   skip_if(zumir_tier() == "none", "no tier runs here")
-  gc()
-  base <- .Call(zumir_test_live_arenas)
+  ns <- asNamespace("zumir")
   big <- function(x) {
     s <- 0
     for (i in seq_along(x)) {
@@ -174,16 +176,47 @@ test_that("an R error while mir_compile() lowers leaves no context behind", {
     }
     s
   }
-  # An error at every point of compile and build: a time limit that
-  # expires at once, each time a little later.
-  for (k in 1:20) {
-    run <- function() {
-      setTimeLimit(elapsed = k / 1000, transient = TRUE)
-      on.exit(setTimeLimit())
-      mir_compile(big)
-    }
-    tryCatch(run(), error = function(e) NULL)
+  # Errors injected deterministically (a time limit fired at only one of
+  # twenty points): at the k-th instruction the lowering emits, for every
+  # k, and once more after the module is built in C.
+  at <- new.env()
+  at$n <- 0L
+  at$k <- 0L
+  suppressMessages(trace(
+    "rf_ins",
+    tracer = bquote({
+      assign("n", .(at)$n + 1L, envir = .(at))
+      if (.(at)$n == .(at)$k) stop("injected")
+    }),
+    where = ns,
+    print = FALSE
+  ))
+  on.exit(suppressMessages(untrace("rf_ins", where = ns)), add = TRUE)
+  mir_compile(big)
+  steps <- at$n
+  expect_gt(steps, 20L)
+  gc()
+  base <- .Call(zumir_test_live_arenas)
+  raised <- 0L
+  for (k in seq_len(steps)) {
+    at$n <- 0L
+    at$k <- k
+    raised <- raised +
+      inherits(tryCatch(mir_compile(big), error = identity), "error")
   }
+  at$k <- 0L
+  expect_identical(raised, steps)
+  suppressMessages(trace(
+    "rf_context",
+    exit = quote(stop(structure(
+      class = c("injected_error", "error", "condition"),
+      list(message = "injected after the build", call = NULL)
+    ))),
+    where = ns,
+    print = FALSE
+  ))
+  on.exit(suppressMessages(untrace("rf_context", where = ns)), add = TRUE)
+  expect_error(mir_compile(big), class = "injected_error")
   gc()
   expect_lte(.Call(zumir_test_live_arenas), base)
 })

@@ -1,0 +1,38 @@
+void f(int n, const double *x, double *y) {
+  int k = 0;
+  unsigned v1 = (unsigned)127;
+  unsigned long long v2 = (unsigned long long)(long long)x[41];
+  unsigned long v3 = (unsigned long)63;
+  unsigned v4 = (unsigned)(long long)x[43];
+  unsigned short v5 = (unsigned short)-1;
+  unsigned long long v6 = (unsigned long long)(long long)x[45];
+  unsigned char v7 = (unsigned char)4294967296LL;
+  int v8 = (int)(long long)x[47];
+  unsigned long v9 = (unsigned long)-7;
+  long long v10 = (long long)9223372036854775807LL;
+  v7 = (1 && (~((((v2 ? 32768 : v2)) * ((v9 * 128)))))); y[k++] = (double)v7;
+  v3 = (int)((65535 | v4)); y[k++] = (double)v3;
+  y[k++] = (double)((((((double)v4 - (double)(((((-129) < 31)), v7))) > -1e9 && ((double)v4 - (double)(((((-129) < 31)), v7))) < 1e9 ? (int)((double)v4 - (double)(((((-129) < 31)), v7))) : 5)) >> (v7 & 31))); y[k++] = sizeof((((((double)v4 - (double)(((((-129) < 31)), v7))) > -1e9 && ((double)v4 - (double)(((((-129) < 31)), v7))) < 1e9 ? (int)((double)v4 - (double)(((((-129) < 31)), v7))) : 5)) >> (v7 & 31)));
+  y[k++] = (double)(((unsigned)((v5 > v5)) << (v8 & 31))); y[k++] = sizeof(((unsigned)((v5 > v5)) << (v8 & 31)));
+  y[k++] = (double)((((((v2 >> (v1 & 63))) == ((2147483647 & v8)))) * ((((v4 ? 127 / v4 : 3)) ^ (-v2))))); y[k++] = sizeof((((((v2 >> (v1 & 63))) == ((2147483647 & v8)))) * ((((v4 ? 127 / v4 : 3)) ^ (-v2)))));
+  y[k++] = (double)(((((double)(-128) > (double)v5)) | (((-18446744073709551615ull), ((signed char)v4))))); y[k++] = sizeof(((((double)(-128) > (double)v5)) | (((-18446744073709551615ull), ((signed char)v4)))));
+  y[k++] = (double)(((((unsigned long)v5 * 2)) && ((signed char)v5))); y[k++] = sizeof(((((unsigned long)v5 * 2)) && ((signed char)v5)));
+  y[k++] = (double)((((32768 <= v3)) ^ v5)); y[k++] = sizeof((((32768 <= v3)) ^ v5));
+  y[k++] = (double)((unsigned long)((((((0x8000000000000000ull | v3)) >> (((255 * 1u)) & 63))) ^ (((unsigned long)((v10 > v4)) - 255))))); y[k++] = sizeof((unsigned long)((((((0x8000000000000000ull | v3)) >> (((255 * 1u)) & 63))) ^ (((unsigned long)((v10 > v4)) - 255)))));
+  v10 ^= (((((unsigned long long)((v4 ? 7 : 32767))) + ((((v10 && v6)), ((v10 ? v10 : v5)))))) != (-1)); y[k++] = (double)v10;
+  y[k++] = (double)(((((-128) ? (unsigned long long)v7 / (-128) : 3)), ((v5, v1)))); y[k++] = sizeof(((((-128) ? (unsigned long long)v7 / (-128) : 3)), ((v5, v1))));
+  v1 = ((((~128) & ((0x8000000000000000ull, 0xffffffffu)))) & ((((v1 ? v1 / v1 : 3)) & ((127 < v7))))); y[k++] = (double)v1;
+  y[k++] = (double)(((double)((9223372036854775807LL ^ 0xffffffffu)) <= (double)((short)(-1)))); y[k++] = sizeof(((double)((9223372036854775807LL ^ 0xffffffffu)) <= (double)((short)(-1))));
+  v8 |= -(((unsigned)((((65536 < v8)) > (((float)((-2147483647-1)) == (float)v5)))) << (v8 & 31))); y[k++] = (double)v8;
+  v8 = (((v1 >> (9223372036854775807LL & 31))), (!v2)); y[k++] = (double)v8;
+  v1 = (((0x80000000u << (18446744073709551615ull & 31))) && ((unsigned long long)v9)); y[k++] = (double)v1;
+  y[k++] = (double)(((((unsigned)((v8 >> (v8 & 31))) << (63 & 31))) && (((unsigned)v10 + 255)))); y[k++] = sizeof(((((unsigned)((v8 >> (v8 & 31))) << (63 & 31))) && (((unsigned)v10 + 255))));
+  v4 >>= (((unsigned char)((((v3 << (65536 & 63))) >> (((65535 ? (unsigned long long)0x7fffLL % 65535 : 3)) & 63)))) & 7); y[k++] = (double)v4;
+  v3 ^= (long)v8; y[k++] = (double)v3;
+  v10 |= (((short)v9) ? (unsigned long long)((v3 <= 255)) / ((short)v9) : 3); y[k++] = (double)v10;
+  y[k++] = (double)((((((((v2 - v1)) ? ((v7 >> ((-128) & 31))) / ((v2 - v1)) : 3)) && ((long long)100))) ? v4 / ((((((v2 - v1)) ? ((v7 >> ((-128) & 31))) / ((v2 - v1)) : 3)) && ((long long)100))) : 3)); y[k++] = sizeof((((((((v2 - v1)) ? ((v7 >> ((-128) & 31))) / ((v2 - v1)) : 3)) && ((long long)100))) ? v4 / ((((((v2 - v1)) ? ((v7 >> ((-128) & 31))) / ((v2 - v1)) : 3)) && ((long long)100))) : 3));
+  v10 = (v1 == 0x7fffLL); y[k++] = (double)v10;
+  v5 = (long)v7; y[k++] = (double)v5;
+  y[k++] = (double)((((v6 + (((unsigned long long)((63 != 31)) + (((float)31 >= (float)v3)))))) << (((((((v7 && (-7))) ? ((1u - v4)) : (((unsigned)v10 - v7)))) & ((((v9 ? v9 % v9 : 3)) && ((9223372036854775807LL, v5)))))) & 63))); y[k++] = sizeof((((v6 + (((unsigned long long)((63 != 31)) + (((float)31 >= (float)v3)))))) << (((((((v7 && (-7))) ? ((1u - v4)) : (((unsigned)v10 - v7)))) & ((((v9 ? v9 % v9 : 3)) && ((9223372036854775807LL, v5)))))) & 63)));
+  y[k++] = (double)((unsigned long)(((((unsigned)0 + v7)) >> (v1 & 31)))); y[k++] = sizeof((unsigned long)(((((unsigned)0 + v7)) >> (v1 & 31))));
+}

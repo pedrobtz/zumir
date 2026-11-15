@@ -8,6 +8,8 @@ test_that("random functions return what R returns", {
   base <- rf_random_seed()
   local_seed(base)
   compiled <- 0L
+  tally <- new.env()
+  tally$values <- 0L
   for (k in seq_len(rf_random_count())) {
     seed <- base + k
     set.seed(seed)
@@ -20,7 +22,7 @@ test_that("random functions return what R returns", {
     for (j in 1:3) {
       args <- rf_gen_args()
       setTimeLimit(elapsed = 30, transient = TRUE)
-      d <- compare_with_r(f, g, args, na_nan = "any")
+      d <- compare_with_r(f, g, args, na_nan = "any", tally = tally)
       setTimeLimit()
       if (!is.null(d)) {
         path <- rf_save_reproducer(seed, f, args, d)
@@ -40,12 +42,15 @@ test_that("random functions return what R returns", {
   # Most draws are in the subset: a generator that drifts out of it would
   # leave the test checking nothing.
   expect_gt(compiled, rf_random_count() * 0.8)
+  # And most comparisons compare values R returned, not two errors.
+  expect_gt(tally$values, compiled * 3 * 0.5)
 })
 
 test_that("native and interpreted random functions agree", {
   skip_if(zumir_tier() != "native", "the native tier does not run here")
   base <- rf_random_seed()
   local_seed(base)
+  compiled <- 0L
   for (k in seq_len(rf_random_count() %/% 2L)) {
     seed <- base + k
     set.seed(seed)
@@ -57,6 +62,7 @@ test_that("native and interpreted random functions agree", {
     if (is.null(n)) {
       next
     }
+    compiled <- compiled + 1L
     i <- mir_compile(f, tier = "interp")
     args <- rf_gen_args(na = FALSE)
     a <- run_capture(n, args)
@@ -83,5 +89,5 @@ test_that("native and interpreted random functions agree", {
       return()
     }
   }
-  succeed()
+  expect_gt(compiled, (rf_random_count() %/% 2L) * 0.8)
 })

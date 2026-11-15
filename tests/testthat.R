@@ -9,4 +9,13 @@
 library(testthat)
 library(zumir)
 
-test_check("zumir")
+# Shuffled within each file, as tools/ci-run-tests.R runs them, so an order
+# dependence shows on every R CMD check leg, not on one platform. The seed
+# is printed in testthat.Rout; ZUMIR_TEST_SEED replays an order.
+seed <- suppressWarnings(as.integer(Sys.getenv("ZUMIR_TEST_SEED")))
+if (is.na(seed)) {
+  seed <- as.integer(Sys.time()) %% 100000L
+}
+cat("test order seed:", seed, "(ZUMIR_TEST_SEED to replay)\n")
+set.seed(seed)
+test_check("zumir", shuffle = TRUE)

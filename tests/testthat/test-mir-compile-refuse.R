@@ -202,3 +202,117 @@ test_that("abs() of an integer or logical is refused: R keeps the type", {
     3
   )
 })
+
+test_that("every refusal site refuses with a compile error (#82)", {
+  cases <- refuse_cases()
+  expect_gt(length(cases), 50L)
+  for (nm in names(cases)) {
+    expect_error(
+      mir_compile(cases[[nm]]),
+      class = "zumir_compile_error",
+      info = nm
+    )
+  }
+})
+
+test_that("an empty block as the result is refused, where R gives NULL (#54)", {
+  f <- function(x) {
+    if (x > 0) {} else {
+      1
+    }
+  }
+  expect_null(f(5))
+  expect_error(mir_compile(f), class = "zumir_compile_error")
+  g <- function(n) {
+    y <- numeric(2)
+    z <- numeric(3)
+    if (n > 0) {
+      z
+    } else {}
+  }
+  expect_null(g(-1))
+  expect_error(mir_compile(g), class = "zumir_compile_error")
+})
+
+test_that("a construct called with arguments R refuses is refused (#69)", {
+  # Each is an error in R; mir_compile() computed a value for the extra
+  # arguments and gave an unclassed subscript error for missing ones.
+  bodies <- alist(
+    `^`(x, 2, 3),
+    `-`(x, 1, 2),
+    `*`(x),
+    `/`(x),
+    `==`(x, 1, 2),
+    `==`(x),
+    `!`(x, 1),
+    `&&`(x > 0, TRUE, FALSE),
+    `(`(x, 1),
+    as.double(is.na(x, 1)),
+    as.double(is.nan(x, 1)),
+    as.double(is.finite(x, 1)),
+    as.double(length(x, 1)),
+    `while`(x > 0)
+  )
+  for (b in bodies) {
+    f <- function(x) NULL
+    body(f) <- b
+    expect_error(eval(as.call(c(f, 1))), info = deparse(b))
+    expect_error(
+      mir_compile(f),
+      class = "zumir_compile_error",
+      info = deparse(b)
+    )
+  }
+  loops <- list(
+    function(n) {
+      s <- 0
+      for (i in seq_len(n, 2)) {
+        s <- s + 1
+      }
+      s
+    },
+    function(x) {
+      s <- 0
+      for (i in seq_along(x, 1)) {
+        s <- s + 1
+      }
+      s
+    },
+    function(n) {
+      s <- 0
+      for (i in `:`(1, n, 7)) {
+        s <- s + 1
+      }
+      s
+    },
+    function(n) {
+      y <- numeric(nonsense = n)
+      1
+    }
+  )
+  for (f in loops) {
+    expect_error(mir_compile(f), class = "zumir_compile_error")
+  }
+})
+
+test_that("a logical constant with attributes is refused (#70)", {
+  for (k in list(c(a = TRUE), structure(TRUE, class = "foo"))) {
+    f <- function(x) x + K
+    body(f)[[3]] <- k
+    expect_false(identical(attributes(f(0)), NULL))
+    expect_error(mir_compile(f), class = "zumir_compile_error")
+  }
+})
+
+test_that("a non-function or an explicit tier \"none\" is an argument error", {
+  expect_error(mir_compile(sum), class = "zumir_argument_error")
+  expect_error(mir_compile(1), class = "zumir_argument_error")
+  expect_error(
+    mir_compile(function(x) x, tier = "none"),
+    class = "zumir_argument_error"
+  )
+  expect_error(
+    mir_compile(function(x) x, tier = NA_character_),
+    class = "zumir_argument_error"
+  )
+})

@@ -11,9 +11,10 @@
  * may have published an object it had not finished building (new_func_arr
  * adds the function to its module before allocating its variables), and
  * MIR_finish would walk it. zumir_mir_free() releases the arena's blocks
- * and code mappings directly instead. A context that failed with any other
- * MIR error is finished by MIR_finish, under a trap; if that raises too, the
- * arena releases what is left.
+ * and code mappings directly instead. A context held by R or a consumer
+ * is released the same way after any MIR error (zumir_rctx_fail marks
+ * the arena failed: MIR's state after a raise is not trusted), and so
+ * after a raise are the tier probe's and the test models'.
  *
  * The arena also counts what each context holds, for zumir_info()
  * (Stage 4). No R API here. */

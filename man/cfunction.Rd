@@ -10,7 +10,8 @@ cfunction(code, out = character(), n = NULL, tier = NULL)
 \item{code}{One string of C.}
 
 \item{out}{Names of the output (non-\code{const} pointer) parameters, or a
-named integer vector giving each a fixed length.}
+named integer vector giving each a fixed length; \code{character()} or
+\code{NULL} for none.}
 
 \item{n}{The name of an \code{int} parameter that receives the length, or
 \code{NULL}.}
@@ -43,10 +44,13 @@ helpers beside it are fine. Its parameters may be \code{int}, \code{double},
 \itemize{
 \item A \code{const} pointer is an input, passed without a copy: an integer or
 double vector (an integer vector is converted for a \verb{const double *}).
+A factor, \code{Date}, \code{POSIXct} or \code{difftime} is refused, for a pointer as
+for a scalar.
 \item A non-\code{const} pointer is an output and must be named in \code{out}. When
 the call supplies a value, the C function gets a copy of it; when it
 does not, a zero-filled vector. Either way the caller's vector is
-never changed, and the written copy is returned.
+never changed, and the written copy is returned, without the
+supplied value's names, dimensions or class.
 \item \code{n} names an \code{int} parameter that receives a length. When the call
 does not give it, it is the common length of the pointer inputs; when
 it does, it may not exceed any of them. Outputs have length \code{n},
@@ -56,6 +60,15 @@ unless \code{out} gives them a fixed length, as in \code{out = c(y = 3)}.
 The R function returns the C function's value, or its one output, or,
 when there are several, a named list: the value first, named after the
 function, then the outputs by parameter name.
+
+\code{NA} crosses as R's C API carries it: an \code{NA} element of an integer
+input arrives in C as \code{INT_MIN}, and \code{INT_MIN} in an \code{int} result or
+output comes back as \code{NA}. An \code{NA} double is a NaN in C.
+
+The signature is read from the source as c2mir's preprocessor leaves it,
+so comments, \verb{#if} branches and macros cannot change what is read. Any
+other parameter or return type (\code{float}, \verb{long double}, \code{unsigned},
+\code{char}, a typedef) is a compile error.
 
 Code compiled by \code{cfunction()} runs with \code{.Call()}'s rights: it can
 read and write any memory a C function can, and a loop that never ends

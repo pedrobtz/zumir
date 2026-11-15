@@ -8,12 +8,14 @@
 #' The function must be exported by its module (`export name`), and take
 #' and return numbers only: the integer types `i8` to `u64`, `f` and `d`,
 #' with at most one result. The R function has one argument per MIR
-#' argument, by the same names, each a single number. An integer argument
-#' must be a whole number that fits its type. Results of 8 to 32 bits are R
+#' argument, by the same names, each a single number (not a factor or a
+#' date). An integer argument must be a whole number that fits its type;
+#' an `f` argument is rounded to the nearest float. Results of 8 to 32 bits
+#' are R
 #' integers; 64-bit results and `u32` are doubles, and one beyond 2^53 is
 #' an error, since a double could not hold it exactly.
 #'
-#' The code may call the C math library and `memcpy`, `memmove`, `memset`,
+#' The code may call the C maths library and `memcpy`, `memmove`, `memset`,
 #' `memcmp` and `strlen` by name (`import exp`); any other import is a link
 #' error. Compiled code runs with the rights of `.Call()` code: a wrong
 #' memory access crashes R, as it would in a package's C code.

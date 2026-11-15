@@ -21,7 +21,12 @@ mir_condition <- function(res, call = NULL) {
 # fields (line, column, mir_type) go in `...`.
 zumir_condition <- function(kind, message, ...) {
   structure(
-    class = c(paste0("zumir_", kind, "_error"), "zumir_error", "error", "condition"),
+    class = c(
+      paste0("zumir_", kind, "_error"),
+      "zumir_error",
+      "error",
+      "condition"
+    ),
     list(message = message, call = NULL, ...)
   )
 }

@@ -92,6 +92,8 @@ typedef struct zumir_api_v1 {
   int (*zumir_status)(zumir_ctx *z, const char **message);
   void *(*zumir_compile)(zumir_ctx *z, MIR_module_t module, const char *name, int tier,
                          int *tier_out, int *status);
+  /* An import for this context's links; it takes precedence over the C
+   * maths library's function of the same name. */
   int (*zumir_import)(zumir_ctx *z, const char *name, void *addr);
 
   /* MIR's API, as shims (D20). */

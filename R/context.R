@@ -1,5 +1,5 @@
-# MIR contexts held by R (src/zumir_ctx.c). Internal until Stage 5's
-# mir_function() and C API: the tests build, compile and call through these.
+# Internal, for tests: MIR contexts held by R (src/zumir_ctx.c), which the
+# tests build, compile and call through.
 # Each returns its value or signals a zumir_mir_error (MIR raised; the
 # context is failed and can only be freed) or a zumir_context_error (the
 # context cannot be used).

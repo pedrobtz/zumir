@@ -288,7 +288,11 @@ SEXP zumir_mirf_call(SEXP x, SEXP args) {
   for (int i = 0; i < z->nargs; i++) {
     SEXP v = VECTOR_ELT(args, i);
     MIR_type_t t = z->arg_types[i];
-    if ((TYPEOF(v) != REALSXP && TYPEOF(v) != INTSXP) || XLENGTH(v) != 1) {
+    /* A factor or a date is not its number, as is.numeric() says and
+     * cfunction() refuses it (design D26). */
+    if ((TYPEOF(v) != REALSXP && TYPEOF(v) != INTSXP) || XLENGTH(v) != 1 ||
+        (Rf_isObject(v) && (Rf_inherits(v, "factor") || Rf_inherits(v, "Date") ||
+                            Rf_inherits(v, "POSIXt") || Rf_inherits(v, "difftime")))) {
       snprintf(why, sizeof why, "argument %d must be one number", i + 1);
       return zumir_status("argument", 0, why);
     }

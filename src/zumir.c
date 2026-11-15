@@ -65,6 +65,7 @@ SEXP zumir_test_prelude(void);
 SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name);
 SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args);
 SEXP zumir_cfun_prepro(SEXP source, SEXP name, SEXP path);
+SEXP zumir_test_nested_flags(SEXP fn, SEXP env);
 SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_result);
 
 static const R_CallMethodDef zumir_call_methods[] = {
@@ -106,6 +107,7 @@ static const R_CallMethodDef zumir_call_methods[] = {
   {"zumir_cfun_new", (DL_FUNC) &zumir_cfun_new, 3},
   {"zumir_cfun_invoke", (DL_FUNC) &zumir_cfun_invoke, 3},
   {"zumir_cfun_prepro", (DL_FUNC) &zumir_cfun_prepro, 3},
+  {"zumir_test_nested_flags", (DL_FUNC) &zumir_test_nested_flags, 2},
   {"zumir_rf_call", (DL_FUNC) &zumir_rf_call, 5},
   {NULL, NULL, 0}
 };

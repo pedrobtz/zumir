@@ -648,6 +648,7 @@ extern void MIR_interp_arr (MIR_context_t ctx, MIR_item_t func_item, MIR_val_t *
 extern void MIR_interp_arr_varg (MIR_context_t ctx, MIR_item_t func_item, MIR_val_t *results,
                                  size_t nargs, MIR_val_t *vals, va_list va);
 extern void MIR_set_interp_interface (MIR_context_t ctx, MIR_item_t func_item);
+extern void MIR_interp_prepare (MIR_context_t ctx, MIR_item_t func_item);
 
 /* Private: */
 extern double _MIR_get_api_version (void);

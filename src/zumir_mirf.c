@@ -180,7 +180,10 @@ SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
   MIR_func_t fn = f.func != NULL ? f.func->u.func : NULL;
   if (fn == NULL) {
     snprintf(why, sizeof why, "the MIR text has no function '%.200s'", f.name);
-  } else if (!f.exported) {
+    UNPROTECT(1);
+    return zumir_status("argument", 0, why);
+  }
+  if (!f.exported) {
     snprintf(why, sizeof why, "'%.200s' is not exported: add `export %.200s` to its module",
              f.name, f.name);
   } else if (fn->vararg_p) {

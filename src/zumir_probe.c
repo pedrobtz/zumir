@@ -103,6 +103,7 @@ static void probe_tier(int tier) {
     for (MIR_item_t it = DLIST_HEAD(MIR_item_t, mod->items); it != NULL;
          it = DLIST_NEXT(MIR_item_t, it)) {
       if (it->item_type != MIR_func_item) continue;
+      if (tier == ZUMIR_ITIER_INTERP) MIR_interp_prepare(ctx, it); /* as zumir_ctx.c does */
       if (strcmp(it->u.func->name, "arith") == 0) arith = it->addr;
       if (strcmp(it->u.func->name, "ext") == 0) ext = it->addr;
     }
@@ -111,6 +112,9 @@ static void probe_tier(int tier) {
   } else {
     int err = arena != NULL ? zumir_arena_map_errno(arena) : 0;
     map_reason(why[0], sizeof(why[0]), t.message, err);
+    /* MIR's state after a raise is not trusted (zumir_ctx.c): free the
+     * arena directly, never through MIR_finish. */
+    if (arena != NULL) zumir_arena_mark_failed(arena);
   }
 
   if (ok[0]) {

@@ -42,7 +42,10 @@ typedef struct zumir_rctx {
   int type;   /* the error's MIR_error_type_t */
   char message[1024];
   int map_errno; /* errno of a refused code mapping, if any */
-  void *fn;      /* the linked function, once linked */
+  void *fn;      /* the last function compile returned */
+  int linked;    /* a compile has linked: the tier is fixed (design §4.3) */
+  MIR_module_t *loaded; /* the modules loaded, each once */
+  size_t nloaded, cap_loaded;
   int imports;   /* ZUMIR_IMPORTS_* */
   zumir_import_entry *extra; /* the consumer's imports (D14) */
   size_t nextra, cap_extra;

@@ -364,6 +364,10 @@ SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_
     vp[i] = XLENGTH(v) > 0 ? REAL(v) : NULL;
   }
   int64_t r[2] = {0, 0};
+  /* The poll runs R code (finalizers) that may call a compiled function
+   * inside this call: keep the outer call's flags, or its warnings are
+   * lost. */
+  int outer_nan = zumir_r_nan_warned, outer_fmod = zumir_r_fmod_warned;
   zumir_r_nan_warned = 0;
   zumir_r_fmod_warned = 0;
   /* ISO C has no cast from an object pointer to a function pointer; the
@@ -372,8 +376,8 @@ SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_
   memcpy(&fn, &z->fn, sizeof fn);
   int64_t status = fn(REAL(consts), REAL(scalars), vp, vl, r);
   int nan = zumir_r_nan_warned, fmod = zumir_r_fmod_warned;
-  zumir_r_nan_warned = 0;
-  zumir_r_fmod_warned = 0;
+  zumir_r_nan_warned = outer_nan;
+  zumir_r_fmod_warned = outer_fmod;
   double value;
   if (Rf_asLogical(vector_result) == TRUE)
     value = (double) r[0];

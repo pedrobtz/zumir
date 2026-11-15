@@ -280,13 +280,27 @@ const zumir_import_entry *zumir_import_list(int kind, size_t *n) {
 }
 
 #if ZUMIR_HAVE_MIR
+/* Whether a module of ctx exports `name`: the module's own function then
+ * answers the name, not the import list (a user's exp is the user's). */
+static int exported(MIR_context_t ctx, const char *name) {
+  for (MIR_module_t m = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(ctx)); m != NULL;
+       m = DLIST_NEXT(MIR_module_t, m))
+    for (MIR_item_t it = DLIST_HEAD(MIR_item_t, m->items); it != NULL;
+         it = DLIST_NEXT(MIR_item_t, it))
+      if (it->item_type == MIR_export_item && strcmp(MIR_item_name(ctx, it), name) == 0)
+        return 1;
+  return 0;
+}
+
 void zumir_imports_load(MIR_context_t ctx, int kind, const zumir_import_entry *extra,
                         size_t nextra) {
   size_t n;
   const zumir_import_entry *list = zumir_import_list(kind, &n);
-  for (size_t i = 0; i < n; i++) MIR_load_external(ctx, list[i].name, list[i].addr);
+  for (size_t i = 0; i < n; i++)
+    if (!exported(ctx, list[i].name)) MIR_load_external(ctx, list[i].name, list[i].addr);
   if (kind == ZUMIR_IMPORTS_CONSUMER)
-    for (size_t i = 0; i < nextra; i++) MIR_load_external(ctx, extra[i].name, extra[i].addr);
+    for (size_t i = 0; i < nextra; i++)
+      if (!exported(ctx, extra[i].name)) MIR_load_external(ctx, extra[i].name, extra[i].addr);
 }
 #endif
 

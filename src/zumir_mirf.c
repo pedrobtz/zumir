@@ -47,23 +47,33 @@ typedef struct {
   const char *text;
   const char *name;
   MIR_item_t func; /* the function named `name`, if any */
-  int exported;
+  int nfunc;       /* how many modules define one */
+  int exported;    /* its own module exports it */
 } find_arg;
 
-/* Reads the text, then looks for the named function and its export. */
+/* Reads the text, then looks for the named function and its export, in
+ * the same module: with the name in two modules the wrapper took one
+ * function's signature and the link the other function. */
 static void body_scan_find(zumir_rctx *z, void *arg) {
   find_arg *f = arg;
   MIR_context_t ctx = z->ctx;
   MIR_scan_string(ctx, f->text);
   for (MIR_module_t m = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(ctx)); m != NULL;
-       m = DLIST_NEXT(MIR_module_t, m))
+       m = DLIST_NEXT(MIR_module_t, m)) {
+    MIR_item_t here = NULL;
+    int exp_here = 0;
     for (MIR_item_t it = DLIST_HEAD(MIR_item_t, m->items); it != NULL;
          it = DLIST_NEXT(MIR_item_t, it)) {
-      if (it->item_type == MIR_func_item && strcmp(it->u.func->name, f->name) == 0)
-        f->func = it;
+      if (it->item_type == MIR_func_item && strcmp(it->u.func->name, f->name) == 0) here = it;
       if (it->item_type == MIR_export_item && strcmp(MIR_item_name(ctx, it), f->name) == 0)
-        f->exported = 1;
+        exp_here = 1;
     }
+    if (here != NULL) {
+      f->nfunc++;
+      f->func = here;
+      f->exported = exp_here;
+    }
+  }
 }
 
 /* Builds the _zumir_call wrapper around `arg`, a function item; under a
@@ -170,7 +180,7 @@ SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
   }
   SEXP st;
   zumir_rctx *z = zumir_rctx_get(x, 1, &st);
-  find_arg f = {CHAR(STRING_ELT(text, 0)), CHAR(STRING_ELT(name, 0)), NULL, 0};
+  find_arg f = {CHAR(STRING_ELT(text, 0)), CHAR(STRING_ELT(name, 0)), NULL, 0, 0};
   if (!zumir_rctx_run(z, body_scan_find, &f)) {
     UNPROTECT(1);
     return zumir_status("mir", z->type, z->message);
@@ -183,7 +193,10 @@ SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
     UNPROTECT(1);
     return zumir_status("argument", 0, why);
   }
-  if (!f.exported) {
+  if (f.nfunc > 1) {
+    snprintf(why, sizeof why, "'%.200s' is defined in %d modules; give it one name", f.name,
+             f.nfunc);
+  } else if (!f.exported) {
     snprintf(why, sizeof why, "'%.200s' is not exported: add `export %.200s` to its module",
              f.name, f.name);
   } else if (fn->vararg_p) {

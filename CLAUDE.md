@@ -216,9 +216,10 @@ which holds a write token and is pinned to a commit:
   R-devel row added to `runners` (full profile only).
 - `native-checks.yaml`: sanitizers (with ASan), valgrind (with
   `--smc-check=all`, for the code MIR writes), lto, rchk,
-  analyzers and cran-special. `analyzers` runs off pull requests only, with
-  180 minutes: `-fanalyzer` on vendored MIR outran the 45-minute default,
-  and `exclude` does not skip the analysis (pedrobtz/r-actions#113).
+  analyzers and cran-special. `analyzers` gates on findings in zumir's own
+  C; vendored MIR and its three wrappers are in its `skip` list, compiled
+  without `-fanalyzer`, which ran GCC out of memory on c2mir
+  (pedrobtz/r-actions#113). A new wrapper that includes MIR joins the list.
 - `gctorture.yaml`: the wide step on pull requests under a 10-minute
   budget; step 20 daily (while the roadmap is implemented) and on dispatch.
 - `platforms.yaml`: `tools/ci/platform.sh` on macOS arm64, Windows and

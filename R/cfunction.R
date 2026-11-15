@@ -69,7 +69,7 @@ cfunction <- function(code, out = character(), n = NULL, tier = NULL) {
   if (!is.null(n) && !(is.character(n) && length(n) == 1L && !is.na(n))) {
     cf_stop("argument", "`n` must be one parameter name, or NULL")
   }
-  tier <- resolve_tier(tier)
+  tier <- resolve_tier(tier, "cfunction")
   res <- zumir_check(.Call(zumir_cfun_new, code, tier, "cfunction"))
   sig <- cf_signature(code, res$name)
   cf_check_signature(sig, res)
@@ -84,8 +84,10 @@ cfunction <- function(code, out = character(), n = NULL, tier = NULL) {
   # arguments and signals what it refuses, so a call costs about what a
   # package's .Call wrapper does (design §9). R's JIT does not compile a
   # closure made here, so nothing else goes in the body.
+  # The routine from a call in a call's head, where R skips non-function
+  # bindings: a parameter named zumir_cfun_invoke shadowed its name.
   invoke <- bquote(
-    .Call(zumir_cfun_invoke, .(res$context), .(cf_cspec(spec)), .(call_args))
+    .Call(cf_routine(), .(res$context), .(cf_cspec(spec)), .(call_args))
   )
   body(g) <- if (spec$ret == "void" && length(spec$out) == 0L) {
     call("invisible", invoke)
@@ -116,6 +118,9 @@ print.zumir_cfunction <- function(x, ...) {
 # list("y", z = 3)) to list(names, fixed): fixed a named vector of the
 # fixed lengths.
 cf_out <- function(out) {
+  if (is.null(out)) {
+    out <- character()
+  }
   if (is.character(out) && is.null(names(out))) {
     return(list(names = out, fixed = stats_setNames(numeric(), character())))
   }
@@ -147,29 +152,40 @@ cf_out <- function(out) {
   cf_stop("argument", "`out` must be parameter names, or named lengths")
 }
 
+cf_routine <- function() zumir_cfun_invoke
+
 cf_stop <- function(kind, message) {
-  class <- switch(
-    kind,
-    argument = "zumir_argument_error",
-    compile = "zumir_compile_error"
-  )
-  stop(structure(
-    class = c(class, "zumir_error", "error", "condition"),
-    list(message = paste0("cfunction(): ", message, "."), call = NULL)
-  ))
+  zumir_stop(kind, paste0("cfunction(): ", message, "."))
 }
 
-# The definition of `name` in the source: its return type and parameters,
-# read from the text c2mir compiled. Comments are removed first; a
+# The source as c2mir's preprocessor leaves it, after the prelude: no
+# comments, conditionals resolved, macros expanded. The signature is read
+# from this, so a decoy in a comment, an #if 0 branch or a macro is never
+# read in place of the definition c2mir compiled.
+cf_preprocessed <- function(code) {
+  path <- tempfile("zumir-cfunction-", fileext = ".i")
+  on.exit(unlink(path))
+  zumir_check(.Call(zumir_cfun_prepro, code, "cfunction", path))
+  text <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  text <- sub("(?s)^.*?__zumir_prelude_end\\s*;", "", text, perl = TRUE)
+  gsub("(?m)^#line[^\n]*", " ", text, perl = TRUE)
+}
+
+# The definition of `name`: its return type and parameters, read from the
+# preprocessed source with string and character literals removed. A
 # signature the patterns do not read is refused, never guessed.
 cf_signature <- function(code, name) {
-  text <- gsub("/\\*.*?\\*/", " ", code, perl = TRUE)
-  text <- gsub("//[^\n]*", " ", text, perl = TRUE)
+  text <- gsub(
+    "(?s)\"(?:[^\"\\\\\n]|\\\\.)*\"|'(?:[^'\\\\\n]|\\\\.)*'",
+    " ",
+    cf_preprocessed(code),
+    perl = TRUE
+  )
   text <- gsub("[[:space:]]+", " ", text, perl = TRUE)
-  # The word before the name is the return type (qualifiers before it are
-  # not read: what c2mir compiled is checked against this afterwards).
+  # Every word before the name is the return type (extern and inline
+  # aside), so `long double` is read whole and refused by name.
   pattern <- sprintf(
-    "\\b([A-Za-z_][A-Za-z0-9_]*)( ?\\*)? ?\\b%s ?\\(([^()]*)\\) ?\\{",
+    "((?:\\b[A-Za-z_][A-Za-z0-9_]* ?)+?)( ?\\*)? ?\\b%s ?\\(([^()]*)\\) ?\\{",
     name
   )
   m <- regmatches(text, regexec(pattern, text, perl = TRUE))[[1]]
@@ -185,7 +201,8 @@ cf_signature <- function(code, name) {
       )
     )
   }
-  ret <- m[[2]]
+  words <- strsplit(trimws(m[[2]]), " ", fixed = TRUE)[[1]]
+  ret <- paste(setdiff(words, c("extern", "inline")), collapse = " ")
   if (!ret %in% c("void", "int", "double")) {
     cf_stop(
       "compile",
@@ -261,10 +278,20 @@ cf_signature <- function(code, name) {
 # What c2mir compiled has to be what the text says: one MIR argument per
 # parameter, of the matching kind, and the matching result.
 cf_check_signature <- function(sig, res) {
-  want <- ifelse(
-    sig$params$kind == "scalar",
-    ifelse(sig$params$type == "int", "i32", "d"),
-    "p"
+  # vapply, not ifelse(): with no parameters ifelse() gives logical(0),
+  # which is not identical to character(0).
+  want <- vapply(
+    seq_len(nrow(sig$params)),
+    function(i) {
+      if (sig$params$kind[[i]] != "scalar") {
+        "p"
+      } else if (sig$params$type[[i]] == "int") {
+        "i32"
+      } else {
+        "d"
+      }
+    },
+    ""
   )
   got <- res$arg_types
   # c2mir passes a pointer as u64 (or i64, p); the text has already
@@ -289,6 +316,16 @@ cf_spec <- function(sig, out, n) {
   fixed <- out$fixed
   if (anyDuplicated(out_names)) {
     cf_stop("argument", "`out` names a parameter twice")
+  }
+  if (sig$ret != "void" && sig$name %in% out_names) {
+    cf_stop(
+      "argument",
+      sprintf(
+        "the function and output `%s` share a name, so the result would name two elements `%s`",
+        sig$name,
+        sig$name
+      )
+    )
   }
   for (o in out_names) {
     if (!o %in% p$name) {

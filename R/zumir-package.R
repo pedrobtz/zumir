@@ -21,5 +21,11 @@ NULL
 }
 
 .onUnload <- function(libpath) {
-  library.dynam.unload("zumir", libpath)
+  # A live context's finalizer is C in this DLL: unmapping the DLL under it
+  # crashed R at the next gc or at exit. Collect first, and keep the DLL
+  # while any context lives; a reload then reuses it.
+  gc()
+  if (.Call(zumir_memory)$contexts == 0L) {
+    library.dynam.unload("zumir", libpath)
+  }
 }

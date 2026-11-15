@@ -4,8 +4,6 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   # Weekly on main rather than on every push to it, and on demand; the
   # badge follows (r-actions README, "Pushes to main").
-  schedule:
-    - cron: "56 8 * * 6"
   workflow_dispatch:
 
 name: coverage

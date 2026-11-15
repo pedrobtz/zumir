@@ -9,8 +9,6 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   # The full set runs weekly and on demand:
   # `gh workflow run native-checks.yaml --ref main`.
-  schedule:
-    - cron: "26 8 * * 6"
   workflow_dispatch:
 
 name: native-checks

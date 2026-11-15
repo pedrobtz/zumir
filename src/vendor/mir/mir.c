@@ -1558,6 +1558,35 @@ static reg_desc_t *find_rd_by_reg (MIR_context_t ctx, MIR_reg_t reg, MIR_func_t 
   return &VARR_ADDR (reg_desc_t, func_regs->reg_descs)[rdn];
 }
 
+/* Refuse an operand label that is not placed in the current function: one
+   never appended, or one from another function. Code generated for it jumped
+   through an unset address, and the interpreter looped or crashed. Labels are
+   marked through their data, as link_module_lrefs does, and unmarked before
+   any error is raised. */
+static void check_func_labels (MIR_context_t ctx, const char *func_name) {
+  MIR_insn_t insn, bad = NULL;
+
+  for (insn = DLIST_HEAD (MIR_insn_t, curr_func->insns); insn != NULL;
+       insn = DLIST_NEXT (MIR_insn_t, insn))
+    if (insn->code == MIR_LABEL) insn->data = curr_func;
+  for (insn = DLIST_HEAD (MIR_insn_t, curr_func->insns); insn != NULL && bad == NULL;
+       insn = DLIST_NEXT (MIR_insn_t, insn))
+    for (size_t i = 0; i < insn->nops; i++)
+      if (insn->ops[i].mode == MIR_OP_LABEL && insn->ops[i].u.label->data != curr_func) {
+        bad = insn;
+        break;
+      }
+  for (insn = DLIST_HEAD (MIR_insn_t, curr_func->insns); insn != NULL;
+       insn = DLIST_NEXT (MIR_insn_t, insn))
+    if (insn->code == MIR_LABEL) insn->data = NULL;
+  if (bad != NULL) {
+    curr_func = NULL;
+    MIR_get_error_func (ctx) (MIR_invalid_insn_error,
+                              "func %s: in instruction '%s': a label that is not in the function",
+                              func_name, insn_descs[bad->code].name);
+  }
+}
+
 void MIR_finish_func (MIR_context_t ctx) {
   int expr_p = TRUE;
   MIR_insn_t insn, prev_insn;
@@ -1568,6 +1597,7 @@ void MIR_finish_func (MIR_context_t ctx) {
   if (curr_func == NULL)
     MIR_get_error_func (ctx) (MIR_no_func_error, "finish of non-existing function");
   func_name = curr_func->name;
+  check_func_labels (ctx, func_name);
   if (curr_func->vararg_p || curr_func->nargs != 0 || curr_func->nres != 1) expr_p = FALSE;
   for (insn = DLIST_HEAD (MIR_insn_t, curr_func->insns); insn != NULL;
        insn = DLIST_NEXT (MIR_insn_t, insn)) {

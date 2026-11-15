@@ -21,9 +21,10 @@ static char stddef_str[]
     "typedef int wchar_t;\n"
 #endif
     "\n"
-#if !defined(__APPLE__) && !defined(_WIN32)
+    /* Always: an embedder that forbids header files has no other NULL. */
+    "#ifndef NULL\n"
     "#define NULL ((void *) 0)\n"
-#endif
+    "#endif\n"
     "\n"
     "#define offsetof(type, member_designator) ((size_t) & ((type *) 0)->member_designator)\n"
     "\n"

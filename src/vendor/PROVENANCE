@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   a603752b007b38f77011eb023549456bccf70aea
+  Fork commit:   3c28225314e80ec070b3adb309db5674c6324f9d
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -39,6 +39,16 @@ interpreter and the C compiler c2mir)
                  06104552 Empty the buffer when a macro argument has no start marker
                  46ed8157 Generate no code from a source with parse errors
                  a603752b Keep the current stream valid after the end of the unit
+                 89750416 Grow both of the interpreter's call arrays
+                 f1c087be Refuse a label that is not in the function
+                 1d1d3ea6 Renumber the SSA edges copy_prop swaps, and skip operands with none
+                 4c9aab06 Convert to _Bool by comparing with zero in c2mir
+                 6a2b27b6 Convert floating values from 2^63 up to unsigned long long in c2mir
+                 9dd2334d Give float.h C11's digits and the platform's long double, and NULL
+                 e70b8330 Type character constants as int, and wide strings by their elements
+                 124486f0 Convert _Generic's operand and #if's conditional as C11 does
+                 0557c2a1 Alias a bit-field access by the member's type in c2mir
+                 3c282253 Add MIR_interp_prepare: allocate at link what a call would
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -162,6 +172,41 @@ The patches, with the fork branch that carries each one alone:
             string stream left cs undefined. Both from libFuzzer in CI.
             fix/c2mir-stream-after-end (on fix/c2mir-allocator, which it
             needs); upstream: not filed yet (#30).
+
+From the critical review of cf9b7b6 (2026-11-15, #54 to #108), each found
+by its bug hunt and checked against cc or R:
+
+  89750416  call() grew call_res_args and call_arg_descs in one ||, so the
+            second never grew: a call of 95 or more arguments overflowed it
+            on the interpreter (#57). fix/interp-call-arrays.
+  f1c087be  MIR_finish_func accepted a label operand not placed in the
+            function; generated code jumped through an unset address and
+            the interpreter crashed or looped (#58). fix/label-not-in-func.
+  1d1d3ea6  copy_prop's and/uext rewrite swapped operands without
+            renumbering their SSA edges and read a missing edge through
+            NULL: a segfault compiling unsigned r = 0xff & (unsigned) n
+            (#56). fix/copy-prop-swap-edges.
+  4c9aab06  Conversions to _Bool truncated to u8 instead of comparing with
+            zero (C11 6.3.1.2) (#65). fix/c2mir-bool-conversion.
+  6a2b27b6  Floating values in [2^63, 2^64) converted to unsigned long long
+            as 2^63, through the signed conversions (#66).
+            fix/c2mir-float-to-u64.
+  9dd2334d  float.h's FLT_DIG and DBL_DIG were the round-trip counts, its
+            LDBL_ macros a double's on x86-64 and aarch64 Linux, and NULL
+            was undefined on macOS and Windows without system headers (#67).
+            fix/c2mir-float-h-null.
+  e70b8330  'a' was typed char (sizeof 1) and a wide string's length was its
+            byte count (#67). fix/c2mir-char-const-type.
+  124486f0  _Generic promoted its operand, and #if's ?: took the evaluated
+            arm's signedness only (#67). fix/c2mir-generic-and-if-cond.
+  0557c2a1  A narrow bit-field was read with int's alias and written with
+            the member's, so DSE dropped a store at -O2 and the native tier
+            read garbage (#68). fix/c2mir-bitfield-alias.
+  3c282253  New entry MIR_interp_prepare: the interpreter's code, call
+            interfaces and argument arrays made at link, so a call
+            allocates nothing and cannot raise outside zumir's trap (#60).
+            fix/interp-prepare (on fix/interp-call-arrays, which it needs).
+            mir.h gains its declaration; no enum or struct changes (D21).
 
 Not patched, built differently instead (design §4.2):
 

@@ -16,6 +16,7 @@ void MIR_interp_arr_varg (MIR_context_t ctx, MIR_item_t func_item, MIR_val_t *re
 void MIR_interp_arr (MIR_context_t ctx, MIR_item_t func_item, MIR_val_t *results, size_t nargs,
                      MIR_val_t *vals) {}
 void MIR_set_interp_interface (MIR_context_t ctx, MIR_item_t func_item) {}
+void MIR_interp_prepare (MIR_context_t ctx, MIR_item_t func_item) {}
 #else
 
 #ifndef MIR_INTERP_TRACE
@@ -1835,33 +1836,31 @@ static void *get_ff_interface (MIR_context_t ctx, size_t arg_vars_num, size_t nr
   return ffi->interface_addr;
 }
 
-static void call (MIR_context_t ctx, MIR_val_t *bp, MIR_op_t *insn_arg_ops, code_t ffi_address_ptr,
-                  MIR_item_t proto_item, void *addr, code_t res_ops, size_t nargs) {
+/* Grow the call arrays for a call of nargs arguments, and make the call's
+   foreign-function interface the first time: everything a call allocates,
+   so MIR_interp_prepare can do it before any call. */
+static void *call_ffi (MIR_context_t ctx, MIR_op_t *insn_arg_ops, code_t ffi_address_ptr,
+                       MIR_item_t proto_item, size_t nargs) {
   struct interp_ctx *interp_ctx = ctx->interp_ctx;
   size_t i, arg_vars_num, nres;
-  MIR_val_t *res;
-  MIR_type_t type;
   MIR_var_t *arg_vars = NULL;
   MIR_proto_t proto = proto_item->u.proto;
   MIR_op_mode_t mode;
-  void *ff_interface_addr;
 
   if (proto->args == NULL) {
-    mir_assert (nargs == 0 && !proto->vararg_p);
     arg_vars_num = 0;
   } else {
-    mir_assert (nargs >= VARR_LENGTH (MIR_var_t, proto->args)
-                && (proto->vararg_p || nargs == VARR_LENGTH (MIR_var_t, proto->args)));
     arg_vars = VARR_ADDR (MIR_var_t, proto->args);
     arg_vars_num = VARR_LENGTH (MIR_var_t, proto->args);
   }
   nres = proto->nres;
-  if (VARR_EXPAND (MIR_val_t, call_res_args_varr, nargs + nres)
-      || VARR_EXPAND (_MIR_arg_desc_t, call_arg_descs_varr, nargs)) {
+  /* Grow each array on its own: with ||, a call that grew the first never
+     grew the second, and more than its 64 initial descriptors overflowed it. */
+  if (VARR_EXPAND (MIR_val_t, call_res_args_varr, nargs + nres))
     call_res_args = VARR_ADDR (MIR_val_t, call_res_args_varr);
+  if (VARR_EXPAND (_MIR_arg_desc_t, call_arg_descs_varr, nargs))
     call_arg_descs = VARR_ADDR (_MIR_arg_desc_t, call_arg_descs_varr);
-  }
-  if ((ff_interface_addr = ffi_address_ptr->a) == NULL) {
+  if (ffi_address_ptr->a == NULL) {
     for (i = 0; i < nargs; i++) {
       if (i < arg_vars_num) {
         call_arg_descs[i].type = arg_vars[i].type;
@@ -1884,10 +1883,33 @@ static void call (MIR_context_t ctx, MIR_val_t *bp, MIR_op_t *insn_arg_ops, code
                                                            : MIR_T_I64);
       }
     }
-    ff_interface_addr = ffi_address_ptr->a
-      = get_ff_interface (ctx, arg_vars_num, nres, proto->res_types, nargs, call_arg_descs,
-                          proto->vararg_p);
+    ffi_address_ptr->a = get_ff_interface (ctx, arg_vars_num, nres, proto->res_types, nargs,
+                                           call_arg_descs, proto->vararg_p);
   }
+  return ffi_address_ptr->a;
+}
+
+static void call (MIR_context_t ctx, MIR_val_t *bp, MIR_op_t *insn_arg_ops, code_t ffi_address_ptr,
+                  MIR_item_t proto_item, void *addr, code_t res_ops, size_t nargs) {
+  struct interp_ctx *interp_ctx = ctx->interp_ctx;
+  size_t i, arg_vars_num, nres;
+  MIR_val_t *res;
+  MIR_type_t type;
+  MIR_var_t *arg_vars = NULL;
+  MIR_proto_t proto = proto_item->u.proto;
+  void *ff_interface_addr;
+
+  if (proto->args == NULL) {
+    mir_assert (nargs == 0 && !proto->vararg_p);
+    arg_vars_num = 0;
+  } else {
+    mir_assert (nargs >= VARR_LENGTH (MIR_var_t, proto->args)
+                && (proto->vararg_p || nargs == VARR_LENGTH (MIR_var_t, proto->args)));
+    arg_vars = VARR_ADDR (MIR_var_t, proto->args);
+    arg_vars_num = VARR_LENGTH (MIR_var_t, proto->args);
+  }
+  nres = proto->nres;
+  ff_interface_addr = call_ffi (ctx, insn_arg_ops, ffi_address_ptr, proto_item, nargs);
 
   for (i = 0; i < nargs; i++) {
     if (i >= arg_vars_num) {
@@ -2114,6 +2136,39 @@ static void redirect_interface_to_interp (MIR_context_t ctx, MIR_item_t func_ite
 
 void MIR_set_interp_interface (MIR_context_t ctx, MIR_item_t func_item) {
   if (func_item != NULL) redirect_interface_to_interp (ctx, func_item);
+}
+
+/* Do now everything the interpreter would allocate at a call: generate the
+   function's code, make each call site's foreign-function interface, and
+   grow the argument arrays. After it, calling the function allocates
+   nothing, so an embedder whose calls must not raise (an allocation
+   failure, an invalid insn) can raise here instead, under its own error
+   handling. Call it after MIR_link, for every function item. */
+void MIR_interp_prepare (MIR_context_t ctx, MIR_item_t func_item) {
+  struct interp_ctx *interp_ctx = ctx->interp_ctx;
+  func_desc_t func_desc;
+
+  mir_assert (func_item->item_type == MIR_func_item);
+  if (func_item->data == NULL) generate_icode (ctx, func_item);
+  func_desc = get_func_desc (func_item);
+  if (VARR_EXPAND (MIR_val_t, arg_vals_varr, func_item->u.func->nargs))
+    arg_vals = VARR_ADDR (MIR_val_t, arg_vals_varr);
+  for (MIR_insn_t insn = DLIST_HEAD (MIR_insn_t, func_item->u.func->insns); insn != NULL;
+       insn = DLIST_NEXT (MIR_insn_t, insn)) {
+    if (!MIR_call_code_p (insn->code) && insn->code != MIR_INLINE && insn->code != MIR_INLAY)
+      continue;
+    /* generate_icode left the insn's code offset in data: the operands
+       follow its icode (and, when tracing, the insn) */
+    code_t ops = func_desc->code + (int64_t) insn->data + 1 + MIR_INTERP_TRACE;
+    int64_t nops = get_i (ops);
+    MIR_item_t proto_item = get_a (ops + 3);
+    size_t start = proto_item->u.proto->nres + 5;
+
+    if (VARR_EXPAND (MIR_val_t, arg_vals_varr, nops))
+      arg_vals = VARR_ADDR (MIR_val_t, arg_vals_varr);
+    call_ffi (ctx, &insn->ops[proto_item->u.proto->nres + 2], ops + 2, proto_item,
+              nops - start + 3);
+  }
 }
 
 #endif /* #ifdef MIR_NO_INTERP */

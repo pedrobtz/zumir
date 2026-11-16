@@ -11,7 +11,7 @@ test_that("a context's memory is freed when its R object is collected", {
   expect_gt(held$bytes, base$bytes)
   rm(ctxs)
   gc()
-  expect_identical(zumir_info()$memory, base)
+  expect_memory_at_most(base)
 })
 
 test_that("context_free() frees at once, and the finalizer then does nothing", {
@@ -23,7 +23,7 @@ test_that("context_free() frees at once, and the finalizer then does nothing", {
   expect_identical(zumir_info()$memory, base)
   rm(ctx)
   gc()
-  expect_identical(zumir_info()$memory, base)
+  expect_memory_at_most(base)
 })
 
 test_that("contexts are freed under gctorture too", {
@@ -38,5 +38,5 @@ test_that("contexts are freed under gctorture too", {
   gctorture(FALSE)
   gc()
   expect_length(out, 2L)
-  expect_identical(zumir_info()$memory, base)
+  expect_memory_at_most(base)
 })

@@ -61,3 +61,12 @@ full_profile <- function() {
   }
   FALSE
 }
+
+# At most the baseline after a gc(): a context another test left (kept
+# alive on a leg that keeps byte-code constants) may be collected
+# meanwhile, now that the suite runs shuffled; a leak here would keep ours.
+expect_memory_at_most <- function(base) {
+  m <- zumir_info()$memory
+  expect_lte(m$contexts, base$contexts)
+  expect_lte(m$bytes, base$bytes)
+}

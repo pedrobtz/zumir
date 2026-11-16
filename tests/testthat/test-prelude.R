@@ -217,9 +217,12 @@ test_that("float.h, NULL, character constants and _Generic are C11's (#67)", {
       y[k++] = LDBL_MANT_DIG >= DBL_MANT_DIG;
     }"
   want <- c(6, 15, 53, 1, 1, 1, 1, 2, 1, 1)
+  # valgrind computes long double at double precision, so the epsilon
+  # probe (the 9th) holds everywhere but under it.
+  keep <- if (Sys.getenv("R_ACTIONS_WORKFLOW") == "valgrind") -9L else 1:10
   for (tier in tiers_here()) {
     f <- cfunction(src, out = c(y = 10), tier = tier)
-    expect_identical(f(n = 10L), want, info = tier)
+    expect_identical(f(n = 10L)[keep], want[keep], info = tier)
   }
 })
 

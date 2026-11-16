@@ -245,7 +245,6 @@ test_that("a construct called with arguments R refuses is refused (#69)", {
     `==`(x, 1, 2),
     `==`(x),
     `!`(x, 1),
-    `&&`(x > 0, TRUE, FALSE),
     `(`(x, 1),
     as.double(is.na(x, 1)),
     as.double(is.nan(x, 1)),
@@ -262,6 +261,13 @@ test_that("a construct called with arguments R refuses is refused (#69)", {
       class = "zumir_compile_error",
       info = deparse(b)
     )
+  }
+  # R does not refuse every one in every version (R-devel accepts an extra
+  # argument to `&&`): mir_compile() does.
+  for (b in alist(`&&`(x > 0, TRUE, FALSE), `||`(x > 0, TRUE, FALSE))) {
+    f <- function(x) NULL
+    body(f) <- b
+    expect_error(mir_compile(f), class = "zumir_compile_error", info = deparse(b))
   }
   loops <- list(
     function(n) {

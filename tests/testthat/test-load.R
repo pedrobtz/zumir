@@ -40,8 +40,9 @@ test_that("unloading with a live compiled function keeps the DLL, and exits clea
       "invisible(gc())",
       sprintf("library(zumir, lib.loc = %s)", deparse(lib)),
       "cat('again:', f(2), '\\n')",
-      "rm(f); invisible(gc())",
-      "cat('contexts:', zumir_info()$memory$contexts == base, '\\n')",
+      "before <- zumir_info()$memory$contexts",
+      "rm(f); invisible(gc()); invisible(gc())",
+      "cat('contexts:', zumir_info()$memory$contexts == before - 1L, '\\n')",
       "g <- mir_compile(function(x) x * 2)",
       "cat('new:', g(3), '\\n')"
     ),

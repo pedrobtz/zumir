@@ -6451,6 +6451,18 @@ static int null_const_p (struct expr *expr, struct type *type) {
               && type_qual_eq_p (&type->type_qual, &zero_type_qual)));
 }
 
+/* A floating constant folded to an integer type. Out of the target's range
+   the conversion is undefined in C (C11 6.3.1.4) and so was the folding
+   cast in the compiler: NaN and values outside the 64-bit range fold to 0,
+   values from 2^63 up as an unsigned 64-bit conversion does at run time,
+   and the rest through long long. Narrowing the result is defined. */
+static mir_ullong fold_d2u (mir_ldouble d) {
+  if (!(d == d) || d >= 18446744073709551616.0L || d <= -9223372036854775809.0L) return 0;
+  if (d >= 9223372036854775808.0L)
+    return (mir_ullong) (mir_llong) (d - 9223372036854775808.0L) ^ ((mir_ullong) 1 << 63);
+  return (mir_ullong) (mir_llong) d;
+}
+
 static void cast_value (struct expr *to_e, struct expr *from_e, struct type *to) {
   assert (to_e->const_p && from_e->const_p);
   struct type *from = from_e->type;
@@ -6477,6 +6489,27 @@ static void cast_value (struct expr *to_e, struct expr *from_e, struct type *to)
   default: assert (FALSE);                                                               \
   }
 
+#define DCONV(TP, cast, mto) \
+  case TP: to_e->c.mto = (cast) fold_d2u (from_e->c.d_val); break;
+#define BASIC_FROM_D_CONV                                                                \
+  switch (to->u.basic_type) {                                                            \
+    case TP_BOOL: to_e->c.u_val = from_e->c.d_val != 0; break; /* C11 6.3.1.2 */        \
+    DCONV (TP_UCHAR, mir_uchar, u_val) DCONV (TP_USHORT, mir_ushort, u_val);             \
+    DCONV (TP_UINT, mir_uint, u_val) DCONV (TP_ULONG, mir_ulong, u_val);                 \
+    DCONV (TP_ULLONG, mir_ullong, u_val) DCONV (TP_SCHAR, mir_char, i_val);              \
+    DCONV (TP_SHORT, mir_short, i_val) DCONV (TP_INT, mir_int, i_val);                   \
+    DCONV (TP_LONG, mir_long, i_val) DCONV (TP_LLONG, mir_llong, i_val);                 \
+    CONV (TP_FLOAT, mir_float, d_val, d_val) CONV (TP_DOUBLE, mir_double, d_val, d_val); \
+    CONV (TP_LDOUBLE, mir_ldouble, d_val, d_val);                                        \
+  case TP_CHAR:                                                                          \
+    if (char_is_signed_p ())                                                             \
+      to_e->c.i_val = (mir_char) fold_d2u (from_e->c.d_val);                             \
+    else                                                                                 \
+      to_e->c.u_val = (mir_char) fold_d2u (from_e->c.d_val);                             \
+    break;                                                                               \
+  default: assert (FALSE);                                                               \
+  }
+
 #define BASIC_TO_CONV(cast, mto)                                \
   switch (from->u.basic_type) {                                 \
   case TP_BOOL:                                                 \
@@ -6498,7 +6531,7 @@ static void cast_value (struct expr *to_e, struct expr *from_e, struct type *to)
   case TP_LLONG: to_e->c.mto = (cast) from_e->c.i_val; break;   \
   case TP_FLOAT:                                                \
   case TP_DOUBLE:                                               \
-  case TP_LDOUBLE: to_e->c.mto = (cast) from_e->c.d_val; break; \
+  case TP_LDOUBLE: to_e->c.mto = (cast) fold_d2u (from_e->c.d_val); break; \
   default: assert (FALSE);                                      \
   }
 
@@ -6540,10 +6573,12 @@ static void cast_value (struct expr *to_e, struct expr *from_e, struct type *to)
     case TP_LLONG: BASIC_FROM_CONV (i_val); break;
     case TP_FLOAT:
     case TP_DOUBLE:
-    case TP_LDOUBLE: BASIC_FROM_CONV (d_val); break;
+    case TP_LDOUBLE: BASIC_FROM_D_CONV; break;
     default: assert (FALSE);
     }
   }
+#undef DCONV
+#undef BASIC_FROM_D_CONV
 #undef CONV
 #undef BASIC_FROM_CONV
 #undef BASIC_TO_CONV
@@ -8311,8 +8346,9 @@ static struct expr *check_assign_op (c2m_ctx_t c2m_ctx, node_t r, struct expr *e
         convert_value (e2, &t);
         if (floating_type_p (&t))
           e->c.d_val = (add_p ? e1->c.d_val + e2->c.d_val : e1->c.d_val - e2->c.d_val);
-        else if (signed_integer_type_p (&t))
-          e->c.i_val = (add_p ? e1->c.i_val + e2->c.i_val : e1->c.i_val - e2->c.i_val);
+        else if (signed_integer_type_p (&t)) /* wrapping, as MIR computes, without UB */
+          e->c.i_val = (mir_llong) (add_p ? (mir_ullong) e1->c.i_val + (mir_ullong) e2->c.i_val
+                                          : (mir_ullong) e1->c.i_val - (mir_ullong) e2->c.i_val);
         else
           e->c.u_val = (add_p ? e1->c.u_val + e2->c.u_val : e1->c.u_val - e2->c.u_val);
       }

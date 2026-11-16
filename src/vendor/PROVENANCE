@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   3c28225314e80ec070b3adb309db5674c6324f9d
+  Fork commit:   06e8281a49400a34016eae022ff6fea0c0a3dd1f
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -49,6 +49,8 @@ interpreter and the C compiler c2mir)
                  124486f0 Convert _Generic's operand and #if's conditional as C11 does
                  0557c2a1 Alias a bit-field access by the member's type in c2mir
                  3c282253 Add MIR_interp_prepare: allocate at link what a call would
+                 75b5075b Fold floating constants to integer types without undefined behaviour
+                 06e8281a Fold signed addition and subtraction by wrapping in c2mir
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -207,6 +209,12 @@ by its bug hunt and checked against cc or R:
             allocates nothing and cannot raise outside zumir's trap (#60).
             fix/interp-prepare (on fix/interp-call-arrays, which it needs).
             mir.h gains its declaration; no enum or struct changes (D21).
+  75b5075b  cast_value folded a floating constant to an integer type with a C
+            cast, undefined out of range (int a = 3e9): UBSan, libFuzzer in
+            CI on the review's seeds. fix/c2mir-fold-float-to-int.
+  06e8281a  A constant + or - on signed operands overflowed while folding, the
+            case b6e92b74 left; it wraps through unsigned arithmetic now
+            (UBSan on the fuzz corpus). fix/c2mir-fold-add-wrapping.
 
 Not patched, built differently instead (design §4.2):
 

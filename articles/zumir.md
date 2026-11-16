@@ -42,6 +42,34 @@ identical(csum(x), csum_r(x))
 #> [1] TRUE
 ```
 
+The compiled loop runs far faster than the R loop, and close to R’s own
+[`cumsum()`](https://rdrr.io/r/base/cumsum.html), which is written in C.
+Timings vary by machine.
+
+``` r
+
+x <- rnorm(1e6)
+bench::mark(csum_r(x), csum(x), cumsum(x), min_iterations = 10)[, 1:5]
+#> # A tibble: 3 × 5
+#>   expression      min   median `itr/sec` mem_alloc
+#>   <bch:expr> <bch:tm> <bch:tm>     <dbl> <bch:byt>
+#> 1 csum_r(x)   48.76ms  51.21ms      19.2    7.63MB
+#> 2 csum(x)      4.94ms   5.11ms     195.     7.63MB
+#> 3 cumsum(x)    3.87ms   3.91ms     255.     7.63MB
+```
+
+So
+[`mir_compile()`](https://pedrobtz.github.io/zumir/reference/mir_compile.md)
+pays off for a loop that R has no built-in for. Examples are a
+recurrence, where each step needs the one before it, a loop that stops
+early, and one pass that does what several vectorised calls would do.
+Where R already has a built-in, such as
+[`cumsum()`](https://rdrr.io/r/base/cumsum.html),
+[`sum()`](https://rdrr.io/r/base/sum.html) or vectorised arithmetic, use
+the built-in. It is already compiled C, and the compiled loop will not
+beat it. Compile once and call the result many times, because compiling
+takes time too.
+
 ## Compile a C function
 
 [`cfunction()`](https://pedrobtz.github.io/zumir/reference/cfunction.md)
@@ -60,6 +88,32 @@ sq <- cfunction("
 
 sq(x = c(1, 2, 3))
 #> [1] 1 4 9
+```
+
+The cumulative sum from above, written in C, comes close to
+[`cumsum()`](https://rdrr.io/r/base/cumsum.html). It is a little faster
+than the compiled R loop, which also does what R does on every step,
+such as checking for an interrupt.
+
+``` r
+
+csum_c <- cfunction("
+  void csum_c(int n, const double *x, double *y) {
+    double acc = 0;
+    for (int i = 0; i < n; i++) {
+      acc += x[i];
+      y[i] = acc;
+    }
+  }", out = "y", n = "n")
+
+x <- rnorm(1e6)
+bench::mark(csum(x), csum_c(x = x), cumsum(x), min_iterations = 10)[, 1:5]
+#> # A tibble: 3 × 5
+#>   expression         min   median `itr/sec` mem_alloc
+#>   <bch:expr>    <bch:tm> <bch:tm>     <dbl> <bch:byt>
+#> 1 csum(x)         4.67ms   5.11ms      195.    7.63MB
+#> 2 csum_c(x = x)   1.67ms   4.48ms      225.    7.63MB
+#> 3 cumsum(x)       1.13ms   3.88ms      278.    7.63MB
 ```
 
 ## Return a value
@@ -191,7 +245,7 @@ zumir_info()
 #> [1] 6
 #> 
 #> $memory$bytes
-#> [1] 2535896
+#> [1] 2772529
 
 csum_interp <- mir_compile(csum_r, tier = "interp")
 ```

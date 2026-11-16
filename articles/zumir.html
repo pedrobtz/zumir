@@ -101,6 +101,26 @@ it errors where R would answer differently.</p>
 <span><span class="co">#&gt; [1]  1  3 NA NA</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/identical.html" class="external-link">identical</a></span><span class="op">(</span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum_r</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] TRUE</span></span></code></pre></div>
+<p>The compiled loop runs far faster than the R loop, and close to R’s
+own <code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum()</a></code>, which is written in C. Timings vary by
+machine.</p>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1e6</span><span class="op">)</span></span>
+<span><span class="fu">bench</span><span class="fu">::</span><span class="fu"><a href="https://bench.r-lib.org/reference/mark.html" class="external-link">mark</a></span><span class="op">(</span><span class="fu">csum_r</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, min_iterations <span class="op">=</span> <span class="fl">10</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
+<span><span class="co">#&gt;   expression      min   median `itr/sec` mem_alloc</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   48.76ms  51.21ms      19.2    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      4.94ms   5.11ms     195.     7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    3.87ms   3.91ms     255.     7.63MB</span></span></code></pre></div>
+<p>So <code><a href="../reference/mir_compile.html">mir_compile()</a></code> pays off for a loop that R has no
+built-in for. Examples are a recurrence, where each step needs the one
+before it, a loop that stops early, and one pass that does what several
+vectorised calls would do. Where R already has a built-in, such as
+<code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum()</a></code>, <code><a href="https://rdrr.io/r/base/sum.html" class="external-link">sum()</a></code> or vectorised arithmetic, use
+the built-in. It is already compiled C, and the compiled loop will not
+beat it. Compile once and call the result many times, because compiling
+takes time too.</p>
 </div>
 <div class="section level2">
 <h2 id="compile-a-c-function">Compile a C function<a class="anchor" aria-label="anchor" href="#compile-a-c-function"></a>
@@ -111,7 +131,7 @@ non-<code>static</code> function; <code>static</code> helpers beside it
 are fine. Arguments named in <code>out</code> are allocated for you and
 returned, and your own vectors are never changed. Lengths come from the
 <code>int</code> argument you name.</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sq</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  void sq(int n, const double *x, double *y) {</span></span>
 <span><span class="st">    for (int i = 0; i &lt; n; i++) y[i] = x[i] * x[i];</span></span>
@@ -119,13 +139,35 @@ returned, and your own vectors are never changed. Lengths come from the
 <span></span>
 <span><span class="fu">sq</span><span class="op">(</span>x <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">2</span>, <span class="fl">3</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] 1 4 9</span></span></code></pre></div>
+<p>The cumulative sum from above, written in C, comes close to
+<code><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum()</a></code>. It is a little faster than the compiled R loop,
+which also does what R does on every step, such as checking for an
+interrupt.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">csum_c</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
+<span><span class="st">  void csum_c(int n, const double *x, double *y) {</span></span>
+<span><span class="st">    double acc = 0;</span></span>
+<span><span class="st">    for (int i = 0; i &lt; n; i++) {</span></span>
+<span><span class="st">      acc += x[i];</span></span>
+<span><span class="st">      y[i] = acc;</span></span>
+<span><span class="st">    }</span></span>
+<span><span class="st">  }"</span>, out <span class="op">=</span> <span class="st">"y"</span>, n <span class="op">=</span> <span class="st">"n"</span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1e6</span><span class="op">)</span></span>
+<span><span class="fu">bench</span><span class="fu">::</span><span class="fu"><a href="https://bench.r-lib.org/reference/mark.html" class="external-link">mark</a></span><span class="op">(</span><span class="fu">csum</span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, <span class="fu">csum_c</span><span class="op">(</span>x <span class="op">=</span> <span class="va">x</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/cumsum.html" class="external-link">cumsum</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span>, min_iterations <span class="op">=</span> <span class="fl">10</span><span class="op">)</span><span class="op">[</span>, <span class="fl">1</span><span class="op">:</span><span class="fl">5</span><span class="op">]</span></span>
+<span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
+<span><span class="co">#&gt;   expression         min   median `itr/sec` mem_alloc</span></span>
+<span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)         4.67ms   5.11ms      195.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)   1.67ms   4.48ms      225.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)       1.13ms   3.88ms      278.    7.63MB</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="return-a-value">Return a value<a class="anchor" aria-label="anchor" href="#return-a-value"></a>
 </h2>
 <p>A function that returns <code>int</code> or <code>double</code> gives
 that value back directly.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">dot</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/cfunction.html">cfunction</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  double dot(int n, const double *x, const double *y) {</span></span>
 <span><span class="st">    double s = 0;</span></span>
@@ -147,7 +189,7 @@ include system headers or call R’s API.</p>
 <p><code><a href="../reference/mir_function.html">mir_function()</a></code> takes MIR’s textual IR instead of C. It
 is useful for tests, for learning MIR, and for checking a lowering by
 hand.</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">f</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mir_function.html">mir_function</a></span><span class="op">(</span><span class="st">"</span></span>
 <span><span class="st">  m: module</span></span>
 <span><span class="st">     export add</span></span>
@@ -171,7 +213,7 @@ memory that is both writable and executable, no tier runs and nothing
 can be compiled. <code><a href="../reference/zumir_info.html">zumir_tier()</a></code> says which tier this session
 uses, and <code><a href="../reference/zumir_info.html">zumir_info()</a></code> says why. You can also ask for the
 interpreter yourself.</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/zumir_info.html">zumir_tier</a></span><span class="op">(</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "native"</span></span>
 <span><span class="fu"><a href="../reference/zumir_info.html">zumir_info</a></span><span class="op">(</span><span class="op">)</span></span>
@@ -243,7 +285,7 @@ interpreter yourself.</p>
 <span><span class="co">#&gt; [1] 6</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $memory$bytes</span></span>
-<span><span class="co">#&gt; [1] 2535896</span></span>
+<span><span class="co">#&gt; [1] 2772529</span></span>
 <span></span>
 <span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mir_compile.html">mir_compile</a></span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
 </div>

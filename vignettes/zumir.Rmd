@@ -54,6 +54,22 @@ csum(x)
 identical(csum(x), csum_r(x))
 ```
 
+The compiled loop runs far faster than the R loop, and close to R's own
+`cumsum()`, which is written in C. Timings vary by machine.
+
+```{r, eval = zumir::zumir_tier() != "none" && requireNamespace("bench", quietly = TRUE)}
+x <- rnorm(1e6)
+bench::mark(csum_r(x), csum(x), cumsum(x), min_iterations = 10)[, 1:5]
+```
+
+So `mir_compile()` pays off for a loop that R has no built-in for. Examples
+are a recurrence, where each step needs the one before it, a loop that stops
+early, and one pass that does what several vectorised calls would do. Where
+R already has a built-in, such as `cumsum()`, `sum()` or vectorised
+arithmetic, use the built-in. It is already compiled C, and the compiled
+loop will not beat it. Compile once and call the result many times, because
+compiling takes time too.
+
 ## Compile a C function
 
 `cfunction()` takes the source of one C function and returns an R function
@@ -69,6 +85,24 @@ sq <- cfunction("
   }", out = "y", n = "n")
 
 sq(x = c(1, 2, 3))
+```
+
+The cumulative sum from above, written in C, comes close to `cumsum()`. It
+is a little faster than the compiled R loop, which also does what R does on
+every step, such as checking for an interrupt.
+
+```{r, eval = zumir::zumir_tier() != "none" && requireNamespace("bench", quietly = TRUE)}
+csum_c <- cfunction("
+  void csum_c(int n, const double *x, double *y) {
+    double acc = 0;
+    for (int i = 0; i < n; i++) {
+      acc += x[i];
+      y[i] = acc;
+    }
+  }", out = "y", n = "n")
+
+x <- rnorm(1e6)
+bench::mark(csum(x), csum_c(x = x), cumsum(x), min_iterations = 10)[, 1:5]
 ```
 
 ## Return a value

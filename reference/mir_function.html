@@ -82,11 +82,13 @@ as the function does.</p>
     <p>The function must be exported by its module (<code>export name</code>), and take
 and return numbers only: the integer types <code>i8</code> to <code>u64</code>, <code>f</code> and <code>d</code>,
 with at most one result. The R function has one argument per MIR
-argument, by the same names, each a single number. An integer argument
-must be a whole number that fits its type. Results of 8 to 32 bits are R
+argument, by the same names, each a single number (not a factor or a
+date). An integer argument must be a whole number that fits its type;
+an <code>f</code> argument is rounded to the nearest float. Results of 8 to 32 bits
+are R
 integers; 64-bit results and <code>u32</code> are doubles, and one beyond 2^53 is
 an error, since a double could not hold it exactly.</p>
-<p>The code may call the C math library and <code>memcpy</code>, <code>memmove</code>, <code>memset</code>,
+<p>The code may call the C maths library and <code>memcpy</code>, <code>memmove</code>, <code>memset</code>,
 <code>memcmp</code> and <code>strlen</code> by name (<code>import exp</code>); any other import is a link
 error. Compiled code runs with the rights of <code><a href="https://rdrr.io/r/base/CallExternal.html" class="external-link">.Call()</a></code> code: a wrong
 memory access crashes R, as it would in a package's C code.</p>

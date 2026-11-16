@@ -155,6 +155,19 @@ zumir_info()
 #> [26] "06104552 Empty the buffer when a macro argument has no start marker"                  
 #> [27] "46ed8157 Generate no code from a source with parse errors"                            
 #> [28] "a603752b Keep the current stream valid after the end of the unit"                     
+#> [29] "89750416 Grow both of the interpreter's call arrays"                                  
+#> [30] "f1c087be Refuse a label that is not in the function"                                  
+#> [31] "1d1d3ea6 Renumber the SSA edges copy_prop swaps, and skip operands with none"         
+#> [32] "4c9aab06 Convert to _Bool by comparing with zero in c2mir"                            
+#> [33] "6a2b27b6 Convert floating values from 2^63 up to unsigned long long in c2mir"         
+#> [34] "9dd2334d Give float.h C11's digits and the platform's long double, and NULL"          
+#> [35] "e70b8330 Type character constants as int, and wide strings by their elements"         
+#> [36] "124486f0 Convert _Generic's operand and #if's conditional as C11 does"                
+#> [37] "0557c2a1 Alias a bit-field access by the member's type in c2mir"                      
+#> [38] "3c282253 Add MIR_interp_prepare: allocate at link what a call would"                  
+#> [39] "75b5075b Fold floating constants to integer types without undefined behaviour"        
+#> [40] "06e8281a Fold signed addition and subtraction by wrapping in c2mir"                   
+#> [41] "b4c30634 Fold every signed operation by wrapping in c2mir"                            
 #> 
 #> $target
 #> [1] TRUE
@@ -175,10 +188,10 @@ zumir_info()
 #> 
 #> $memory
 #> $memory$contexts
-#> [1] 4
+#> [1] 6
 #> 
 #> $memory$bytes
-#> [1] 2004718
+#> [1] 2535896
 
 csum_interp <- mir_compile(csum_r, tier = "interp")
 ```

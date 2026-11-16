@@ -45,6 +45,15 @@
 <li><p><code><a href="../reference/mir_function.html">mir_function()</a></code> compiles a function from MIR’s textual form, natively or on MIR’s interpreter, and returns an R function that calls it.</p></li>
 <li><p><code><a href="../reference/mir_compile.html">mir_compile()</a></code> compiles a numeric R function, in a subset of R, to native code that returns exactly what R returns, warnings and errors included. Where matching R is not cheap it refuses, at compile time or at the call, with a classed error. Compiled loops stop for Ctrl-C and <code><a href="https://rdrr.io/r/base/setTimeLimit.html" class="external-link">setTimeLimit()</a></code>.</p></li>
 <li><p>Packages can build and compile MIR code through zumir’s C API: put <code>LinkingTo: zumir</code> in DESCRIPTION and include <code>zumir.h</code>. MIR’s errors are reported through the context, never by ending the R session.</p></li>
+<li>
+<p>A critical review before release (<a href="https://github.com/pedrobtz/zumir/issues/54" class="external-link">#54</a> to <a href="https://github.com/pedrobtz/zumir/issues/108" class="external-link">#108</a>) fixed what it found, each with a test:</p>
+<ul><li>in the vendored MIR: a code generator crash, an interpreter overflow on calls of 95 or more arguments, labels used but never placed, <code>_Bool</code> and <code>unsigned long long</code> conversions, <code>float.h</code>, <code>NULL</code>, character constant types, <code>_Generic</code>, <code>#if</code>’s <code>?:</code> and bit-field reads;</li>
+<li>
+<code><a href="../reference/mir_compile.html">mir_compile()</a></code> refuses an empty result block and calls with argument counts R refuses, where it gave a value;</li>
+<li>
+<code><a href="../reference/cfunction.html">cfunction()</a></code> reads its signature after the preprocessor, so a comment or <code>#if 0</code> can no longer make it write the caller’s vector; it accepts functions of no parameters and refuses factors and dates for pointers;</li>
+<li>an interpreted function’s first call no longer allocates, so it cannot fail outside zumir’s error handling; the C API turns every misuse it can detect into a status; unloading zumir with a compiled function alive no longer crashes R.</li>
+</ul></li>
 <li><p><code><a href="../reference/zumir_info.html">zumir_info()</a></code> reports the vendored MIR and its patches, which tiers run in this session and why the others do not, and the memory MIR contexts hold. <code><a href="../reference/zumir_info.html">zumir_tier()</a></code> is the default tier: <code>"native"</code>, <code>"interp"</code>, or <code>"none"</code> where the system refuses writable and executable memory.</p></li>
 </ul></div>
   </main></div>

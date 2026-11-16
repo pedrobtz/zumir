@@ -55,7 +55,16 @@ conditions and a table of maths. In detail:
   `sin`, `cos`, `tan`; two-argument `min` and `max`; `length`, `is.na`,
   `is.nan`, `is.finite`, `as.double`.
 
-- The result is a double scalar or a vector local.
+- The result is a double scalar or a vector local, never an empty block
+  ([`{}`](https://rdrr.io/r/base/Paren.html), which is `NULL` in R).
+  Each construct takes the arguments R accepts; any other count is a
+  compile error.
+
+Every argument the body reads, on any path, is evaluated before the
+compiled code runs, since types are inferred over the whole body. An
+argument R would never evaluate (in a branch not taken) is evaluated,
+its side effects happen, and a value outside the subset is an error
+where R might not have looked at it.
 
 Where matching R exactly would not be cheap, the compiled function
 errors instead: an index out of range, `NA` or not a whole number; a
@@ -72,8 +81,8 @@ builds, and [`is.nan()`](https://rdrr.io/r/base/is.finite.html) of such
 a value can take a different branch.
 [`is.na()`](https://rdrr.io/r/base/NA.html) is `TRUE` either way.
 
-[What mir_compile()
-accepts](https://pedrobtz.github.io/zumir/articles/mir-compile.html)
+The article
+[`vignette("mir-compile", package = "zumir")`](https://pedrobtz.github.io/zumir/articles/mir-compile.md)
 lists the subset in full, every place it errors where R would answer,
 and why.
 

@@ -90,8 +90,15 @@ local is assigned on every path before it is read.</p></li>
 <code>log</code>, <code>log1p</code>, <code>expm1</code>, <code>sqrt</code>, <code>abs</code>, <code>floor</code>, <code>ceiling</code>, <code>trunc</code>,
 <code>sin</code>, <code>cos</code>, <code>tan</code>; two-argument <code>min</code> and <code>max</code>; <code>length</code>, <code>is.na</code>,
 <code>is.nan</code>, <code>is.finite</code>, <code>as.double</code>.</p></li>
-<li><p>The result is a double scalar or a vector local.</p></li>
-</ul><p>Where matching R exactly would not be cheap, the compiled function
+<li><p>The result is a double scalar or a vector local, never an empty
+block (<code><a href="https://rdrr.io/r/base/Paren.html" class="external-link">{}</a></code>, which is <code>NULL</code> in R). Each construct takes the arguments
+R accepts; any other count is a compile error.</p></li>
+</ul><p>Every argument the body reads, on any path, is evaluated before the
+compiled code runs, since types are inferred over the whole body. An
+argument R would never evaluate (in a branch not taken) is evaluated, its
+side effects happen, and a value outside the subset is an error where R
+might not have looked at it.</p>
+<p>Where matching R exactly would not be cheap, the compiled function
 errors instead: an index out of range, <code>NA</code> or not a whole number; a
 <code><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len()</a></code> or <code>a:b</code> bound that is <code>NA</code> or not whole; integer overflow;
 an argument that is not a double, has attributes, or is a scalar of
@@ -102,9 +109,8 @@ compile error naming the construct.</p>
 comes out (see <a href="https://rdrr.io/r/base/NA.html" class="external-link">NA</a>), and so does <code>mir_compile()</code>: the answer can differ
 between R, the two tiers and builds, and <code><a href="https://rdrr.io/r/base/is.finite.html" class="external-link">is.nan()</a></code> of such a value
 can take a different branch. <code><a href="https://rdrr.io/r/base/NA.html" class="external-link">is.na()</a></code> is <code>TRUE</code> either way.</p>
-<p><a href="https://pedrobtz.github.io/zumir/articles/mir-compile.html">What mir_compile() accepts</a>
-lists the subset in full, every place it errors where R would answer,
-and why.</p>
+<p>The article <code><a href="../articles/mir-compile.html">vignette("mir-compile", package = "zumir")</a></code> lists the
+subset in full, every place it errors where R would answer, and why.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

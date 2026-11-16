@@ -19,7 +19,9 @@ cfunction(code, out = character(), n = NULL, tier = NULL)
 - out:
 
   Names of the output (non-`const` pointer) parameters, or a named
-  integer vector giving each a fixed length.
+  integer vector giving each a fixed length;
+  [`character()`](https://rdrr.io/r/base/character.html) or `NULL` for
+  none.
 
 - n:
 
@@ -54,11 +56,14 @@ helpers beside it are fine. Its parameters may be `int`, `double`,
 
 - A `const` pointer is an input, passed without a copy: an integer or
   double vector (an integer vector is converted for a `const double *`).
+  A factor, `Date`, `POSIXct` or `difftime` is refused, for a pointer as
+  for a scalar.
 
 - A non-`const` pointer is an output and must be named in `out`. When
   the call supplies a value, the C function gets a copy of it; when it
   does not, a zero-filled vector. Either way the caller's vector is
-  never changed, and the written copy is returned.
+  never changed, and the written copy is returned, without the supplied
+  value's names, dimensions or class.
 
 - `n` names an `int` parameter that receives a length. When the call
   does not give it, it is the common length of the pointer inputs; when
@@ -68,6 +73,15 @@ helpers beside it are fine. Its parameters may be `int`, `double`,
 The R function returns the C function's value, or its one output, or,
 when there are several, a named list: the value first, named after the
 function, then the outputs by parameter name.
+
+`NA` crosses as R's C API carries it: an `NA` element of an integer
+input arrives in C as `INT_MIN`, and `INT_MIN` in an `int` result or
+output comes back as `NA`. An `NA` double is a NaN in C.
+
+The signature is read from the source as c2mir's preprocessor leaves it,
+so comments, `#if` branches and macros cannot change what is read. Any
+other parameter or return type (`float`, `long double`, `unsigned`,
+`char`, a typedef) is a compile error.
 
 Code compiled by `cfunction()` runs with
 [`.Call()`](https://rdrr.io/r/base/CallExternal.html)'s rights: it can

@@ -63,7 +63,8 @@ needed: no Rtools, Xcode tools or <code>gcc</code>.</p>
 
 <dt id="arg-out">out<a class="anchor" aria-label="anchor" href="#arg-out"></a></dt>
 <dd><p>Names of the output (non-<code>const</code> pointer) parameters, or a
-named integer vector giving each a fixed length.</p></dd>
+named integer vector giving each a fixed length; <code><a href="https://rdrr.io/r/base/character.html" class="external-link">character()</a></code> or
+<code>NULL</code> for none.</p></dd>
 
 
 <dt id="arg-n">n<a class="anchor" aria-label="anchor" href="#arg-n"></a></dt>
@@ -94,11 +95,14 @@ link errors. The function is generated on the session's tier
 helpers beside it are fine. Its parameters may be <code>int</code>, <code>double</code>,
 <code>const int *</code>, <code>const double *</code>, <code>int *</code> and <code>double *</code>, and it returns
 <code>void</code>, <code>int</code> or <code>double</code>.</p><ul><li><p>A <code>const</code> pointer is an input, passed without a copy: an integer or
-double vector (an integer vector is converted for a <code>const double *</code>).</p></li>
+double vector (an integer vector is converted for a <code>const double *</code>).
+A factor, <code>Date</code>, <code>POSIXct</code> or <code>difftime</code> is refused, for a pointer as
+for a scalar.</p></li>
 <li><p>A non-<code>const</code> pointer is an output and must be named in <code>out</code>. When
 the call supplies a value, the C function gets a copy of it; when it
 does not, a zero-filled vector. Either way the caller's vector is
-never changed, and the written copy is returned.</p></li>
+never changed, and the written copy is returned, without the
+supplied value's names, dimensions or class.</p></li>
 <li><p><code>n</code> names an <code>int</code> parameter that receives a length. When the call
 does not give it, it is the common length of the pointer inputs; when
 it does, it may not exceed any of them. Outputs have length <code>n</code>,
@@ -106,6 +110,13 @@ unless <code>out</code> gives them a fixed length, as in <code>out = c(y = 3)</c
 </ul><p>The R function returns the C function's value, or its one output, or,
 when there are several, a named list: the value first, named after the
 function, then the outputs by parameter name.</p>
+<p><code>NA</code> crosses as R's C API carries it: an <code>NA</code> element of an integer
+input arrives in C as <code>INT_MIN</code>, and <code>INT_MIN</code> in an <code>int</code> result or
+output comes back as <code>NA</code>. An <code>NA</code> double is a NaN in C.</p>
+<p>The signature is read from the source as c2mir's preprocessor leaves it,
+so comments, <code>#if</code> branches and macros cannot change what is read. Any
+other parameter or return type (<code>float</code>, <code>long double</code>, <code>unsigned</code>,
+<code>char</code>, a typedef) is a compile error.</p>
 <p>Code compiled by <code>cfunction()</code> runs with <code><a href="https://rdrr.io/r/base/CallExternal.html" class="external-link">.Call()</a></code>'s rights: it can
 read and write any memory a C function can, and a loop that never ends
 is not interrupted.</p>

@@ -330,7 +330,9 @@ endgroup
 # sanitizer runtime preloaded. A second zumir_ctx_free(), a NULL argument
 # or a write past an array is reported here; the plain build above passes
 # it silently.
-if [ "$os" = ubuntu ] && [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
+# x86-64 only: one sanitised leg is enough for the C API, and the build
+# took the aarch64 job past its timeout.
+if [ "$os" = ubuntu ] && [ "$(uname -m)" = x86_64 ] && [ "${R_ACTIONS_PROFILE:-quick}" = full ]; then
   group "Consumer package under ASan"
   asan_lib="$tmp/asan-lib"
   mkdir -p "$asan_lib"

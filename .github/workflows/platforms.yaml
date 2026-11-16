@@ -42,7 +42,7 @@ jobs:
       # The script installs the package and runs its tests (the no-target
       # build), so R-only changes run it too, and it needs testthat.
       r-dependencies: true
-      timeout-minutes: 30
+      timeout-minutes: 40
       os: >-
         ${{ github.event_name == 'pull_request'
           && '["macos-latest", "windows-latest", "ubuntu-latest", "ubuntu-24.04-arm"]'

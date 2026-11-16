@@ -42,7 +42,10 @@ test_that("unloading with a live compiled function keeps the DLL, and exits clea
       "cat('again:', f(2), '\\n')",
       "before <- zumir_info()$memory$contexts",
       "rm(f); invisible(gc()); invisible(gc())",
-      "cat('contexts:', zumir_info()$memory$contexts == before - 1L, '\\n')",
+      # At most what it was: a context's finalizer from the old load must
+      # not throw the count off. Not exactly one less: a leg that keeps
+      # byte-code constants (rcnst) keeps f's body, and its context, alive.
+      "cat('contexts:', zumir_info()$memory$contexts <= before, '\\n')",
       "g <- mir_compile(function(x) x * 2)",
       "cat('new:', g(3), '\\n')"
     ),

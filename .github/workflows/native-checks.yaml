@@ -1,14 +1,14 @@
 on:
   # No `push:`. A pull request already checks its merge with main, so the
   # push after merge would check the same tree again, in every package at
-  # once. Main is checked by the schedule below, which skips a commit it has
-  # already checked (r-actions README, "Pushes to main").
+  # once. With no schedule (removed before the repository went private,
+  # #53), main's full checks are a dispatch on its head: the readiness and
+  # release commits always get one (ci.md).
   # `labeled`/`unlabeled` so that adding or removing a CI label (`full-ci`,
   # `ci:minimal`, `skip-ci:<workflow>`) reruns it.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # The full set runs weekly and on demand:
-  # `gh workflow run native-checks.yaml --ref main`.
+  # The full set runs on demand: `gh workflow run native-checks.yaml --ref main`.
   workflow_dispatch:
 
 name: native-checks
@@ -23,7 +23,7 @@ concurrency:
 # `profile` goes to the three workflows it changes: quick skips the asan
 # containers, valgrind and cran-special. lto and rchk take minutes either
 # way and run on every pull request, as does analyzers. gctorture has its own caller,
-# gctorture.yaml, with step 20 on a schedule.
+# gctorture.yaml, with step 20 on a dispatch.
 jobs:
   sanitizers:
     # Decided without a runner (ci.md, Labels); the gate inside repeats it.

@@ -157,3 +157,106 @@ test_that("both tiers give the same answers", {
     expect_identical(n(v), i(v))
   }
 })
+
+# The vendored c2mir fixes of the critical review (src/vendor/PROVENANCE),
+# each against the value C11 and the platform's cc give.
+
+test_that("a conversion to _Bool compares with zero (#65)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  src <- "
+    static _Bool id(_Bool b) { return b; }
+    static _Bool sb = 5;
+    void f(int n, double *y) {
+      int flags = 0x300, i256 = 256; double h = 0.5; long long L = 0x100000000LL;
+      int k = 0;
+      _Bool has = flags & 0x100; y[k++] = has;
+      y[k++] = (_Bool) 0.5; y[k++] = (_Bool) 256; y[k++] = (_Bool) i256;
+      y[k++] = (_Bool) h; y[k++] = (_Bool) L; y[k++] = (_Bool) &flags;
+      _Bool b = 1; b += 1; y[k++] = b;
+      y[k++] = sb; y[k++] = id(i256); y[k++] = id(0.5);
+      struct { _Bool a : 1; } s; s.a = 2; y[k++] = s.a;
+      _Bool arr[2] = {256, 0.1}; y[k++] = arr[0] + arr[1];
+      y[k++] = (_Bool) 0; y[k++] = (_Bool) 0.0;
+    }"
+  want <- c(rep(1, 12), 2, 0, 0, 0)
+  for (tier in tiers_here()) {
+    f <- cfunction(src, out = c(y = 16), tier = tier)
+    expect_identical(f(n = 16L), want, info = tier)
+  }
+})
+
+test_that("a floating value from 2^63 up converts to unsigned long long (#66)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  src <- "
+    double f(double x) { unsigned long long u = x; return (double) u; }"
+  xs <- c(2^63 - 1024, 2^63, 1e19, 2^64 - 2048, 0, 1)
+  for (tier in tiers_here()) {
+    f <- cfunction(src, tier = tier)
+    expect_identical(vapply(xs, f, 0), xs, info = tier)
+  }
+})
+
+test_that("float.h, NULL, character constants and _Generic are C11's (#67)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  src <- "
+    void f(int n, double *y) {
+      int k = 0, *p = NULL;
+      y[k++] = FLT_DIG; y[k++] = DBL_DIG; y[k++] = DBL_MANT_DIG;
+      y[k++] = p == NULL;
+      y[k++] = sizeof ('a') == sizeof (int);
+      y[k++] = sizeof (L\"ab\") == 3 * sizeof (wchar_t);
+      y[k++] = _Generic (u'a', unsigned short: 1, default: 2);
+    #if (1 ? -1 : 0u) < 0
+      y[k++] = 1;
+    #else
+      y[k++] = 2;
+    #endif
+      /* The LDBL_ macros describe the long double c2mir computes with. */
+      long double one = 1;
+      y[k++] = one + LDBL_EPSILON != one && one + LDBL_EPSILON / 2 == one;
+      y[k++] = LDBL_MANT_DIG >= DBL_MANT_DIG;
+    }"
+  want <- c(6, 15, 53, 1, 1, 1, 1, 2, 1, 1)
+  # valgrind computes long double at double precision, so the epsilon
+  # probe (the 9th) holds everywhere but under it.
+  keep <- if (Sys.getenv("R_ACTIONS_WORKFLOW") == "valgrind") -9L else 1:10
+  for (tier in tiers_here()) {
+    f <- cfunction(src, out = c(y = 10), tier = tier)
+    expect_identical(f(n = 10L)[keep], want[keep], info = tier)
+  }
+})
+
+test_that("a narrow bit-field reads what was stored, on every tier (#68)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  src <- "
+    void f(int n, double *y) {
+      struct { unsigned a : 3; long long b : 40; unsigned long long c : 31;
+               int d : 31; unsigned e : 32; } q = {7, 1, 1, 1, 1};
+      long long t = q.c;
+      y[0] = t; y[1] = (double) (q.c + 1); y[2] = q.a; y[3] = q.d;
+    }"
+  for (tier in tiers_here()) {
+    f <- cfunction(src, out = c(y = 4), tier = tier)
+    expect_identical(f(n = 4L), c(1, 2, 7, 1), info = tier)
+  }
+})
+
+test_that("an and feeding a uext compiles natively, in a child process (#56)", {
+  skip_if(zumir_tier() != "native", "native code does not run here")
+  lib <- installed_lib()
+  skip_if(is.null(lib), "zumir is not installed: run under R CMD check")
+  res <- run_child(
+    lib,
+    c(
+      "library(zumir)",
+      paste0(
+        "f <- cfunction('double f(int n) { unsigned mask = 0xff; ",
+        "unsigned r = mask & (unsigned) n; return r; }', tier = 'native')"
+      ),
+      "cat('value:', f(300L), f(-1L), '\\n')"
+    ),
+    timeout = 120
+  )
+  expect_identical(res$status, 0L)
+  expect_true("value: 44 255 " %in% res$output)
+})

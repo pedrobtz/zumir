@@ -217,9 +217,14 @@ static compiled compile_model(const model_t *m, int tier) {
              NULL);
     for (MIR_item_t it = DLIST_HEAD(MIR_item_t, mod->items); it != NULL;
          it = DLIST_NEXT(MIR_item_t, it))
-      if (it->item_type == MIR_func_item) c.fn = (rhs_fn) it->addr;
+      if (it->item_type == MIR_func_item) {
+        if (tier == ZUMIR_ITIER_INTERP) MIR_interp_prepare(ctx, it);
+        c.fn = (rhs_fn) it->addr;
+      }
     zumir_trap_pop(&t);
     c.ok = c.fn != NULL;
+  } else if (arena != NULL) {
+    zumir_arena_mark_failed(arena); /* never MIR_finish after a raise */
   }
   c.ctx = ctx;
   c.arena = arena;

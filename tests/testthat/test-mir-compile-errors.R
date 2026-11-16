@@ -265,3 +265,23 @@ test_that("a time limit stops compiled loops, and the session goes on", {
   expect_identical(sum(out$output == "message TRUE "), 2L, info = info)
   expect_true("again 10 65537 " %in% out$output, info = info)
 })
+
+test_that("a compiled call inside the poll keeps the outer call's warning (#77)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  # The poll runs pending finalizers: R code that may call a compiled
+  # function inside another's call. The inner call cleared the outer
+  # call's flags, so fo(-1, 3e5) lost sqrt(-1)'s warning (found under
+  # gctorture with a finalizer that calls one). The entry stands in for
+  # the poll: the flags as the outer call left them, then R code.
+  for (tier in tiers_here()) {
+    fi <- mir_compile(function(a) a + 1, tier = tier)
+    flags <- .Call(zumir_test_nested_flags, function() fi(1), environment())
+    expect_identical(flags, c(TRUE, TRUE), info = tier)
+    # And the inner call's own warning is still its own.
+    fw <- mir_compile(function(a) sqrt(a), tier = tier)
+    expect_warning(
+      .Call(zumir_test_nested_flags, function() fw(-1), environment()),
+      class = "simpleWarning"
+    )
+  }
+})

@@ -85,11 +85,15 @@ typedef struct zumir_api_v1 {
 
   /* zumir's own entries; each returns a status or sets *status. */
   zumir_ctx *(*zumir_ctx_new)(int *status);
-  void (*zumir_ctx_free)(zumir_ctx *z); /* NULL, or twice: does nothing */
+  /* NULL does nothing; z is freed, and must not be used or freed again
+   * (zumir cannot tell a freed handle from a live one) */
+  void (*zumir_ctx_free)(zumir_ctx *z);
   MIR_context_t (*zumir_mir)(zumir_ctx *z);
   int (*zumir_status)(zumir_ctx *z, const char **message);
   void *(*zumir_compile)(zumir_ctx *z, MIR_module_t module, const char *name, int tier,
                          int *tier_out, int *status);
+  /* An import for this context's links; it takes precedence over the C
+   * maths library's function of the same name. */
   int (*zumir_import)(zumir_ctx *z, const char *name, void *addr);
 
   /* MIR's API, as shims (D20). */
@@ -146,7 +150,18 @@ typedef struct zumir_api_v1 {
   MIR_op_t (*MIR_new_label_op)(MIR_context_t ctx, MIR_label_t label);
   const char *(*MIR_insn_name)(MIR_context_t ctx, MIR_insn_code_t code);
   void (*MIR_output_module)(MIR_context_t ctx, FILE *f, MIR_module_t module);
+
+  /* Appended later in version 1: present when `size` covers it
+   * (ZUMIR_API_HAS). Fails the zumir context owning ctx with `message`,
+   * as a shim does when MIR raises; for a consumer's own checks, such as
+   * the emitter's limits. */
+  void (*zumir_mir_fail)(MIR_context_t ctx, const char *message);
 } zumir_api_v1;
+
+/* Whether table `api` has field `field`: its size covers it. */
+#define ZUMIR_API_HAS(api, field)                                              \
+  ((api)->size >= offsetof(zumir_api_v1, field) + sizeof((api)->field) &&     \
+   (api)->field != NULL)
 
 /* The getter registered with R_RegisterCCallable("zumir", "zumir_api_get"):
  * the table, or NULL with *why set when this zumir cannot serve `version`
@@ -219,15 +234,29 @@ static inline const zumir_api_v1 *zumir_api_load(const char **why) {
 #define MIR_insn_name zumir_api_->MIR_insn_name
 #define MIR_output_module zumir_api_->MIR_output_module
 
+/* Fails the emitter's context with `message`: through zumir_mir_fail when
+ * the provider has it, else through an invalid instruction, which the
+ * shim also records as an error. */
+static inline void zumir_emit_fail_(MIR_context_t ctx, const char *message) {
+  if (ZUMIR_API_HAS(zumir_api_, zumir_mir_fail))
+    zumir_api_->zumir_mir_fail(ctx, message);
+  else
+    (void) MIR_new_insn_arr(ctx, MIR_INSN_BOUND, 0, NULL);
+}
+
 /* ---- The double emitter (D13) -------------------------------------------
  * Straight-line double code with branches, as a lowering from an IR needs:
  * registers, loads and stores at an index from a pointer register (y[i],
  * par[k]), the four operations, negation, constants, comparisons,
  * branches, and calls to the math table by name, each import and its
- * prototype made once per emitter. Every helper goes through the shims, so
- * after an error it does nothing; check once, at zumir_compile(). */
+ * prototype made once per module. Every helper goes through the shims, so
+ * after an error it does nothing; check once, at zumir_compile(). An
+ * emitter calls at most ZUMIR_EMIT_MAX_CALLS distinct functions, each of
+ * at most 4 arguments and a name shorter than ZUMIR_EMIT_MAX_NAME; past
+ * either limit the context fails, and zumir_compile() reports it. */
 
 #define ZUMIR_EMIT_MAX_CALLS 32
+#define ZUMIR_EMIT_MAX_NAME 64
 
 typedef struct zumir_emitter {
   MIR_context_t ctx;
@@ -236,7 +265,7 @@ typedef struct zumir_emitter {
   unsigned ntmp;
   int ncalls;
   struct {
-    const char *name;
+    char name[ZUMIR_EMIT_MAX_NAME]; /* a copy: the caller's buffer may change */
     int nargs;
     MIR_item_t proto, import;
   } calls[ZUMIR_EMIT_MAX_CALLS];
@@ -374,12 +403,20 @@ static inline void zumir_emit_move(zumir_emitter *e, MIR_reg_t r, MIR_reg_t a) {
  * library, or what the consumer registered with zumir_import(). */
 static inline MIR_reg_t zumir_emit_call(zumir_emitter *e, const char *name, int nargs,
                                         const MIR_reg_t *args) {
-  int k;
+  int k, len = 0;
   MIR_op_t ops[3 + 4];
   MIR_reg_t r = zumir_emit_reg(e, MIR_T_D);
-  if (nargs < 0 || nargs > 4) return r;
+  if (nargs < 0 || nargs > 4) {
+    zumir_emit_fail_(e->ctx, "zumir_emit_call: a call takes 0 to 4 arguments");
+    return r;
+  }
+  while (name[len] != '\0' && len < ZUMIR_EMIT_MAX_NAME) len++;
+  if (len == 0 || len >= ZUMIR_EMIT_MAX_NAME - 8) {
+    zumir_emit_fail_(e->ctx, "zumir_emit_call: the function's name is empty or too long");
+    return r;
+  }
   for (k = 0; k < e->ncalls; k++)
-    if (e->calls[k].nargs == nargs && e->calls[k].name[0] == name[0]) {
+    if (e->calls[k].nargs == nargs) {
       const char *a = e->calls[k].name, *b = name;
       while (*a != '\0' && *a == *b) a++, b++;
       if (*a == *b) break;
@@ -387,23 +424,33 @@ static inline MIR_reg_t zumir_emit_call(zumir_emitter *e, const char *name, int 
   if (k == e->ncalls) {
     MIR_type_t res = MIR_T_D;
     MIR_var_t vars[4];
-    char proto_name[64];
+    char proto_name[ZUMIR_EMIT_MAX_NAME];
     const char *p = "_zp_";
     int n = 0;
-    if (k == ZUMIR_EMIT_MAX_CALLS) return r;
+    MIR_item_t it;
+    if (k == ZUMIR_EMIT_MAX_CALLS) {
+      zumir_emit_fail_(e->ctx, "zumir_emit_call: more than ZUMIR_EMIT_MAX_CALLS functions");
+      return r;
+    }
     for (int i = 0; i < nargs; i++) {
       vars[i].type = MIR_T_D;
       vars[i].name = i == 0 ? "a" : i == 1 ? "b" : i == 2 ? "c" : "d";
       vars[i].size = 0;
     }
     while (*p != '\0') proto_name[n++] = *p++;
-    for (p = name; *p != '\0' && n < 62; p++) proto_name[n++] = *p;
+    for (p = name; *p != '\0'; p++) proto_name[n++] = *p;
     proto_name[n++] = (char) ('0' + nargs);
     proto_name[n] = '\0';
-    e->calls[k].name = name;
+    for (int i = 0; i <= len; i++) e->calls[k].name[i] = name[i];
     e->calls[k].nargs = nargs;
-    e->calls[k].proto = MIR_new_proto_arr(e->ctx, proto_name, 1, &res, (size_t) nargs, vars);
-    e->calls[k].import = MIR_new_import(e->ctx, name);
+    /* Once per module: another function's emitter may have made them. */
+    it = MIR_get_module_item(e->ctx, e->func->module, proto_name);
+    e->calls[k].proto = it != NULL && it->item_type == MIR_proto_item
+                          ? it
+                          : MIR_new_proto_arr(e->ctx, proto_name, 1, &res, (size_t) nargs, vars);
+    it = MIR_get_module_item(e->ctx, e->func->module, name);
+    e->calls[k].import =
+      it != NULL && it->item_type == MIR_import_item ? it : MIR_new_import(e->ctx, name);
     e->ncalls++;
   }
   ops[0] = MIR_new_ref_op(e->ctx, e->calls[k].proto);

@@ -107,3 +107,43 @@ test_that("failing each of MIR's allocations in turn: an error, never a crash", 
   }
   expect_identical(.Call(zumir_test_live_arenas), base)
 })
+
+test_that("an interpreted function's first call allocates nothing (#60)", {
+  skip_if(!"interp" %in% tiers_here(), "the interpreter does not run here")
+  # The interpreter made its code, call interfaces and argument arrays at
+  # the first call, outside any trap: an allocation failure there was an
+  # unclassed error, and through the C API a longjmp across the consumer.
+  # They are made at link now, so failing the call's allocations changes
+  # nothing.
+  fail_at <- function(n) invisible(.Call(zumir_test_fail_alloc, n))
+  on.exit(fail_at(0L))
+  makers <- list(
+    mir_compile = function() {
+      mir_compile(function(x) sqrt(x) + 1, tier = "interp")
+    },
+    cfunction = function() {
+      cfunction("double f(double x) { return sin(x) + 1; }", tier = "interp")
+    },
+    mir_function = function() {
+      mir_function(
+        "m: module\nexport f\nf: func d, d:a\ndadd a, a, a\nret a\nendfunc\nendmodule\n",
+        "f",
+        tier = "interp"
+      )
+    }
+  )
+  want <- list(
+    mir_compile = sqrt(2) + 1,
+    cfunction = sin(2) + 1,
+    mir_function = 4
+  )
+  for (nm in names(makers)) {
+    for (n in 1:4) {
+      f <- makers[[nm]]()
+      fail_at(n)
+      got <- tryCatch(f(2), error = function(e) e)
+      fail_at(0L)
+      expect_identical(got, want[[nm]], info = paste(nm, n))
+    }
+  }
+})

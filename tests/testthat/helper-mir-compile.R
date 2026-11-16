@@ -67,9 +67,15 @@ run_r <- function(f, args) {
   run_capture(plain, args)
 }
 
-compare_with_r <- function(f, g, args, na_nan = "inputs") {
+# `tally`, an environment, counts in $values the comparisons where R
+# returned a value: a floor on it shows the comparisons compared values,
+# not two errors.
+compare_with_r <- function(f, g, args, na_nan = "inputs", tally = NULL) {
   r <- run_r(f, args)
   z <- run_capture(g, args)
+  if (!is.null(tally) && !inherits(r$value, "error")) {
+    tally$values <- tally$values + 1L
+  }
   if (inherits(r$value, "error")) {
     if (!inherits(z$value, "error")) {
       return(sprintf(
@@ -202,7 +208,9 @@ rf_gen_leaf <- function(env) {
   # x is indexed only by a seq_along(x) variable: any other index can fall
   # outside x, where R reads NA and mir_compile() refuses (D16).
   if (k == 3 && length(env$alongvars)) {
-    return(call("[", quote(x), as.name(sample(env$alongvars, 1))))
+    i <- as.name(sample(env$alongvars, 1))
+    # An index that is a double as well as one that is an integer.
+    return(call("[", quote(x), if (runif(1) < 0.3) call("as.double", i) else i))
   }
   as.name(sample(c("a", "b", env$locals), 1))
 }
@@ -211,6 +219,7 @@ rf_gen_expr <- function(depth, env) {
   if (depth <= 0 || runif(1) < 0.25) {
     return(rf_gen_leaf(env))
   }
+
   k <- sample(10, 1)
   if (k <= 5) {
     op <- sample(
@@ -283,7 +292,8 @@ rf_gen_stmt <- function(depth, env) {
   if (k <= 7) {
     s <- call("if", rf_gen_cond(2, env), rf_gen_block(depth - 1, env))
     if (runif(1) < 0.5) {
-      s[[4]] <- rf_gen_block(depth - 1, env)
+      # Sometimes an empty branch, a statement that does nothing.
+      s[[4]] <- if (runif(1) < 0.1) quote({}) else rf_gen_block(depth - 1, env)
     }
     return(s)
   }
@@ -354,6 +364,18 @@ rf_gen_function <- function(na = TRUE) {
   }
   stmts <- lapply(seq_len(sample(1:4, 1)), function(i) rf_gen_stmt(2, env))
   result <- rf_gen_expr(2, env)
+  # Rarely, a shape outside the subset that once compiled anyway: an empty
+  # result branch, NULL in R (#54); a call with an argument R refuses
+  # (#69); an attributed logical (#70). Each must be refused or answer as R
+  # does; one function in about 30 has one.
+  odd <- sample(4, 1, prob = c(0.97, 0.01, 0.01, 0.01))
+  result <- switch(
+    odd,
+    result,
+    call("if", rf_gen_cond(1, env), result, quote({})),
+    call("^", result, 2, 3),
+    call("+", result, c(a = TRUE))
+  )
   # A while statement's counters are locals too: give them a value first.
   ws <- if (env$count$n > 1) {
     lapply(paste0("w", seq_len(env$count$n - 1)), function(w) {
@@ -380,12 +402,13 @@ rf_gen_args <- function(na = TRUE) {
 
 # ---- The random differential's run: count, seed and reproducer ----
 
-# 10^2 functions, or 10^4 on the full profile's R CMD check legs. Under a
+# 10^2 functions, or 10^4 on the full profile (full_profile(), which resolves
+# r-actions' "auto" on the R CMD check legs). Under a
 # memory tool (valgrind, gctorture, the sanitizers), which runs R 20 to 100
 # times slower, the full profile keeps 10^2: those legs check memory, and
 # the check legs carry the differential's breadth.
 rf_random_count <- function() {
-  full <- identical(Sys.getenv("R_ACTIONS_PROFILE"), "full")
+  full <- full_profile()
   tool <- Sys.getenv("R_ACTIONS_WORKFLOW") %in%
     c("valgrind", "gctorture", "sanitizers")
   if (full && !tool) 10000L else 100L

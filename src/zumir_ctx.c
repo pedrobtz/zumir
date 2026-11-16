@@ -81,6 +81,7 @@ void zumir_rctx_free(zumir_rctx *z) {
   for (size_t i = 0; i < z->nextra; i++) free((void *) z->extra[i].name);
   free(z->extra);
   free(z->arg_types);
+  free(z->loaded);
   free(z);
 }
 
@@ -124,20 +125,51 @@ typedef struct {
   void *fn;
 } compile_arg;
 
+static int module_loaded(const zumir_rctx *z, MIR_module_t m) {
+  for (size_t i = 0; i < z->nloaded; i++)
+    if (z->loaded[i] == m) return 1;
+  return 0;
+}
+
+/* Loads m unless an earlier compile did: a second MIR_load_module of a
+ * module with an export failed the context ("prohibited for
+ * redefinition"), so a module gave only one entry point. Under the trap. */
+static void load_once(zumir_rctx *z, MIR_module_t m) {
+  if (module_loaded(z, m)) return;
+  if (z->nloaded == z->cap_loaded) {
+    size_t cap = z->cap_loaded == 0 ? 8 : 2 * z->cap_loaded;
+    MIR_module_t *p = realloc(z->loaded, cap * sizeof(*p));
+    if (p == NULL)
+      MIR_get_error_func(z->ctx)(MIR_alloc_error, "Not enough memory for the module list");
+    z->loaded = p;
+    z->cap_loaded = cap;
+  }
+  MIR_load_module(z->ctx, m);
+  z->loaded[z->nloaded++] = m;
+}
+
 static void body_compile(zumir_rctx *z, void *arg) {
   compile_arg *c = arg;
   MIR_context_t ctx = z->ctx;
   if (c->tier == ZUMIR_ITIER_NATIVE) start_gen(z);
   if (c->module != NULL) {
-    MIR_load_module(ctx, c->module);
+    load_once(z, c->module);
   } else {
     for (MIR_module_t m = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(ctx)); m != NULL;
          m = DLIST_NEXT(MIR_module_t, m))
-      MIR_load_module(ctx, m);
+      load_once(z, m);
   }
   zumir_imports_load(ctx, z->imports, z->extra, z->nextra);
   MIR_link(ctx, c->tier == ZUMIR_ITIER_NATIVE ? MIR_set_gen_interface : MIR_set_interp_interface,
            NULL);
+  /* The interpreter would generate code, make call interfaces and grow
+   * its arrays at the first call, outside any trap: an allocation failure
+   * there had no recovery point (design D4, D20). Do it all now. */
+  if (c->tier == ZUMIR_ITIER_INTERP)
+    for (size_t i = 0; i < z->nloaded; i++)
+      for (MIR_item_t it = DLIST_HEAD(MIR_item_t, z->loaded[i]->items); it != NULL;
+           it = DLIST_NEXT(MIR_item_t, it))
+        if (it->item_type == MIR_func_item) MIR_interp_prepare(ctx, it);
   c->fn = NULL;
   for (MIR_module_t m = DLIST_HEAD(MIR_module_t, *MIR_get_module_list(ctx)); m != NULL;
        m = DLIST_NEXT(MIR_module_t, m)) {
@@ -170,12 +202,15 @@ void *zumir_rctx_compile(zumir_rctx *z, MIR_module_t module, const char *name, i
   }
   /* One tier per context: generation redirects the thunks linked code
    * calls through, so the tiers are not mixed (design §4.3). */
-  if (z->tier >= 0 && z->tier != tier && z->fn != NULL) {
+  if (z->tier >= 0 && z->tier != tier && z->linked) {
     *status = ZUMIR_ST_ARG;
     return NULL;
   }
   z->tier = tier;
   compile_arg c = {module, name, tier, NULL};
+  /* Linked from here, whatever the run's outcome: even a compile that
+   * finds no function has linked the module on this tier. */
+  z->linked = 1;
   if (!zumir_rctx_run(z, body_compile, &c)) {
     *status = ZUMIR_ST_MIR;
     return NULL;

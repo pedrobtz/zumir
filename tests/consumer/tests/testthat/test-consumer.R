@@ -111,3 +111,77 @@ test_that("a consumer import resolves in its context only, and not under D6's li
     class = "zumir_mir_error"
   )
 })
+
+# The C API's guarantees from the critical review (src/review.c). Status
+# codes: 0 OK, 1 E_MIR, 2 E_FAILED, 4 E_NOT_FOUND, 5 E_ARG.
+
+test_that("an invalid opcode is a status on R's thread and another (#59)", {
+  skip_if(zumir::zumir_tier() == "none", "no tier runs here")
+  expect_identical(zumirconsumer:::zc_bad_opcode(), c(1L, 1L))
+})
+
+test_that("the emitter fails its context past its limits, not silently (#61)", {
+  skip_if(zumir::zumir_tier() == "none", "no tier runs here")
+  for (tier in if (zumir::zumir_tier() == "native") {
+    c("native", "interp")
+  } else {
+    "interp"
+  }) {
+    ok <- zumirconsumer:::zc_emit_limits(32, -1, tier)
+    expect_identical(ok, c(0, 32 * 1.5), info = tier)
+    expect_identical(
+      zumirconsumer:::zc_emit_limits(31, 2, tier)[[1]],
+      0,
+      info = tier
+    )
+    expect_true(
+      zumirconsumer:::zc_emit_limits(32, 2, tier)[[1]] %in% c(1, 2),
+      info = tier
+    )
+    expect_true(
+      zumirconsumer:::zc_emit_limits(0, 5, tier)[[1]] %in% c(1, 2),
+      info = tier
+    )
+    expect_identical(
+      zumirconsumer:::zc_emit_limits(0, 4, tier)[[1]],
+      0,
+      info = tier
+    )
+  }
+})
+
+test_that("the emitter copies names and shares prototypes in a module (#76, #90)", {
+  skip_if(zumir::zumir_tier() == "none", "no tier runs here")
+  x <- 0.7
+  for (tier in if (zumir::zumir_tier() == "native") {
+    c("native", "interp")
+  } else {
+    "interp"
+  }) {
+    r <- zumirconsumer:::zc_emit_names(x, tier)
+    expect_identical(r, c(0, sin(x) + cos(x), 0, sin(x) * cos(x)), info = tier)
+  }
+})
+
+test_that("a link that found no function still fixes the tier (#92)", {
+  skip_if(zumir::zumir_tier() != "native", "native code does not run here")
+  expect_identical(zumirconsumer:::zc_tier_lock(), c(4L, 5L))
+})
+
+test_that("NULL arguments to the shims are statuses, not crashes (#78)", {
+  skip_if(zumir::zumir_tier() == "none", "no tier runs here")
+  expect_identical(zumirconsumer:::zc_null_args(), rep(1L, 6))
+})
+
+test_that("an interpreted function's first call returns under an allocation failure (#60)", {
+  skip_if(!zumir::zumir_tier() %in% c("native", "interp"), "no tier runs here")
+  ns <- asNamespace("zumir")
+  on.exit(.Call(ns$zumir_test_fail_alloc, 0L))
+  for (n in 1:4) {
+    f <- zumirconsumer:::zc_interp_compile()
+    .Call(ns$zumir_test_fail_alloc, n)
+    r <- zumirconsumer:::zc_interp_call(f, 0.5)
+    .Call(ns$zumir_test_fail_alloc, 0L)
+    expect_identical(r, c(1, 1, sin(0.5) + 1), info = n)
+  }
+})

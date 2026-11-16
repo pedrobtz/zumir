@@ -70,18 +70,65 @@ static zumir_rctx *owner(MIR_context_t ctx) {
     zumir_rctx_fail(z, &t);                          \
   }
 
+/* Fails z with a zumir message, as a shim does when MIR raises. */
+static void fail_with(zumir_rctx *z, int type, const char *message) {
+  zumir_trap t;
+  t.type = type;
+  snprintf(t.message, sizeof(t.message), "%s", message);
+  zumir_rctx_fail(z, &t);
+}
+
+/* A shim that first refuses the arguments MIR would dereference unchecked
+ * (BAD), failing the context instead of crashing (D20). */
+#define SHIM_CHECKED(RET, NAME, FAIL, PARAMS, BAD, CALL)                      \
+  static RET shim_##NAME PARAMS {                                             \
+    zumir_rctx *z = owner(ctx);                                               \
+    if (z == NULL || z->failed) return FAIL;                                  \
+    if (BAD) {                                                                \
+      fail_with(z, MIR_wrong_param_value_error, "zumir: " #NAME ": a NULL argument"); \
+      return FAIL;                                                            \
+    }                                                                         \
+    zumir_trap t;                                                             \
+    zumir_trap_push(&t);                                                      \
+    if (setjmp(t.env) == 0) {                                                 \
+      RET r = CALL;                                                           \
+      zumir_trap_pop(&t);                                                     \
+      return r;                                                               \
+    }                                                                         \
+    zumir_rctx_fail(z, &t);                                                   \
+    return FAIL;                                                              \
+  }
+
+#define SHIMV_CHECKED(NAME, PARAMS, BAD, CALL)                                \
+  static void shim_##NAME PARAMS {                                            \
+    zumir_rctx *z = owner(ctx);                                               \
+    if (z == NULL || z->failed) return;                                       \
+    if (BAD) {                                                                \
+      fail_with(z, MIR_wrong_param_value_error, "zumir: " #NAME ": a NULL argument"); \
+      return;                                                                 \
+    }                                                                         \
+    zumir_trap t;                                                             \
+    zumir_trap_push(&t);                                                      \
+    if (setjmp(t.env) == 0) {                                                 \
+      CALL;                                                                   \
+      zumir_trap_pop(&t);                                                     \
+      return;                                                                 \
+    }                                                                         \
+    zumir_rctx_fail(z, &t);                                                   \
+  }
+
 #define ITEM_FAIL (&dummy_item)
 #define INSN_FAIL ((MIR_insn_t) (void *) dummy_insn_space)
 
 SHIM(MIR_module_t, MIR_new_module, &dummy_module, (MIR_context_t ctx, const char *name),
      MIR_new_module(ctx, name))
 SHIMV(MIR_finish_module, (MIR_context_t ctx), MIR_finish_module(ctx))
-SHIM(MIR_item_t, MIR_new_import, ITEM_FAIL, (MIR_context_t ctx, const char *name),
-     MIR_new_import(ctx, name))
-SHIM(MIR_item_t, MIR_new_export, ITEM_FAIL, (MIR_context_t ctx, const char *name),
-     MIR_new_export(ctx, name))
-SHIM(MIR_item_t, MIR_new_forward, ITEM_FAIL, (MIR_context_t ctx, const char *name),
-     MIR_new_forward(ctx, name))
+SHIM_CHECKED(MIR_item_t, MIR_new_import, ITEM_FAIL, (MIR_context_t ctx, const char *name),
+             name == NULL, MIR_new_import(ctx, name))
+SHIM_CHECKED(MIR_item_t, MIR_new_export, ITEM_FAIL, (MIR_context_t ctx, const char *name),
+             name == NULL, MIR_new_export(ctx, name))
+SHIM_CHECKED(MIR_item_t, MIR_new_forward, ITEM_FAIL, (MIR_context_t ctx, const char *name),
+             name == NULL, MIR_new_forward(ctx, name))
 SHIM(MIR_item_t, MIR_new_bss, ITEM_FAIL, (MIR_context_t ctx, const char *name, size_t len),
      MIR_new_bss(ctx, name, len))
 SHIM(MIR_item_t, MIR_new_data, ITEM_FAIL,
@@ -106,34 +153,37 @@ SHIM(MIR_item_t, MIR_new_vararg_func_arr, ITEM_FAIL,
       MIR_var_t *vars),
      MIR_new_vararg_func_arr(ctx, name, nres, res_types, nargs, vars))
 SHIMV(MIR_finish_func, (MIR_context_t ctx), MIR_finish_func(ctx))
-SHIM(MIR_reg_t, MIR_new_func_reg, 0,
-     (MIR_context_t ctx, MIR_func_t func, MIR_type_t type, const char *name),
-     MIR_new_func_reg(ctx, func, type, name))
-SHIM(MIR_reg_t, MIR_reg, 0, (MIR_context_t ctx, const char *reg_name, MIR_func_t func),
-     MIR_reg(ctx, reg_name, func))
-SHIM(MIR_type_t, MIR_reg_type, MIR_T_UNDEF, (MIR_context_t ctx, MIR_reg_t reg, MIR_func_t func),
-     MIR_reg_type(ctx, reg, func))
-SHIM(const char *, MIR_item_name, "", (MIR_context_t ctx, MIR_item_t item),
-     MIR_item_name(ctx, item))
-SHIM(MIR_item_t, MIR_get_module_item, NULL,
-     (MIR_context_t ctx, MIR_module_t module, const char *name),
-     MIR_get_module_item(ctx, module, name))
-SHIM(MIR_insn_t, MIR_new_insn_arr, INSN_FAIL,
-     (MIR_context_t ctx, MIR_insn_code_t code, size_t nops, MIR_op_t *ops),
-     MIR_new_insn_arr(ctx, code, nops, ops))
+SHIM_CHECKED(MIR_reg_t, MIR_new_func_reg, 0,
+             (MIR_context_t ctx, MIR_func_t func, MIR_type_t type, const char *name),
+             func == NULL || name == NULL, MIR_new_func_reg(ctx, func, type, name))
+SHIM_CHECKED(MIR_reg_t, MIR_reg, 0, (MIR_context_t ctx, const char *reg_name, MIR_func_t func),
+             reg_name == NULL || func == NULL, MIR_reg(ctx, reg_name, func))
+SHIM_CHECKED(MIR_type_t, MIR_reg_type, MIR_T_UNDEF,
+             (MIR_context_t ctx, MIR_reg_t reg, MIR_func_t func), func == NULL,
+             MIR_reg_type(ctx, reg, func))
+SHIM_CHECKED(const char *, MIR_item_name, "", (MIR_context_t ctx, MIR_item_t item),
+             item == NULL, MIR_item_name(ctx, item))
+SHIM_CHECKED(MIR_item_t, MIR_get_module_item, NULL,
+             (MIR_context_t ctx, MIR_module_t module, const char *name),
+             module == NULL || name == NULL, MIR_get_module_item(ctx, module, name))
+SHIM_CHECKED(MIR_insn_t, MIR_new_insn_arr, INSN_FAIL,
+             (MIR_context_t ctx, MIR_insn_code_t code, size_t nops, MIR_op_t *ops),
+             nops > 0 && ops == NULL, MIR_new_insn_arr(ctx, code, nops, ops))
 SHIM(MIR_insn_t, MIR_new_label, INSN_FAIL, (MIR_context_t ctx), MIR_new_label(ctx))
-SHIMV(MIR_append_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
-      MIR_append_insn(ctx, func, insn))
-SHIMV(MIR_prepend_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
-      MIR_prepend_insn(ctx, func, insn))
-SHIMV(MIR_insert_insn_after,
-      (MIR_context_t ctx, MIR_item_t func, MIR_insn_t after, MIR_insn_t insn),
-      MIR_insert_insn_after(ctx, func, after, insn))
-SHIMV(MIR_insert_insn_before,
-      (MIR_context_t ctx, MIR_item_t func, MIR_insn_t before, MIR_insn_t insn),
-      MIR_insert_insn_before(ctx, func, before, insn))
-SHIMV(MIR_remove_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
-      MIR_remove_insn(ctx, func, insn))
+SHIMV_CHECKED(MIR_append_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
+              func == NULL || insn == NULL, MIR_append_insn(ctx, func, insn))
+SHIMV_CHECKED(MIR_prepend_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
+              func == NULL || insn == NULL, MIR_prepend_insn(ctx, func, insn))
+SHIMV_CHECKED(MIR_insert_insn_after,
+              (MIR_context_t ctx, MIR_item_t func, MIR_insn_t after, MIR_insn_t insn),
+              func == NULL || after == NULL || insn == NULL,
+              MIR_insert_insn_after(ctx, func, after, insn))
+SHIMV_CHECKED(MIR_insert_insn_before,
+              (MIR_context_t ctx, MIR_item_t func, MIR_insn_t before, MIR_insn_t insn),
+              func == NULL || before == NULL || insn == NULL,
+              MIR_insert_insn_before(ctx, func, before, insn))
+SHIMV_CHECKED(MIR_remove_insn, (MIR_context_t ctx, MIR_item_t func, MIR_insn_t insn),
+              func == NULL || insn == NULL, MIR_remove_insn(ctx, func, insn))
 SHIM(MIR_op_t, MIR_new_reg_op, zero_op, (MIR_context_t ctx, MIR_reg_t reg),
      MIR_new_reg_op(ctx, reg))
 SHIM(MIR_op_t, MIR_new_int_op, zero_op, (MIR_context_t ctx, int64_t v), MIR_new_int_op(ctx, v))
@@ -143,18 +193,18 @@ SHIM(MIR_op_t, MIR_new_float_op, zero_op, (MIR_context_t ctx, float v),
      MIR_new_float_op(ctx, v))
 SHIM(MIR_op_t, MIR_new_double_op, zero_op, (MIR_context_t ctx, double v),
      MIR_new_double_op(ctx, v))
-SHIM(MIR_op_t, MIR_new_ref_op, zero_op, (MIR_context_t ctx, MIR_item_t item),
-     MIR_new_ref_op(ctx, item))
+SHIM_CHECKED(MIR_op_t, MIR_new_ref_op, zero_op, (MIR_context_t ctx, MIR_item_t item),
+             item == NULL, MIR_new_ref_op(ctx, item))
 SHIM(MIR_op_t, MIR_new_mem_op, zero_op,
      (MIR_context_t ctx, MIR_type_t type, MIR_disp_t disp, MIR_reg_t base, MIR_reg_t index,
       MIR_scale_t scale),
      MIR_new_mem_op(ctx, type, disp, base, index, scale))
-SHIM(MIR_op_t, MIR_new_label_op, zero_op, (MIR_context_t ctx, MIR_label_t label),
-     MIR_new_label_op(ctx, label))
+SHIM_CHECKED(MIR_op_t, MIR_new_label_op, zero_op, (MIR_context_t ctx, MIR_label_t label),
+             label == NULL, MIR_new_label_op(ctx, label))
 SHIM(const char *, MIR_insn_name, "", (MIR_context_t ctx, MIR_insn_code_t code),
      MIR_insn_name(ctx, code))
-SHIMV(MIR_output_module, (MIR_context_t ctx, FILE *f, MIR_module_t module),
-      MIR_output_module(ctx, f, module))
+SHIMV_CHECKED(MIR_output_module, (MIR_context_t ctx, FILE *f, MIR_module_t module),
+              f == NULL || module == NULL, MIR_output_module(ctx, f, module))
 
 /* ---- Variadic shims: the operands are read here, then MIR's array form ---- */
 
@@ -181,6 +231,12 @@ static MIR_insn_t insn_from_va(MIR_context_t ctx, MIR_insn_code_t code, size_t n
 static MIR_insn_t shim_MIR_new_insn(MIR_context_t ctx, MIR_insn_code_t code, ...) {
   zumir_rctx *z = owner(ctx);
   if (z == NULL || z->failed) return INSN_FAIL;
+  /* MIR's operand-count lookup raises on an invalid code, and no trap is
+   * set yet: refuse it here, as MIR_new_insn_arr's trap would. */
+  if ((unsigned) code >= (unsigned) MIR_INSN_BOUND) {
+    fail_with(z, MIR_wrong_param_value_error, "zumir: MIR_new_insn: an invalid instruction code");
+    return INSN_FAIL;
+  }
   /* MIR_new_insn refuses calls, rets and the rest itself; reading their
    * operand count here would read nothing. */
   size_t nops = zumir_mir_code_nops(ctx, code);
@@ -259,6 +315,12 @@ static MIR_item_t shim_MIR_new_proto(MIR_context_t ctx, const char *name, size_t
 }
 
 /* ---- zumir's own entries ---- */
+
+static void api_mir_fail(MIR_context_t ctx, const char *message) {
+  zumir_rctx *z = owner(ctx);
+  if (z == NULL || z->failed) return;
+  fail_with(z, MIR_wrong_param_value_error, message != NULL ? message : "zumir_mir_fail");
+}
 
 static zumir_ctx *api_ctx_new(int *status) {
   int st;
@@ -381,6 +443,7 @@ static zumir_api_v1 table = {
   .MIR_new_label_op = shim_MIR_new_label_op,
   .MIR_insn_name = shim_MIR_insn_name,
   .MIR_output_module = shim_MIR_output_module,
+  .zumir_mir_fail = api_mir_fail,
 };
 
 /* The getter consumers fetch with R_GetCCallable (zumir_api_load()). */

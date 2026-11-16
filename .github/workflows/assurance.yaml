@@ -4,8 +4,8 @@
 # change, because the file it checks is Markdown the docs gate would skip.
 on:
   pull_request:
-  # No `push:`: a pull request already checks its merge with main,
-  # and the schedule checks main (r-actions README, "Pushes to main").
+  # No `push:`: a pull request already checks its merge with main, and a
+  # dispatch checks main's head (r-actions README, "Pushes to main").
   workflow_dispatch:
 
 name: assurance

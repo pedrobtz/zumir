@@ -44,6 +44,7 @@ typedef struct {
   source_reader reader;
   const char *name;
   int ok;
+  FILE *prepro; /* non-NULL: preprocess only, into this file */
 } c2mir_arg;
 
 static void body_c2mir(zumir_rctx *z, void *arg) {
@@ -51,6 +52,10 @@ static void body_c2mir(zumir_rctx *z, void *arg) {
   struct c2mir_options options;
   memset(&options, 0, sizeof options);
   options.message_file = ZUMIR_MIR_STDERR;
+  if (a->prepro != NULL) {
+    options.prepro_only_p = 1;
+    options.prepro_output_file = a->prepro;
+  }
   zumir_mir_message_clear();
   c2mir_init(z->ctx);
   a->ok = c2mir_compile(z->ctx, &options, source_getc, &a->reader, a->name, NULL);
@@ -136,6 +141,46 @@ SEXP zumir_c2mir_compile(SEXP source, SEXP fname, SEXP tier, SEXP name) {
   }
   UNPROTECT(1);
   return x;
+}
+
+/* The prelude and source after c2mir's preprocessor, written to `path`:
+ * comments gone, conditionals resolved and macros expanded, so cfunction()
+ * reads the signature c2mir compiles, not a decoy in a comment, an #if 0
+ * branch or a macro (a #define const). Returns TRUE, or a zumir_status. */
+SEXP zumir_cfun_prepro(SEXP source, SEXP name, SEXP path) {
+  SEXP x = PROTECT(zumir_rctx_new_sexp(ZUMIR_ITIER_INTERP, ZUMIR_IMPORTS_D6));
+  if (TYPEOF(x) != EXTPTRSXP) {
+    UNPROTECT(1);
+    return x;
+  }
+  SEXP st;
+  zumir_rctx *z = zumir_rctx_get(x, 1, &st);
+  c2mir_arg a;
+  memset(&a, 0, sizeof a);
+  a.name = CHAR(STRING_ELT(name, 0));
+  a.reader.part[0] = zumir_prelude_prefix;
+  a.reader.part[1] = a.name;
+  a.reader.part[2] = zumir_prelude_line0;
+  a.reader.part[3] = CHAR(STRING_ELT(source, 0));
+  a.reader.part[4] = "\n";
+  a.prepro = fopen(R_ExpandFileName(CHAR(STRING_ELT(path, 0))), "w");
+  if (a.prepro == NULL) {
+    UNPROTECT(1);
+    return zumir_status("context", 0, "cannot write the preprocessed source");
+  }
+  int ran = zumir_rctx_run(z, body_c2mir, &a);
+  fclose(a.prepro);
+  if (!ran) {
+    UNPROTECT(1);
+    return zumir_status("mir", z->type, z->message);
+  }
+  if (!a.ok) {
+    SEXP res = compile_status(zumir_mir_message(), a.name);
+    UNPROTECT(1);
+    return res;
+  }
+  UNPROTECT(1);
+  return Rf_ScalarLogical(1);
 }
 
 /* ---- cfunction() (design §4.5 step 5, §5, Q2, D24) ---- */
@@ -233,6 +278,22 @@ SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name) {
     UNPROTECT(1);
     return zumir_status("argument", 0, "the function takes variable arguments");
   }
+  /* A type outside the supported ones (long double, float, char, short,
+   * unsigned int) is refused here, before the wrapper is built: MIR
+   * rejected the wrapper's call with an internal error. */
+  int bad_type = fn->nres == 1 && strcmp(mir_type_name(fn->res_types[0]), "other") == 0;
+  for (size_t i = 0; i < fn->nargs && !bad_type; i++)
+    bad_type = strcmp(mir_type_name(VARR_GET(MIR_var_t, fn->vars, i).type), "other") == 0;
+  if (bad_type) {
+    char why[400];
+    snprintf(why, sizeof why,
+             "cfunction(): `%.200s` returns or takes a type it does not support; it supports "
+             "int, double, const int *, const double *, int * and double *, and returns void, "
+             "int or double.",
+             fn->name);
+    UNPROTECT(1);
+    return zumir_status("compile", 0, why);
+  }
   if (!zumir_rctx_run(z, zumir_mirf_wrapper, one.func)) {
     UNPROTECT(1);
     return zumir_status("mir", z->type, z->message);
@@ -297,13 +358,13 @@ static SEXP cf_refuse(const char *fmt, const char *a, long long b, const char *c
   return cf_raise(zumir_status("argument", 0, msg));
 }
 
-static int cf_is_vector(SEXP v) {
-  return TYPEOF(v) == REALSXP || TYPEOF(v) == INTSXP;
-}
-
-/* is.numeric(): an integer or double vector that is not a factor. */
+/* is.numeric(): an integer or double vector, not a factor and none of the
+ * classes is.numeric() refuses (a Date or a time is not its number). The
+ * same test for scalars and for vectors passed by pointer. */
 static int cf_is_numeric(SEXP v) {
-  return TYPEOF(v) == REALSXP || (TYPEOF(v) == INTSXP && !Rf_inherits(v, "factor"));
+  if (TYPEOF(v) != REALSXP && TYPEOF(v) != INTSXP) return 0;
+  return !Rf_isObject(v) || !(Rf_inherits(v, "factor") || Rf_inherits(v, "Date") ||
+                         Rf_inherits(v, "POSIXt") || Rf_inherits(v, "difftime"));
 }
 
 /* cf_int(): one whole number that fits an int; 0 when it is not. */
@@ -378,7 +439,7 @@ SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
   for (R_xlen_t i = 0; i < np; i++) {
     if (kinds[i] != 2) continue;
     SEXP v = VECTOR_ELT(args, i);
-    if (!cf_is_vector(v)) return cf_refuse("`%s` must be a numeric vector", NAME(i), 0, "", 0);
+    if (!cf_is_numeric(v)) return cf_refuse("`%s` must be a numeric vector", NAME(i), 0, "", 0);
     if (XLENGTH(v) > INT_MAX)
       return cf_refuse("`%s` is longer than .Machine$integer.max", NAME(i), 0, "", 0);
     if (min_len >= 0 && XLENGTH(v) != min_len) same = 0;
@@ -442,7 +503,7 @@ SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
           if (len) memset(types[i] == 1 ? (void *) REAL(v) : (void *) INTEGER(v), 0,
                           (size_t) len * (types[i] == 1 ? sizeof(double) : sizeof(int)));
         } else {
-          if (!cf_is_vector(v)) {
+          if (!cf_is_numeric(v)) {
             UNPROTECT(1);
             return cf_refuse("`%s` must be a numeric vector", nm, 0, "", 0);
           }
@@ -452,8 +513,8 @@ SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
           }
           if (XLENGTH(v) < len) {
             UNPROTECT(1);
-            return cf_refuse("`%s` has length %lld; the function writes %lld", nm, (long long) XLENGTH(v),
-                             "", (long long) len);
+            return cf_refuse("`%s` has length %lld; the function writes %s%lld", nm,
+                             (long long) XLENGTH(v), "", (long long) len);
           }
           /* D24: the C function writes a copy, never the caller's vector. */
           v = cf_fresh(v, types[i], &ok);
@@ -486,6 +547,8 @@ SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
       memcpy(&d, &r, sizeof d);
       value = Rf_ScalarReal(d);
     } else {
+      /* INT_MIN is NA_integer_, as R's C API reads it: an NA element of an
+       * int input arrives as INT_MIN and comes back as NA (design §5). */
       value = Rf_ScalarInteger((int) r);
     }
   }
@@ -580,6 +643,12 @@ SEXP zumir_cfun_invoke(SEXP x, SEXP spec, SEXP args) {
   (void) spec;
   (void) args;
   return zumir_status("context", 0, "zumir was built without MIR");
+}
+SEXP zumir_cfun_prepro(SEXP source, SEXP name, SEXP path) {
+  (void) source;
+  (void) name;
+  (void) path;
+  return zumir_status("context", 0, "zumir was built without MIR: no target");
 }
 #endif
 

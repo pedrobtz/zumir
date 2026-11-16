@@ -329,7 +329,11 @@ consumer builds a whole module and checks once, at `zumir_compile()`,
 with no check after each instruction. The `zumir_` entries return a
 status directly. `zumir_ctx_new()` and `zumir_ctx_free()` are recovery
 points too: a failure inside `MIR_init2` returns `NULL` with a status.
-Freeing a context twice, or freeing `NULL`, does nothing.
+Freeing `NULL` does nothing. A freed context must not be used or freed
+again: the handle is the context's own pointer, so zumir cannot tell a
+freed one from a live one (2026-11-15, #63; an earlier draft promised
+that a second free did nothing, which ASan showed to be a use after
+free).
 
 **Built in Stage 5 (2026-11-13).** `zumir_api_v1` holds its four fixed
 fields, six `zumir_` entries and 41 `MIR_` shims (`inst/include/zumir.h`,
@@ -807,8 +811,10 @@ that never ends is not interrupted.
 
 - **Tested targets**: x86-64 on Linux, macOS and Windows; aarch64 on
   macOS and Linux. These are the r-actions legs.
-- **Built, not tested here**: ppc64le, s390x and riscv64 on Linux, which
-  MIR targets and its own CI tests. Debian builds R on them.
+- **Compiled in, unverified**: ppc64le, s390x and riscv64 on Linux, which
+  MIR targets and its own CI tests, and Debian builds R on. No leg here
+  builds or tests them (#87): until one does they are unverified, not
+  supported.
 - **Windows aarch64**: no target in v0.1.0 (D25). R has a Windows ARM64
   build, but MIR's aarch64 target is tested only under the Linux and
   macOS calling conventions, and MIR's CI never builds Windows on ARM.
@@ -1118,6 +1124,43 @@ decides it and the maintainer may overturn it.
   writes.
 - **D25 (C), 2026-11-13.** Windows aarch64 is a "no target" platform in
   v0.1.0 (§7), until MIR's aarch64 target is tested under that ABI.
+
+Decided while fixing the critical review of cf9b7b6 (2026-11-15, #54 to
+#108), each on the reviewers' recommendation:
+
+- **D26 (C).** In `cfunction()`, `INT_MIN` in an `int` result or output
+  is `NA_integer_`, as R's C API reads it: an `NA` element of an `int`
+  input arrives in C as `INT_MIN` and comes back as `NA`. `mir_function()`
+  keeps refusing an `i32` result of `INT_MIN` (§5): its users write MIR,
+  not R's C. A factor, `Date`, `POSIXt` or `difftime` is refused for
+  every parameter, scalar or pointer, as `is.numeric()` refuses it (#72).
+- **D27 (C).** The interpreter's code, each call site's foreign-function
+  interface and its argument arrays are made at link, under the trap, by
+  `MIR_interp_prepare()` (a fork patch). A call into interpreted code then
+  allocates nothing and cannot raise, so D4 and D20 hold at call time,
+  on any thread (#60).
+- **D28 (C).** A context loads each module once: a second
+  `zumir_compile()` takes another entry point from a module it already
+  loaded (#90). The tier is fixed at a context's first link, whether or
+  not that link found its function (#92).
+- **D29 (R).** `tier = "none"`, or any value but `"native"` or
+  `"interp"`, is an argument error; a tier that does not run here,
+  `NULL`'s default included, is a tier error. Every condition has
+  `call = NULL` and a message that names the function called (#102).
+- **D30 (C).** `cfunction()` reads its signature from c2mir's
+  preprocessed source (comments gone, conditionals resolved, macros
+  expanded), with string and character literals removed, and reads every
+  word of the return type: a decoy in a comment, an `#if 0` branch or a
+  `#define const` was read instead of the definition c2mir compiled
+  (#55).
+- **D31 (R).** zumir's DLL is unloaded only when no context is alive:
+  their finalizers are C in the DLL, and unloading under them crashed R
+  at the next collection or at exit. A reload then reuses the DLL (#62).
+- **D32 (R).** `mir_compile()` evaluates every argument the body reads,
+  on any path, before the call: types are inferred over the whole body
+  (Q6). An argument R would never force (the branch not taken) is
+  forced, its side effects happen, and a value outside the subset is an
+  argument error where R might not look at it (#93).
 
 ## 13. Later versions, in the order they are expected
 

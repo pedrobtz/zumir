@@ -367,3 +367,203 @@ test_that("15, 16 and 17 parameters arrive in order (the slots' stack buffer)", 
     expect_identical(r$y, 7, info = k)
   }
 })
+
+test_that("a decoy signature never replaces the definition c2mir compiles (#55)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  # Each decoy reads as a const input; the definition writes through x.
+  # Read from the text, the decoy made x an input and the call wrote the
+  # caller's vector (D24); read after the preprocessor, x is an output.
+  real <- "void scale(int n, double *x) { for (int i = 0; i < n; i++) x[i] *= 2; }"
+  decoys <- c(
+    comment = paste0(
+      "/* old version:\nvoid scale(int n, const double *x) {\n}\n*/\n",
+      real
+    ),
+    if0 = paste0(
+      "#if 0\nvoid scale(int n, const double *x) {\n#else\n",
+      "void scale(int n, double *x) {\n#endif\n",
+      "  for (int i = 0; i < n; i++) x[i] *= 2;\n}"
+    ),
+    string = paste0(
+      "static const char *s = \"void scale(int n, const double *x) {\";\n",
+      real
+    ),
+    macro = paste0(
+      "#define const\n",
+      "void scale(int n, const double *x) { for (int i = 0; i < n; i++) x[i] *= 2; }"
+    )
+  )
+  for (nm in names(decoys)) {
+    expect_error(
+      cfunction(decoys[[nm]], n = "n"),
+      class = "zumir_compile_error",
+      info = nm
+    )
+    f <- cfunction(decoys[[nm]], out = "x", n = "n")
+    v <- c(1, 2, 3)
+    w <- v
+    before <- serialize(v, NULL)
+    expect_identical(f(n = 3L, x = v), c(2, 4, 6), info = nm)
+    expect_identical(serialize(v, NULL), before, info = nm)
+    expect_identical(w, c(1, 2, 3), info = nm)
+  }
+  # A multi-line comment that held a signature of other pointee types:
+  # the comment's types gave garbage (1, 4.94e-324, 0).
+  g <- cfunction(
+    paste0(
+      "/* old:\n void f(int n, const double *x, double *y) {\n*/\n",
+      "void f(int n, const int *x, int *y) { for (int i = 0; i < n; i++) y[i] = x[i] + 1; }"
+    ),
+    out = "y",
+    n = "n"
+  )
+  expect_identical(g(x = 1:3), 2:4)
+})
+
+test_that("a function of no parameters compiles and is called (#71)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  expect_identical(cfunction("double pi(void) { return M_PI; }")(), pi)
+  expect_identical(cfunction("int one() { return 1; }")(), 1L)
+  expect_null(cfunction("void nop(void) { }")())
+})
+
+test_that("a classed vector is refused for a pointer as for a scalar (#72)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  sq <- cfunction(
+    "void sq(int n, const double *x, double *y) { for (int i = 0; i < n; i++) y[i] = x[i] * x[i]; }",
+    out = "y",
+    n = "n"
+  )
+  expect_identical(sq(x = c(1, 2)), c(1, 4))
+  for (v in list(
+    factor(c("a", "b")),
+    as.Date(c("2026-01-01", "2026-01-02")),
+    as.POSIXct(c(0, 1), origin = "1970-01-01", tz = "UTC"),
+    as.difftime(c(1, 2), units = "secs")
+  )) {
+    expect_false(is.numeric(v))
+    expect_error(sq(x = v), class = "zumir_argument_error")
+    expect_error(sq(x = c(1, 2), y = v), class = "zumir_argument_error")
+  }
+  half <- cfunction("double half(double a) { return a / 2; }")
+  expect_error(half(factor("a")), class = "zumir_argument_error")
+  expect_error(half(as.Date("2026-01-01")), class = "zumir_argument_error")
+})
+
+test_that("INT_MIN in an int result or output reads as NA, as R's C API does", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  dec <- cfunction("int dec(int a) { return a - 1; }")
+  expect_identical(dec(-2147483647L), NA_integer_)
+  fill <- cfunction(
+    "void fill(int n, int *y) { for (int i = 0; i < n; i++) y[i] = INT_MIN; }",
+    out = "y",
+    n = "n"
+  )
+  expect_identical(fill(n = 2L), c(NA_integer_, NA_integer_))
+  # An NA input arrives as INT_MIN and comes back as NA.
+  id <- cfunction("int id(const int *x) { return x[0]; }")
+  expect_identical(id(c(NA_integer_, 1L)), NA_integer_)
+})
+
+test_that("the too-short error states the output's length (#73)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  sq <- cfunction(
+    "void sq(int n, const double *x, double *y) { for (int i = 0; i < n; i++) y[i] = x[i] * x[i]; }",
+    out = "y",
+    n = "n"
+  )
+  e <- expect_error(
+    sq(x = c(1, 2, 3), y = c(9, 9)),
+    class = "zumir_argument_error"
+  )
+  expect_snapshot(conditionMessage(e))
+})
+
+test_that("an unsupported type is a compile error, read whole (#88)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  for (src in c(
+    "long double f(double a) { return a; }",
+    "unsigned int f(int a) { return a; }",
+    "float f(double a) { return a; }",
+    "short f(int a) { return a; }",
+    "double f(float a) { return a; }",
+    "double f(char a) { return a; }"
+  )) {
+    expect_error(cfunction(src), class = "zumir_compile_error", info = src)
+  }
+})
+
+test_that("a parameter named like the routine does not break the call (#89)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  f <- cfunction(
+    "double f(double zumir_cfun_invoke) { return zumir_cfun_invoke + 1; }"
+  )
+  expect_identical(f(1), 2)
+  g <- cfunction("double g(double cf_routine) { return cf_routine * 2; }")
+  expect_identical(g(3), 6)
+})
+
+test_that("out = NULL means no outputs; a function and an output share no name", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  expect_identical(
+    cfunction("double f(double a) { return a; }", out = NULL)(2),
+    2
+  )
+  expect_error(
+    cfunction("int y(int n, double *y) { return 1; }", out = "y", n = "n"),
+    class = "zumir_argument_error"
+  )
+})
+
+test_that("cfunction()'s argument checks refuse what they guard (#83)", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  out_src <- "void f(int n, double *y) { for (int i = 0; i < n; i++) y[i] = i; }"
+  for (code in list(character(), c("a", "b"), NA_character_, 1)) {
+    expect_error(cfunction(code), class = "zumir_argument_error")
+  }
+  # The fixed length straddled, below 0 and above INT_MAX.
+  for (len in c(-1, .Machine$integer.max + 1, 1.5, NA)) {
+    expect_error(
+      cfunction(out_src, out = c(y = len), n = "n"),
+      class = "zumir_argument_error",
+      info = format(len)
+    )
+  }
+  expect_identical(cfunction(out_src, out = c(y = 0))(n = 0L), numeric())
+  expect_identical(cfunction(out_src, out = c(y = 3))(n = 3L), c(0, 1, 2))
+  expect_error(
+    cfunction(out_src, out = c("y", "y"), n = "n"),
+    class = "zumir_argument_error"
+  )
+  expect_error(
+    cfunction("double f(const double a) { return a; }"),
+    class = "zumir_compile_error"
+  )
+  # The list form of out: a name, and a named fixed length.
+  two <- cfunction(
+    "void two(int n, double *y, double *z) { for (int i = 0; i < n; i++) { y[i] = 1; } z[0] = 7; }",
+    out = list("y", z = 1),
+    n = "n"
+  )
+  expect_identical(two(n = 2L), list(y = c(1, 1), z = 7))
+  expect_error(
+    cfunction(out_src, out = list(1), n = "n"),
+    class = "zumir_argument_error"
+  )
+  # n with no input vector to give it, and n that is not whole.
+  f <- cfunction(out_src, out = "y", n = "n")
+  expect_error(f(), class = "zumir_argument_error")
+  expect_error(f(n = 1.5), class = "zumir_argument_error")
+  expect_identical(f(n = 2), c(0, 1))
+})
+
+test_that("the print methods name the function, its arguments and tier", {
+  skip_if(zumir_tier() == "none", "no tier runs here")
+  tier <- zumir_tier()
+  f <- cfunction("double f(double a, int b) { return a + b; }")
+  expect_output(print(f), "<zumir_cfunction f(a, b), ", fixed = TRUE)
+  g <- mir_function(add_text(), "add")
+  expect_output(print(g), "<zumir_function add(", fixed = TRUE)
+  h <- mir_compile(function(x) x + 1)
+  expect_output(print(h), tier, fixed = TRUE)
+})

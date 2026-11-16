@@ -14,12 +14,18 @@ NULL
   # ports of them follow (src/zumir_imports.c).
   .Call(zumir_set_long_double, capabilities("long.double"))
   # R 4.6 wraps exp, cos, sqrt and others with small-argument shortcuts;
-  # mir_compile()'s math follows the R it runs in.
+  # mir_compile()'s maths follows the R it runs in.
   .Call(zumir_set_r46, getRversion() >= "4.6.0")
   # The tier probe runs before anything else maps code (design §4.4).
   probe_tiers()
 }
 
 .onUnload <- function(libpath) {
-  library.dynam.unload("zumir", libpath)
+  # A live context's finalizer is C in this DLL: unmapping the DLL under it
+  # crashed R at the next gc or at exit. Collect first, and keep the DLL
+  # while any context lives; a reload then reuses it.
+  gc()
+  if (.Call(zumir_memory)$contexts == 0L) {
+    library.dynam.unload("zumir", libpath)
+  }
 }

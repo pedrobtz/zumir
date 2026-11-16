@@ -3,8 +3,8 @@
 # links it on the interpreter against D6's list, and checks that the same
 # input gives the same verdict and module twice and leaves no arena and no
 # trap behind. Built without R from the vendored MIR and c2mir and zumir's
-# R-free files. A pull request fuzzes briefly (profile quick); the weekly
-# schedule, a dispatch and a full-ci pull request run the long campaign.
+# R-free files. A pull request fuzzes briefly (profile quick); a dispatch
+# and a full-ci pull request run the long campaign.
 on:
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
@@ -42,12 +42,13 @@ jobs:
       # reaching zumir's glue goes red.
       reach-floor: 70
 
-  # A red scheduled run otherwise notifies only whoever last edited the cron
-  # line: one issue per distinct finding, labelled fuzz, with the report and
-  # the input; a finding's issue is closed by its fix, never by a green run.
+  # A red run on main otherwise notifies only whoever dispatched it: one
+  # issue per distinct finding, labelled fuzz, with the report and the input;
+  # a finding's issue is closed by its fix, never by a green run. (A
+  # schedule ran it until #53 removed them.)
   report:
     needs: fuzz
-    if: ${{ always() && github.event_name == 'schedule' && needs.fuzz.result != 'skipped' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.fuzz.result != 'skipped' }}
     permissions:
       issues: write
     uses: pedrobtz/r-actions/.github/workflows/report.yml@v1

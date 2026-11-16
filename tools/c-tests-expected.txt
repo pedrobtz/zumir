@@ -79,4 +79,3 @@ new/va-struct-args.c [macos-arm64] exit 3, expected 0: structs through varargs o
 gcc/20020216-1.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
 gcc/pr19606.c [ubuntu-aarch64] abort: signed char conversions where plain char is unsigned (#44)
 lacc/bitwise-sign-extend.c [ubuntu-aarch64] exit 48, expected 46: expects plain char signed, unsigned on Linux aarch64
-lacc/struct-comma-call.c [ubuntu-aarch64:gen] link: the aarch64 generator stops on a struct call in a comma expression (#44)

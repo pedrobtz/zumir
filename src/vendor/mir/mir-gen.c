@@ -3331,11 +3331,19 @@ static void copy_prop (gen_ctx_t gen_ctx) {
       }
       if (!sign_p && (def_insn->code == MIR_AND || def_insn->code == MIR_ANDS)) {
         if ((se2 = def_insn->ops[1].data) != NULL && (mov_insn = se2->def->insn)->code == MIR_MOV
-            && (mov_insn->ops[1].mode == MIR_OP_INT || mov_insn->ops[1].mode == MIR_OP_UINT))
+            && (mov_insn->ops[1].mode == MIR_OP_INT || mov_insn->ops[1].mode == MIR_OP_UINT)
+            && def_insn->ops[2].mode == MIR_OP_VAR && def_insn->ops[2].data != NULL) {
           SWAP (def_insn->ops[1], def_insn->ops[2], temp_op);
+          /* The edges moved with their operands: renumber them, or a later
+             removal unlinks the wrong operand. */
+          ((ssa_edge_t) def_insn->ops[1].data)->use_op_num = 1;
+          ((ssa_edge_t) def_insn->ops[2].data)->use_op_num = 2;
+        }
         if ((se2 = def_insn->ops[2].data) == NULL || (mov_insn = se2->def->insn)->code != MIR_MOV
             || (mov_insn->ops[1].mode != MIR_OP_INT && mov_insn->ops[1].mode != MIR_OP_UINT))
           continue;
+        /* The rewrite below reads r2's def through its edge: none, no rewrite. */
+        if (def_insn->ops[1].mode != MIR_OP_VAR || def_insn->ops[1].data == NULL) continue;
         uint64_t c1 = mov_insn->ops[1].u.u;
         uint64_t c2 = w == 8 ? 0xff : w == 16 ? 0xffff : 0xffffffff;
         /* and r1,r2,c1; ... uext r, r1 => and r1,r2,c1; ... mov t, c1 & c2; and r, r2, t */

@@ -16,3 +16,13 @@ declared_names <- function(header) {
   decls <- regmatches(code, gregexpr("[A-Za-z_][A-Za-z0-9_]* \\(", code))[[1]]
   sub(" \\($", "", decls)
 }
+
+# The tiers that run here, both when native code runs.
+tiers_here <- function() {
+  switch(
+    zumir_tier(),
+    native = c("native", "interp"),
+    interp = "interp",
+    character()
+  )
+}

@@ -23,7 +23,15 @@
 #'   `log`, `log1p`, `expm1`, `sqrt`, `abs`, `floor`, `ceiling`, `trunc`,
 #'   `sin`, `cos`, `tan`; two-argument `min` and `max`; `length`, `is.na`,
 #'   `is.nan`, `is.finite`, `as.double`.
-#' * The result is a double scalar or a vector local.
+#' * The result is a double scalar or a vector local, never an empty
+#'   block (`{}`, which is `NULL` in R). Each construct takes the arguments
+#'   R accepts; any other count is a compile error.
+#'
+#' Every argument the body reads, on any path, is evaluated before the
+#' compiled code runs, since types are inferred over the whole body. An
+#' argument R would never evaluate (in a branch not taken) is evaluated, its
+#' side effects happen, and a value outside the subset is an error where R
+#' might not have looked at it.
 #'
 #' Where matching R exactly would not be cheap, the compiled function
 #' errors instead: an index out of range, `NA` or not a whole number; a
@@ -38,9 +46,8 @@
 #' between R, the two tiers and builds, and `is.nan()` of such a value
 #' can take a different branch. `is.na()` is `TRUE` either way.
 #'
-#' [What mir_compile() accepts](https://pedrobtz.github.io/zumir/articles/mir-compile.html)
-#' lists the subset in full, every place it errors where R would answer,
-#' and why.
+#' The article `vignette("mir-compile", package = "zumir")` lists the
+#' subset in full, every place it errors where R would answer, and why.
 #'
 #' @param f A function.
 #' @param tier `"native"` or `"interp"`; by default [zumir_tier()].
@@ -61,12 +68,15 @@ mir_compile <- function(f, tier = NULL) {
 # mir_compile() by either route (D17); tests compare the two.
 rf_make <- function(f, tier = NULL, route = "emitter") {
   if (!is.function(f) || is.primitive(f)) {
-    rf_refuse("`f` must be an R function, not a primitive", NULL)
+    zumir_stop(
+      "argument",
+      "mir_compile(): `f` must be an R function, not a primitive."
+    )
   }
   # The subset check needs no tier, so a refusal is the same everywhere,
   # on a build without MIR too.
   prog <- rf_compile(f)
-  tier <- resolve_tier(tier)
+  tier <- resolve_tier(tier, "mir_compile")
   ctx <- rf_context(prog, tier, route)
   # The call needs neither form of the module again.
   prog$spec <- NULL
@@ -105,10 +115,7 @@ print.zumir_compiled <- function(x, ...) {
 
 rf_refuse <- function(what, expr) {
   where <- if (is.null(expr)) "" else paste0(" in `", rf_deparse(expr), "`")
-  stop(structure(
-    class = c("zumir_compile_error", "zumir_error", "error", "condition"),
-    list(message = paste0("mir_compile(): ", what, where, "."), call = NULL)
-  ))
+  zumir_stop("compile", paste0("mir_compile(): ", what, where, "."))
 }
 
 rf_deparse <- function(e) {
@@ -117,10 +124,7 @@ rf_deparse <- function(e) {
 }
 
 rf_runtime_error <- function(message) {
-  stop(structure(
-    class = c("zumir_runtime_error", "zumir_error", "error", "condition"),
-    list(message = message, call = NULL)
-  ))
+  zumir_stop("runtime", message)
 }
 
 # ---- The subset ----
@@ -295,7 +299,7 @@ rf_compile <- function(f) {
     rf_refuse(
       sprintf(
         "`%s` names both a variable and a function the body calls",
-        clash[1]
+        clash[[1]]
       ),
       NULL
     )
@@ -343,7 +347,6 @@ rf_compile <- function(f) {
   if (length(body_stmts) == 0L) {
     rf_refuse("the body is empty", NULL)
   }
-  # Vector locals, from top-level numeric() before any loop or branch.
   rf_block(st, body_stmts, result = TRUE)
   rf_finish(st)
 }
@@ -391,9 +394,16 @@ rf_place <- function(st, label) {
 
 # The constant pool: a memory operand for x, identical bits shared.
 rf_konst <- function(st, x) {
-  hit <- which(vapply(st$consts, identical, NA, y = x, num.eq = FALSE))
+  hit <- which(vapply(
+    st$consts,
+    identical,
+    NA,
+    y = x,
+    num.eq = FALSE,
+    single.NA = FALSE
+  ))
   if (length(hit)) {
-    k <- hit[1]
+    k <- hit[[1]]
   } else {
     st$consts <- c(st$consts, x)
     k <- length(st$consts)
@@ -401,7 +411,7 @@ rf_konst <- function(st, x) {
   sprintf("d:%d(K)", 8L * (k - 1L))
 }
 
-rf_status_exit <- function(st, name) {
+rf_status_exit <- function(name) {
   sprintf("Lst%d", rf_status[[name]])
 }
 
@@ -465,7 +475,7 @@ rf_expr <- function(st, e) {
     rf_ins(st, sprintf("dmov %s, %s", r, rf_konst(st, e)))
     return(list(t = "d", r = r))
   }
-  if (is.logical(e) && length(e) == 1L) {
+  if (is.logical(e) && length(e) == 1L && is.null(attributes(e))) {
     r <- rf_reg(st, "i64")
     rf_ins(st, sprintf("mov %s, %d", r, if (is.na(e)) 2L else as.integer(e)))
     return(list(t = "l", r = r))
@@ -476,6 +486,7 @@ rf_expr <- function(st, e) {
   if (!is.call(e)) {
     rf_refuse("a value of a type outside the subset", e)
   }
+  rf_check_arity(e)
   h <- as.character(e[[1]])
   n <- length(e) - 1L
   if (h == "(") {
@@ -624,7 +635,7 @@ rf_arith <- function(st, h, e) {
   if (a$t == "v" || b$t == "v") {
     rf_refuse("vector arithmetic is not supported", e)
   }
-  if (a$t == "l" && b$t != "d" || b$t == "l" && a$t != "d") {
+  if ((a$t == "l" && b$t != "d") || (b$t == "l" && a$t != "d")) {
     rf_refuse("arithmetic on a logical without a double is an integer in R", e)
   }
   if (a$t == "i" && b$t == "i") {
@@ -643,11 +654,11 @@ rf_arith <- function(st, h, e) {
       # R's integers stop at +-(2^31 - 1); beyond is NA in R, an error here.
       rf_ins(
         st,
-        sprintf("bgt %s, %s, 2147483647", rf_status_exit(st, "overflow"), r)
+        sprintf("bgt %s, %s, 2147483647", rf_status_exit("overflow"), r)
       )
       rf_ins(
         st,
-        sprintf("blt %s, %s, -2147483647", rf_status_exit(st, "overflow"), r)
+        sprintf("blt %s, %s, -2147483647", rf_status_exit("overflow"), r)
       )
       return(list(t = "i", r = r))
     }
@@ -805,7 +816,7 @@ rf_is <- function(st, h, e) {
 
 # The 1-based index register of x[i] in vector slot k, checked.
 rf_index <- function(st, k, ie, e) {
-  bad <- rf_status_exit(st, "index")
+  bad <- rf_status_exit("index")
   len <- sprintf("vl%d", k)
   v <- rf_expr(st, ie)
   if (v$t == "i") {
@@ -842,9 +853,79 @@ rf_index_read <- function(st, e) {
   list(t = "d", r = r)
 }
 
+# The argument counts R accepts for each construct of the subset; a call
+# outside them is refused before its handler reads an argument (an extra
+# argument was ignored, where R errors, and a missing one gave an unclassed
+# subscript error).
+rf_arity <- list(
+  "(" = 1L,
+  "+" = 1:2,
+  "-" = 1:2,
+  "*" = 2L,
+  "/" = 2L,
+  "^" = 2L,
+  "%%" = 2L,
+  "%/%" = 2L,
+  "==" = 2L,
+  "!=" = 2L,
+  "<" = 2L,
+  "<=" = 2L,
+  ">" = 2L,
+  ">=" = 2L,
+  "!" = 1L,
+  "&&" = 2L,
+  "||" = 2L,
+  "length" = 1L,
+  "is.na" = 1L,
+  "is.nan" = 1L,
+  "is.finite" = 1L,
+  "as.double" = 1L,
+  "[" = 2L,
+  "if" = 2:3,
+  "while" = 2L,
+  "for" = 3L,
+  "break" = 0L,
+  "next" = 0L,
+  "<-" = 2L,
+  "=" = 2L,
+  "seq_len" = 1L,
+  "seq_along" = 1L,
+  ":" = 2L,
+  "numeric" = 0:1
+)
+
+rf_check_arity <- function(e) {
+  if (!is.call(e) || !is.symbol(e[[1]])) {
+    return(invisible())
+  }
+  h <- as.character(e[[1]])
+  ok <- rf_arity[[h]]
+  n <- length(e) - 1L
+  if (!is.null(ok) && !n %in% ok) {
+    rf_refuse(
+      sprintf(
+        "`%s` with %d argument%s, which R does not accept",
+        h,
+        n,
+        if (n == 1L) "" else "s"
+      ),
+      e
+    )
+  }
+  invisible()
+}
+
 # ---- Statements ----
 
 rf_block <- function(st, stmts, result = FALSE) {
+  if (result && length(stmts) == 0L) {
+    # R's value of `{}` is NULL, which is outside the subset; emitting
+    # nothing returned whatever the result slot held (0, or a vector).
+    rf_refuse(
+      "the result is an empty block `{}`, which is NULL in R",
+      quote({})
+    )
+  }
   for (k in seq_along(stmts)) {
     rf_stmt(st, stmts[[k]], result = result && k == length(stmts))
   }
@@ -852,6 +933,7 @@ rf_block <- function(st, stmts, result = FALSE) {
 
 rf_stmt <- function(st, e, result = FALSE) {
   if (is.call(e)) {
+    rf_check_arity(e)
     h <- as.character(e[[1]])
     if (h == "{") {
       return(rf_block(st, as.list(e)[-1], result))
@@ -999,6 +1081,7 @@ rf_type_name <- function(t) {
   c(d = "double", l = "logical", i = "integer", v = "vector")[[t]]
 }
 
+# A vector local, from a top-level numeric() before any loop or branch.
 rf_numeric <- function(st, s, rhs, e) {
   if (!st$top) {
     rf_refuse("`numeric()` inside a loop or branch", e)
@@ -1009,16 +1092,19 @@ rf_numeric <- function(st, s, rhs, e) {
   if (length(rhs) != 2L) {
     rf_refuse("`numeric()` needs one size", e)
   }
+  if (!is.null(names(rhs)) && !names(rhs)[2] %in% c("", "length")) {
+    rf_refuse("`numeric()`'s one argument is `length`", e)
+  }
   size <- rhs[[2]]
   bad <- setdiff(
     all.names(size),
-    c("length", "+", "-", "*", "/", "(", "%/%", st$args)
+    c("length", "+", "-", "*", "/", "^", "(", "%/%", "%%", st$args)
   )
   if (length(bad)) {
     rf_refuse(
       sprintf(
         "a vector size may use only constants, arguments, length() and arithmetic; not `%s`",
-        bad[1]
+        bad[[1]]
       ),
       e
     )
@@ -1050,7 +1136,7 @@ rf_assign_index <- function(st, lhs, rhs, e) {
 rf_condition <- function(st, ce, false, e) {
   v <- rf_expr(st, ce)
   if (v$t == "l") {
-    rf_ins(st, sprintf("beq %s, %s, 2", rf_status_exit(st, "na_cond"), v$r))
+    rf_ins(st, sprintf("beq %s, %s, 2", rf_status_exit("na_cond"), v$r))
     rf_ins(st, sprintf("beq %s, %s, 0", false, v$r))
   } else if (v$t == "i") {
     rf_ins(st, sprintf("beq %s, %s, 0", false, v$r))
@@ -1059,7 +1145,7 @@ rf_condition <- function(st, ce, false, e) {
     # logical"; only a logical NA is a "missing value".
     n <- rf_reg(st, "i64")
     rf_ins(st, sprintf("dne %s, %s, %s", n, v$r, v$r))
-    rf_ins(st, sprintf("bt %s, %s", rf_status_exit(st, "nan_cond"), n))
+    rf_ins(st, sprintf("bt %s, %s", rf_status_exit("nan_cond"), n))
     rf_ins(st, sprintf("dbeq %s, %s, zero_d", false, v$r))
   } else {
     rf_refuse("a condition must be one value", e)
@@ -1097,7 +1183,7 @@ rf_poll <- function(st) {
   rf_ins(st, "and pt, pc, 65535")
   rf_ins(st, sprintf("bne %s, pt, 0", skip))
   rf_ins(st, "call p_i0, zumir_r_poll, pr")
-  rf_ins(st, sprintf("bt %s, pr", rf_status_exit(st, "interrupt")))
+  rf_ins(st, sprintf("bt %s, pr", rf_status_exit("interrupt")))
   rf_place(st, skip)
 }
 
@@ -1178,6 +1264,7 @@ rf_for <- function(st, e) {
   ) {
     rf_refuse("`for` runs over seq_len(n), seq_along(x) or a:b", e)
   }
+  rf_check_arity(sq)
   kind <- as.character(sq[[1]])
   start <- rf_reg(st, "i64")
   count <- rf_reg(st, "i64")
@@ -1188,7 +1275,7 @@ rf_for <- function(st, e) {
     n <- rf_whole(
       st,
       rf_expr(st, sq[[2]]),
-      rf_status_exit(st, "seq_len"),
+      rf_status_exit("seq_len"),
       TRUE,
       e
     )
@@ -1197,7 +1284,7 @@ rf_for <- function(st, e) {
     v <- rf_vector(st, sq[[2]], e)
     rf_ins(st, sprintf("mov %s, vl%d", count, v$slot))
   } else {
-    bad <- rf_status_exit(st, "colon")
+    bad <- rf_status_exit("colon")
     a <- rf_whole(st, rf_expr(st, sq[[2]]), bad, FALSE, e)
     b <- rf_whole(st, rf_expr(st, sq[[3]]), bad, FALSE, e)
     up <- rf_label(st)
@@ -1341,55 +1428,43 @@ rf_call <- function(prog, ctx, args) {
   for (a in c(prog$sargs, prog$vargs)) {
     x <- args[[a]]
     if (typeof(x) != "double") {
-      stop(structure(
-        class = c("zumir_argument_error", "zumir_error", "error", "condition"),
-        list(
-          message = sprintf(
-            "argument `%s` must be a double, not %s: R would compute in another type",
-            a,
-            typeof(x)
-          ),
-          call = NULL
+      zumir_stop(
+        "argument",
+        sprintf(
+          "mir_compile(): argument `%s` must be a double, not %s: R would compute in another type.",
+          a,
+          typeof(x)
         )
-      ))
+      )
     }
     if (!is.null(attributes(x))) {
-      stop(structure(
-        class = c("zumir_argument_error", "zumir_error", "error", "condition"),
-        list(
-          message = sprintf(
-            "argument `%s` has attributes (%s): R would keep or dispatch on them",
-            a,
-            paste(names(attributes(x)), collapse = ", ")
-          ),
-          call = NULL
+      zumir_stop(
+        "argument",
+        sprintf(
+          "mir_compile(): argument `%s` has attributes (%s): R would keep or dispatch on them.",
+          a,
+          paste(names(attributes(x)), collapse = ", ")
         )
-      ))
+      )
     }
     if (a %in% prog$sargs && length(x) != 1L) {
-      stop(structure(
-        class = c("zumir_argument_error", "zumir_error", "error", "condition"),
-        list(
-          message = sprintf(
-            "argument `%s` is used as a scalar and has length %s",
-            a,
-            format(length(x))
-          ),
-          call = NULL
+      zumir_stop(
+        "argument",
+        sprintf(
+          "mir_compile(): argument `%s` is used as a scalar and has length %s.",
+          a,
+          format(length(x), scientific = FALSE)
         )
-      ))
+      )
     }
     if (a %in% prog$vargs && length(x) > .Machine$integer.max) {
-      stop(structure(
-        class = c("zumir_argument_error", "zumir_error", "error", "condition"),
-        list(
-          message = sprintf(
-            "argument `%s` is longer than .Machine$integer.max",
-            a
-          ),
-          call = NULL
+      zumir_stop(
+        "argument",
+        sprintf(
+          "mir_compile(): argument `%s` is longer than .Machine$integer.max.",
+          a
         )
-      ))
+      )
     }
   }
   env <- list2env(args[prog$vargs], parent = baseenv())
@@ -1406,10 +1481,16 @@ rf_call <- function(prog, ctx, args) {
         size != floor(size) ||
         size > .Machine$integer.max
     ) {
+      # The value as given: format() rounds to `digits` and follows OutDec.
+      shown <- if (is.numeric(size) && length(size) == 1L && !is.na(size)) {
+        sprintf("%.17g", size)
+      } else {
+        paste(deparse(size, width.cutoff = 60L, nlines = 1L), collapse = "")
+      }
       rf_runtime_error(sprintf(
         "the size of `%s` must be a whole number from 0, not %s",
         s,
-        format(size)
+        shown
       ))
     }
     numeric(size)

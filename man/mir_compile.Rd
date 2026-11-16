@@ -39,8 +39,16 @@ local is assigned on every path before it is read.
 \code{log}, \code{log1p}, \code{expm1}, \code{sqrt}, \code{abs}, \code{floor}, \code{ceiling}, \code{trunc},
 \code{sin}, \code{cos}, \code{tan}; two-argument \code{min} and \code{max}; \code{length}, \code{is.na},
 \code{is.nan}, \code{is.finite}, \code{as.double}.
-\item The result is a double scalar or a vector local.
+\item The result is a double scalar or a vector local, never an empty
+block (\code{{}}, which is \code{NULL} in R). Each construct takes the arguments
+R accepts; any other count is a compile error.
 }
+
+Every argument the body reads, on any path, is evaluated before the
+compiled code runs, since types are inferred over the whole body. An
+argument R would never evaluate (in a branch not taken) is evaluated, its
+side effects happen, and a value outside the subset is an error where R
+might not have looked at it.
 
 Where matching R exactly would not be cheap, the compiled function
 errors instead: an index out of range, \code{NA} or not a whole number; a
@@ -55,9 +63,8 @@ comes out (see \link{NA}), and so does \code{mir_compile()}: the answer can diff
 between R, the two tiers and builds, and \code{is.nan()} of such a value
 can take a different branch. \code{is.na()} is \code{TRUE} either way.
 
-\href{https://pedrobtz.github.io/zumir/articles/mir-compile.html}{What mir_compile() accepts}
-lists the subset in full, every place it errors where R would answer,
-and why.
+The article \code{vignette("mir-compile", package = "zumir")} lists the
+subset in full, every place it errors where R would answer, and why.
 }
 \examples{
 \dontshow{if (zumir_tier() != "none") withAutoprint(\{ # examplesIf}

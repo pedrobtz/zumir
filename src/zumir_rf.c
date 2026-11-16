@@ -364,6 +364,10 @@ SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_
     vp[i] = XLENGTH(v) > 0 ? REAL(v) : NULL;
   }
   int64_t r[2] = {0, 0};
+  /* The poll runs R code (finalizers) that may call a compiled function
+   * inside this call: keep the outer call's flags, or its warnings are
+   * lost. */
+  int outer_nan = zumir_r_nan_warned, outer_fmod = zumir_r_fmod_warned;
   zumir_r_nan_warned = 0;
   zumir_r_fmod_warned = 0;
   /* ISO C has no cast from an object pointer to a function pointer; the
@@ -372,8 +376,8 @@ SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_
   memcpy(&fn, &z->fn, sizeof fn);
   int64_t status = fn(REAL(consts), REAL(scalars), vp, vl, r);
   int nan = zumir_r_nan_warned, fmod = zumir_r_fmod_warned;
-  zumir_r_nan_warned = 0;
-  zumir_r_fmod_warned = 0;
+  zumir_r_nan_warned = outer_nan;
+  zumir_r_fmod_warned = outer_fmod;
   double value;
   if (Rf_asLogical(vector_result) == TRUE)
     value = (double) r[0];
@@ -391,7 +395,30 @@ SEXP zumir_rf_call(SEXP x, SEXP consts, SEXP scalars, SEXP vectors, SEXP vector_
   UNPROTECT(1);
   return res;
 }
+/* Test entry: what the poll does inside a compiled call. Sets the warning
+ * flags as an outer call's sqrt(-1) and fmod would, evaluates fn() (R code
+ * that may call compiled functions, as a finalizer the poll runs can), and
+ * returns the flags it finds afterwards, c(nan, fmod), then clears them. */
+SEXP zumir_test_nested_flags(SEXP fn, SEXP env) {
+  zumir_r_nan_warned = 1;
+  zumir_r_fmod_warned = 1;
+  SEXP call = PROTECT(Rf_lang1(fn));
+  Rf_eval(call, env);
+  UNPROTECT(1);
+  SEXP res = PROTECT(Rf_allocVector(LGLSXP, 2));
+  LOGICAL(res)[0] = zumir_r_nan_warned;
+  LOGICAL(res)[1] = zumir_r_fmod_warned;
+  zumir_r_nan_warned = 0;
+  zumir_r_fmod_warned = 0;
+  UNPROTECT(1);
+  return res;
+}
 #else
+SEXP zumir_test_nested_flags(SEXP fn, SEXP env) {
+  (void) fn;
+  (void) env;
+  return R_NilValue;
+}
 SEXP zumir_rf_new(SEXP text, SEXP tier, SEXP path) {
   (void) text;
   (void) tier;

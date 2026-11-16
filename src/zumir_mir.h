@@ -45,7 +45,20 @@
   "4fb6f621 Fix what mingw gcc reports on c2mir's Windows x86-64 path",\
   "06104552 Empty the buffer when a macro argument has no start marker",\
   "46ed8157 Generate no code from a source with parse errors",\
-  "a603752b Keep the current stream valid after the end of the unit"
+  "a603752b Keep the current stream valid after the end of the unit",\
+  "89750416 Grow both of the interpreter's call arrays",\
+  "f1c087be Refuse a label that is not in the function",\
+  "1d1d3ea6 Renumber the SSA edges copy_prop swaps, and skip operands with none",\
+  "4c9aab06 Convert to _Bool by comparing with zero in c2mir",\
+  "6a2b27b6 Convert floating values from 2^63 up to unsigned long long in c2mir",\
+  "9dd2334d Give float.h C11's digits and the platform's long double, and NULL",\
+  "e70b8330 Type character constants as int, and wide strings by their elements",\
+  "124486f0 Convert _Generic's operand and #if's conditional as C11 does",\
+  "0557c2a1 Alias a bit-field access by the member's type in c2mir",\
+  "3c282253 Add MIR_interp_prepare: allocate at link what a call would",\
+  "75b5075b Fold floating constants to integer types without undefined behaviour",\
+  "06e8281a Fold signed addition and subtraction by wrapping in c2mir",\
+  "b4c30634 Fold every signed operation by wrapping in c2mir"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

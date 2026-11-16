@@ -2,8 +2,8 @@ on:
   # `labeled`/`unlabeled` so that adding or removing a CI label reruns it.
   pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  # Weekly on main rather than on every push to it, and on demand; the
-  # badge follows (r-actions README, "Pushes to main").
+  # On demand on main rather than on every push to it; the badge follows
+  # (r-actions README, "Pushes to main").
   workflow_dispatch:
 
 name: coverage

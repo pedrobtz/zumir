@@ -3,14 +3,15 @@
 # build without MIR (Stage 2); Stages 3 to 5 add theirs (roadmap).
 #
 # macOS arm64, Windows, and Linux x86-64 and aarch64 on every pull request;
-# macOS x86-64 too on the schedule and on a dispatch, so a pull request takes
+# macOS x86-64 too on a dispatch, so a pull request takes
 # one macOS runner (ci.md). Dispatch it on a branch to see that leg:
 # `gh workflow run platforms.yaml --ref <branch>`.
 on:
   # No `push:`. A pull request already checks its merge with main, so the
   # push after merge would check the same tree again, in every package at
-  # once. Main is checked by the schedule below, which skips a commit it has
-  # already checked (r-actions README, "Pushes to main").
+  # once. With no schedule (removed before the repository went private,
+  # #53), main's full checks are a dispatch on its head: the readiness and
+  # release commits always get one (ci.md).
   # `labeled`/`unlabeled` so that adding or removing a CI label (`full-ci`,
   # `ci:minimal`, `skip-ci:<workflow>`) reruns it.
   pull_request:
@@ -41,7 +42,7 @@ jobs:
       # The script installs the package and runs its tests (the no-target
       # build), so R-only changes run it too, and it needs testthat.
       r-dependencies: true
-      timeout-minutes: 30
+      timeout-minutes: 40
       os: >-
         ${{ github.event_name == 'pull_request'
           && '["macos-latest", "windows-latest", "ubuntu-latest", "ubuntu-24.04-arm"]'

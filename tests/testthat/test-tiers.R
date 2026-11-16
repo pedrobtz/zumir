@@ -4,19 +4,7 @@
 test_that("the three right-hand sides agree bitwise across tiers", {
   skip_if_not(.Call(zumir_has_target), "built without MIR")
   skip_if(zumir_tier() == "none", "no tier runs here")
-  # A fixed seed, restored after (the shared rules' withr::local_seed(), with
-  # no withr dependency).
-  old <- if (exists(".Random.seed", globalenv())) {
-    get(".Random.seed", globalenv())
-  }
-  on.exit(
-    if (is.null(old)) {
-      rm(".Random.seed", envir = globalenv())
-    } else {
-      assign(".Random.seed", old, globalenv())
-    }
-  )
-  set.seed(20261113)
+  local_seed(20261113)
   sizes <- list(c(2, 3), c(3, 6), c(10, 9))
   for (model in 1:3) {
     native <- compile_model(model, "native")

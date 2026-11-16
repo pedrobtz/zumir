@@ -6,7 +6,7 @@ interpreter and the C compiler c2mir)
   Date:          2026-10-23 (master; the only tag, v1.0.0, is from 2024-05-27)
   Fork:          https://github.com/pedrobtz/mir
   Fork branch:   zumir
-  Fork commit:   06e8281a49400a34016eae022ff6fea0c0a3dd1f
+  Fork commit:   b4c30634b5dd0cb89eb701e8fb6e6a7b41132c81
   Imported:      2026-11-13
   License:       MIT (src/vendor/mir/LICENSE), Copyright (C) 2018-2024
                  Vladimir Makarov
@@ -51,6 +51,7 @@ interpreter and the C compiler c2mir)
                  3c282253 Add MIR_interp_prepare: allocate at link what a call would
                  75b5075b Fold floating constants to integer types without undefined behaviour
                  06e8281a Fold signed addition and subtraction by wrapping in c2mir
+                 b4c30634 Fold every signed operation by wrapping in c2mir
 
 src/vendor/mir/ is the files listed in tools/mir-files.txt, copied from the
 fork at the fork commit above. That commit is the upstream commit plus
@@ -215,6 +216,10 @@ by its bug hunt and checked against cc or R:
   06e8281a  A constant + or - on signed operands overflowed while folding, the
             case b6e92b74 left; it wraps through unsigned arithmetic now
             (UBSan on the fuzz corpus). fix/c2mir-fold-add-wrapping.
+  b4c30634  The other signed folds that overflowed: unary minus, *,
+            LLONG_MIN / -1 and % -1, and the preprocessor's +, -, * and
+            unary minus (UBSan, the long fuzz run).
+            fix/c2mir-fold-signed-wrapping.
 
 Not patched, built differently instead (design §4.2):
 

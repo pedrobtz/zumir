@@ -3561,6 +3561,16 @@ static struct val eval (c2m_ctx_t c2m_ctx, node_t tree) {
       res.u.i_val = v1.u.i_val op v2.u.i_val;                  \
   } while (0)
 
+/* + - * on signed values wrap, without the undefined overflow. */
+#define WRAP_BINOP(op)                                                             \
+  do {                                                                             \
+    res.uns_p = eval_binop_operands (c2m_ctx, tree, &v1, &v2);                     \
+    if (res.uns_p)                                                                 \
+      res.u.u_val = v1.u.u_val op v2.u.u_val;                                      \
+    else                                                                           \
+      res.u.i_val = (mir_llong) ((mir_ullong) v1.u.i_val op (mir_ullong) v2.u.i_val); \
+  } while (0)
+
   switch (tree->code) {
   case N_IGNORE:
     error (c2m_ctx, POS (tree), "wrong preprocessor expression");
@@ -3609,14 +3619,18 @@ static struct val eval (c2m_ctx_t c2m_ctx, node_t tree) {
     if (NL_EL (tree->u.ops, 1) == NULL) {
       UNOP (+);
     } else {
-      BINOP (+);
+      WRAP_BINOP (+);
     }
     break;
   case N_SUB:
     if (NL_EL (tree->u.ops, 1) == NULL) {
-      UNOP (-);
+      res = eval (c2m_ctx, NL_HEAD (tree->u.ops));
+      if (res.uns_p)
+        res.u.u_val = -res.u.u_val;
+      else
+        res.u.i_val = (mir_llong) - (mir_ullong) res.u.i_val; /* wraps at LLONG_MIN */
     } else {
-      BINOP (-);
+      WRAP_BINOP (-);
     }
     break;
   case N_AND: BINOP (&); break;
@@ -3624,7 +3638,7 @@ static struct val eval (c2m_ctx_t c2m_ctx, node_t tree) {
   case N_XOR: BINOP (^); break;
   case N_LSH: BINOP (<<); break;
   case N_RSH: BINOP (>>); break;
-  case N_MUL: BINOP (*); break;
+  case N_MUL: WRAP_BINOP (*); break;
   case N_DIV:
   case N_MOD: {
     int zero_p;
@@ -3635,9 +3649,11 @@ static struct val eval (c2m_ctx_t c2m_ctx, node_t tree) {
                      : tree->code == N_DIV      ? v1.u.u_val / v2.u.u_val
                                                 : v1.u.u_val % v2.u.u_val);
     } else {
+      /* LLONG_MIN / -1 overflows: the quotient wraps, the remainder is 0 */
       res.u.i_val = ((zero_p = v2.u.i_val == 0) ? 1
-                     : tree->code == N_DIV      ? v1.u.i_val / v2.u.i_val
-                                                : v1.u.i_val % v2.u.i_val);
+                     : v2.u.i_val == -1 ? (tree->code == N_DIV ? (mir_llong) - (mir_ullong) v1.u.i_val : 0)
+                     : tree->code == N_DIV ? v1.u.i_val / v2.u.i_val
+                                           : v1.u.i_val % v2.u.i_val);
     }
     if (zero_p)
       error (c2m_ctx, POS (tree), "division (%s) by zero in preporocessor",
@@ -8428,8 +8444,8 @@ static struct expr *check_assign_op (c2m_ctx_t c2m_ctx, node_t r, struct expr *e
         if (r->code == N_MUL) {
           if (floating_type_p (&t))
             e->c.d_val = e1->c.d_val * e2->c.d_val;
-          else if (signed_integer_type_p (&t))
-            e->c.i_val = e1->c.i_val * e2->c.i_val;
+          else if (signed_integer_type_p (&t)) /* wrapping, as MIR computes, without UB */
+            e->c.i_val = (mir_llong) ((mir_ullong) e1->c.i_val * (mir_ullong) e2->c.i_val);
           else
             e->c.u_val = e1->c.u_val * e2->c.u_val;
         } else if ((floating_type_p (&t) && e1->c.d_val == 0.0 && e2->c.d_val == 0.0)
@@ -8447,7 +8463,11 @@ static struct expr *check_assign_op (c2m_ctx_t c2m_ctx, node_t r, struct expr *e
         } else if (r->code != N_MOD && floating_type_p (&t)) {
           e->c.d_val = e1->c.d_val / e2->c.d_val;
         } else if (signed_integer_type_p (&t)) {  // ??? zero
-          e->c.i_val = r->code == N_DIV ? e1->c.i_val / e2->c.i_val : e1->c.i_val % e2->c.i_val;
+          /* LLONG_MIN / -1 overflows: the quotient wraps, the remainder is 0 */
+          e->c.i_val = e2->c.i_val == -1
+                         ? (r->code == N_DIV ? (mir_llong) - (mir_ullong) e1->c.i_val : 0)
+                       : r->code == N_DIV ? e1->c.i_val / e2->c.i_val
+                                          : e1->c.i_val % e2->c.i_val;
         } else {
           e->c.u_val = r->code == N_DIV ? e1->c.u_val / e2->c.u_val : e1->c.u_val % e2->c.u_val;
         }
@@ -8973,7 +8993,8 @@ static void check (c2m_ctx_t c2m_ctx, node_t r, node_t context) {
           if (e1->const_p) {
             convert_value (e1, &t);
             if (signed_integer_type_p (&t))
-              e->c.i_val = (r->code == N_ADD ? +e1->c.i_val : -e1->c.i_val);
+              e->c.i_val = (r->code == N_ADD ? +e1->c.i_val
+                                             : (mir_llong) - (mir_ullong) e1->c.i_val);
             else
               e->c.u_val = (r->code == N_ADD ? +e1->c.u_val : -e1->c.u_val);
           }

@@ -57,7 +57,8 @@
   "0557c2a1 Alias a bit-field access by the member's type in c2mir",\
   "3c282253 Add MIR_interp_prepare: allocate at link what a call would",\
   "75b5075b Fold floating constants to integer types without undefined behaviour",\
-  "06e8281a Fold signed addition and subtraction by wrapping in c2mir"
+  "06e8281a Fold signed addition and subtraction by wrapping in c2mir",\
+  "b4c30634 Fold every signed operation by wrapping in c2mir"
 
 #if defined(ZUMIR_NO_MIR)
 #define ZUMIR_HAVE_MIR 0

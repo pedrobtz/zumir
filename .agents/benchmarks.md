@@ -113,3 +113,34 @@ so the route changes little there: 1% to 5% between runs. On the
 interpreter, skipping the scanner saves 10% to 16%. Between the two
 builds the times differ by about as much as between runs, so the move to
 C is not measured to change speed.
+
+## zupmxode's models: compile time against call count (Stage 13)
+
+`Rscript tools/bench-zpx.R`, with zumir and `tests/consumer` installed.
+The models are the IR zupmxode 5f637a1 compiles
+(`tests/consumer/tests/testthat/fixtures/zpx-models.R`), lowered by the
+consumer's copy of zupmxode's lowering: all five blocks in one context, as
+zupmxode does. Compile is the median of 5 rounds of 200 lowerings. A call
+is the right-hand side block, the one a solver calls, over 10⁶ columns,
+median of 5. The R-to-C loop and copying each column cost the same in all
+three columns, so a call's own cost is less than the figure, and the
+native tier's advantage over the reference evaluator is larger than the
+figures suggest. Break-even is compile time over the saving per call
+against zupmxode's reference evaluator of the IR.
+
+2026-11-25, x86_64 macOS (i5-8500B), R 4.6.2, zumir e32ef68:
+
+| Model | Instructions | Tier | Compile | Call | Reference | Break-even calls |
+| --- | --- | --- | --- | --- | --- | --- |
+| lib_PK_2cmt_des | 77 | native | 1.96 ms | 59 ns | 92 ns | 59,000 |
+| lib_PK_2cmt_des | 77 | interp | 1.13 ms | 219 ns | 92 ns | never |
+| lib_PK_2cmt_tdcl_des | 96 | native | 2.48 ms | 68 ns | 113 ns | 55,000 |
+| lib_PK_2cmt_tdcl_des | 96 | interp | 1.39 ms | 337 ns | 113 ns | never |
+| lag_emax | 83 | native | 2.35 ms | 53 ns | 91 ns | 62,000 |
+| lag_emax | 83 | interp | 1.24 ms | 215 ns | 91 ns | never |
+
+A model of about 80 instructions compiles natively in 2 to 2.5 ms and pays
+for itself after about 60,000 right-hand-side calls. MIR's interpreter is 2.4 to 3 times slower than
+zupmxode's evaluator of its own IR, so it never pays. It is there for
+systems where native code can't be made, as design §4.4 has it, not for
+speed. zupmxode's own solve-level figures are in its `.agents/benchmarks.md`.

@@ -8,4 +8,4 @@ License: MIT
 Encoding: UTF-8
 LinkingTo: zumir
 Imports: zumir
-Suggests: testthat (>= 3.0.0)
+Suggests: testthat (>= 3.0.0), withr

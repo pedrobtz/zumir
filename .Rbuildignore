@@ -24,3 +24,5 @@
 ^tests/fuzz$
 ^tools/c-tests-expected\.txt$
 ^README\.Rmd$
+^tools/zpx-fixture\.R$
+^tools/bench-zpx\.R$

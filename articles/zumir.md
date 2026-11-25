@@ -53,9 +53,9 @@ bench::mark(csum_r(x), csum(x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression      min   median `itr/sec` mem_alloc
 #>   <bch:expr> <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum_r(x)   35.51ms   35.8ms      27.9    7.63MB
-#> 2 csum(x)      2.96ms   3.05ms     322.     7.63MB
-#> 3 cumsum(x)    3.51ms   3.59ms     278.     7.63MB
+#> 1 csum_r(x)   36.03ms  36.47ms      27.5    7.63MB
+#> 2 csum(x)      3.22ms   3.52ms     281.     7.63MB
+#> 3 cumsum(x)    2.56ms    2.9ms     347.     7.63MB
 ```
 
 So
@@ -111,9 +111,9 @@ bench::mark(csum(x), csum_c(x = x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression         min   median `itr/sec` mem_alloc
 #>   <bch:expr>    <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum(x)        888.5µs   2.98ms      371.    7.63MB
-#> 2 csum_c(x = x)  666.9µs   2.77ms      419.    7.63MB
-#> 3 cumsum(x)        1.4ms   3.58ms      364.    7.63MB
+#> 1 csum(x)         1.77ms   3.64ms      279.    7.63MB
+#> 2 csum_c(x = x)   1.34ms   3.08ms      326.    7.63MB
+#> 3 cumsum(x)     816.52µs   2.86ms      381.    7.63MB
 ```
 
 ## Return a value
@@ -255,4 +255,6 @@ csum_interp <- mir_compile(csum_r, tier = "interp")
 See the [reference
 index](https://pedrobtz.github.io/zumir/reference/index.md) for every
 function. Packages that generate code, such as zupmxode, use zumir’s C
-API instead of these R functions.
+API instead of these R functions. [A model from
+zupmxode](https://pedrobtz.github.io/zumir/articles/ode-model.md) solves
+one of its models with both compilers here.

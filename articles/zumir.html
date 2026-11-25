@@ -34,6 +34,7 @@
   <button class="nav-link dropdown-toggle" type="button" id="dropdown-articles" data-bs-toggle="dropdown" aria-expanded="false" aria-haspopup="true">Articles</button>
   <ul class="dropdown-menu" aria-labelledby="dropdown-articles">
 <li><a class="dropdown-item" href="../articles/mir-compile.html">What mir_compile() accepts</a></li>
+    <li><a class="dropdown-item" href="../articles/ode-model.html">A model from zupmxode</a></li>
   </ul>
 </li>
 <li class="nav-item"><a class="nav-link" href="../news/index.html">Changelog</a></li>
@@ -109,9 +110,9 @@ machine.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression      min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   35.51ms   35.8ms      27.9    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      2.96ms   3.05ms     322.     7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    3.51ms   3.59ms     278.     7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   36.03ms  36.47ms      27.5    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      3.22ms   3.52ms     281.     7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    2.56ms    2.9ms     347.     7.63MB</span></span></code></pre></div>
 <p>So <code><a href="../reference/mir_compile.html">mir_compile()</a></code> pays off for a loop that R has no
 built-in for. Examples are a recurrence, where each step needs the one
 before it, a loop that stops early, and one pass that does what several
@@ -157,9 +158,9 @@ interrupt.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression         min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)        888.5µs   2.98ms      371.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)  666.9µs   2.77ms      419.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)        1.4ms   3.58ms      364.    7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)         1.77ms   3.64ms      279.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)   1.34ms   3.08ms      326.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)     816.52µs   2.86ms      381.    7.63MB</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="return-a-value">Return a value<a class="anchor" aria-label="anchor" href="#return-a-value"></a>
@@ -293,7 +294,9 @@ interpreter yourself.</p>
 </h2>
 <p>See the <a href="../reference/index.html">reference index</a> for
 every function. Packages that generate code, such as zupmxode, use
-zumir’s C API instead of these R functions.</p>
+zumir’s C API instead of these R functions. <a href="ode-model.html">A
+model from zupmxode</a> solves one of its models with both compilers
+here.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

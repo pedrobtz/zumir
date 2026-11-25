@@ -163,4 +163,5 @@ csum_interp <- mir_compile(csum_r, tier = "interp")
 
 See the [reference index](../reference/index.html) for every function.
 Packages that generate code, such as zupmxode, use zumir's C API instead of
-these R functions.
+these R functions. [A model from zupmxode](ode-model.html) solves one of
+its models with both compilers here.

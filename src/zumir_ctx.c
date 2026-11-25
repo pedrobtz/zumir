@@ -43,6 +43,13 @@ void zumir_rctx_fail(zumir_rctx *z, const void *trap) {
   }
 }
 
+/* The status of a context that failed: MIR running out of memory is
+ * ZUMIR_ST_NO_MEMORY, whichever allocator ran out; any other error is
+ * ZUMIR_ST_MIR (#111). */
+int zumir_rctx_failure(const zumir_rctx *z) {
+  return z->type == MIR_alloc_error ? ZUMIR_ST_NO_MEMORY : ZUMIR_ST_MIR;
+}
+
 int zumir_rctx_run(zumir_rctx *z, zumir_body body, void *arg) {
   if (z->failed) return 0;
   zumir_trap t;
@@ -108,7 +115,7 @@ zumir_rctx *zumir_rctx_new(int tier, int imports, int *status) {
   z->tier = tier;
   z->imports = imports;
   if (!zumir_rctx_run(z, body_new, NULL)) {
-    *status = ZUMIR_ST_MIR;
+    *status = zumir_rctx_failure(z);
     zumir_rctx_free(z);
     return NULL;
   }
@@ -212,7 +219,7 @@ void *zumir_rctx_compile(zumir_rctx *z, MIR_module_t module, const char *name, i
    * finds no function has linked the module on this tier. */
   z->linked = 1;
   if (!zumir_rctx_run(z, body_compile, &c)) {
-    *status = ZUMIR_ST_MIR;
+    *status = zumir_rctx_failure(z);
     return NULL;
   }
   if (c.fn == NULL) {
@@ -354,7 +361,7 @@ SEXP zumir_ctx_link(SEXP x, SEXP name) {
   if (z == NULL) return st;
   int status;
   zumir_rctx_compile(z, NULL, CHAR(STRING_ELT(name, 0)), z->tier, NULL, &status);
-  if (status == ZUMIR_ST_MIR) return zumir_status("mir", z->type, z->message);
+  if (z->failed) return zumir_status("mir", z->type, z->message);
   if (status == ZUMIR_ST_NOT_FOUND) return zumir_status("context", 0, "no function of that name");
   if (status == ZUMIR_ST_NO_TIER) return zumir_status("context", 0, "no tier runs here");
   if (status != ZUMIR_ST_OK) return zumir_status("context", 0, "cannot link");

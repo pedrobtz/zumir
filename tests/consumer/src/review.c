@@ -259,3 +259,35 @@ SEXP zc_interp_call_c(SEXP x, SEXP s_a) {
   UNPROTECT(1);
   return res;
 }
+
+/* ---- #111: MIR's allocation failure is ZUMIR_E_NO_MEMORY ---- */
+
+/* c(zumir_ctx_new's status, zumir_compile's, zumir_status's) for f(a) = a
+ * on `tier`; -1 where the call was not reached (no context). */
+SEXP zc_alloc_status_c(SEXP s_tier) {
+  load();
+  int st_new, st_compile = -1, st_status = -1;
+  zumir_ctx *z = zumir_ctx_new(&st_new);
+  if (z != NULL) {
+    MIR_context_t ctx = zumir_mir(z);
+    MIR_module_t mod = MIR_new_module(ctx, "m");
+    MIR_type_t rt = MIR_T_D;
+    MIR_var_t a = {MIR_T_D, "a", 0};
+    MIR_item_t fi = MIR_new_func_arr(ctx, "f", 1, &rt, 1, &a);
+    if (fi != NULL && fi->u.func != NULL) {
+      MIR_reg_t ra = MIR_reg(ctx, "a", fi->u.func);
+      MIR_append_insn(ctx, fi, MIR_new_ret_insn(ctx, 1, MIR_new_reg_op(ctx, ra)));
+    }
+    MIR_finish_func(ctx);
+    MIR_finish_module(ctx);
+    (void) zumir_compile(z, mod, "f", tier_code(s_tier), NULL, &st_compile);
+    st_status = zumir_status(z, NULL);
+    zumir_ctx_free(z);
+  }
+  SEXP res = PROTECT(Rf_allocVector(INTSXP, 3));
+  INTEGER(res)[0] = st_new;
+  INTEGER(res)[1] = st_compile;
+  INTEGER(res)[2] = st_status;
+  UNPROTECT(1);
+  return res;
+}

@@ -185,3 +185,41 @@ test_that("an interpreted function's first call returns under an allocation fail
     expect_identical(r, c(1, 1, sin(0.5) + 1), info = n)
   }
 })
+
+test_that("MIR's allocation failure is ZUMIR_E_NO_MEMORY at every position (#111)", {
+  skip_if(zumir::zumir_tier() == "none", "no tier runs here")
+  ns <- asNamespace("zumir")
+  on.exit(.Call(ns$zumir_test_fail_alloc, 0L))
+  ok <- 0L
+  no_memory <- 6L
+  failed <- 2L
+  for (tier in c("native", "interp")) {
+    if (tier == "native" && zumir::zumir_tier() != "native") next
+    # Without a failure: the sweep's end, and the oracle for its statuses.
+    expect_identical(zumirconsumer:::zc_alloc_status(tier), c(ok, ok, ok))
+    n <- 0L
+    hit_new <- hit_compile <- FALSE
+    repeat {
+      n <- n + 1L
+      .Call(ns$zumir_test_fail_alloc, n)
+      s <- zumirconsumer:::zc_alloc_status(tier)
+      .Call(ns$zumir_test_fail_alloc, 0L)
+      if (identical(s, c(ok, ok, ok))) break
+      info <- paste(tier, n)
+      if (s[1] != ok) {
+        # No context: nothing else was reached.
+        expect_identical(s, c(no_memory, -1L, -1L), info = info)
+        hit_new <- TRUE
+      } else {
+        # A failure while building fails the context (compile says so);
+        # one during the compile is the compile's own status.
+        expect_true(s[2] %in% c(no_memory, failed), info = info)
+        expect_identical(s[3], no_memory, info = info)
+        hit_compile <- TRUE
+      }
+      if (n > 5000L) fail("the sweep did not end")
+    }
+    expect_true(hit_new, info = tier)
+    expect_true(hit_compile, info = tier)
+  }
+})

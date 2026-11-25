@@ -83,6 +83,9 @@ void zumir_mirf_wrapper(zumir_rctx *z, void *arg);
 /* Runs body under a trap. Returns 1 when it returned, 0 when MIR raised
  * (the context is then failed) or the context was already failed. */
 int zumir_rctx_run(zumir_rctx *z, zumir_body body, void *arg);
+/* A failed context's status: ZUMIR_ST_NO_MEMORY for MIR_alloc_error, else
+ * ZUMIR_ST_MIR. */
+int zumir_rctx_failure(const zumir_rctx *z);
 
 /* The zumir_rctx behind x, or NULL with *status set to a zumir_status
  * list for R to signal: x is not a context, or it was freed or restored

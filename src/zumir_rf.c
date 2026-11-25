@@ -37,7 +37,7 @@ static SEXP compile_rf(SEXP x, zumir_rctx *z, MIR_module_t module, int t) {
   int status;
   zumir_rctx_compile(z, module, "rf", t, NULL, &status);
   if (status != ZUMIR_ST_OK) {
-    return status == ZUMIR_ST_MIR ? zumir_status("mir", z->type, z->message)
+    return z->failed ? zumir_status("mir", z->type, z->message)
                                   : zumir_status("context", 0, "cannot compile on this tier");
   }
   return x;

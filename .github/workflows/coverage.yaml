@@ -22,7 +22,7 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'ci:minimal')
         || contains(github.event.pull_request.labels.*.name, 'skip-ci:coverage'))
     # Pinned to a commit because it holds a write token (ci.md).
-    uses: pedrobtz/r-actions/.github/workflows/coverage.yml@d53e033699ab3fb2fa48a156156e2f142ff68fbc # v1.43.0
+    uses: pedrobtz/r-actions/.github/workflows/coverage.yml@72ecdaf3536ed6b5984ed12815e168ee16ab8aa4 # v1.46.1
     permissions:
       contents: write
     with:
@@ -31,3 +31,6 @@ jobs:
       # The C's own coverage: functions no test enters and conditions taken
       # one way only, in the job summary.
       native: true
+      # A little under the figure, 63.9% on 2026-11-14, so a change that
+      # drops coverage fails instead of moving the badge (#97).
+      fail-under: 62

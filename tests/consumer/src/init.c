@@ -19,6 +19,9 @@ SEXP zc_null_args_c(void);
 SEXP zc_interp_compile_c(void);
 SEXP zc_interp_call_c(SEXP x, SEXP a);
 SEXP zc_alloc_status_c(SEXP tier);
+SEXP zc_zpx_compile_c(SEXP code, SEXP consts, SEXP tier);
+SEXP zc_zpx_run_c(SEXP x, SEXP block, SEXP t, SEXP y, SEXP par, SEXP work);
+SEXP zc_zpx_eval_c(SEXP code, SEXP consts, SEXP block, SEXP t, SEXP y, SEXP par, SEXP work);
 
 static const R_CallMethodDef calls[] = {
   {"zc_rhs_c", (DL_FUNC) &zc_rhs_c, 4},
@@ -37,6 +40,9 @@ static const R_CallMethodDef calls[] = {
   {"zc_interp_compile_c", (DL_FUNC) &zc_interp_compile_c, 0},
   {"zc_interp_call_c", (DL_FUNC) &zc_interp_call_c, 2},
   {"zc_alloc_status_c", (DL_FUNC) &zc_alloc_status_c, 1},
+  {"zc_zpx_compile_c", (DL_FUNC) &zc_zpx_compile_c, 3},
+  {"zc_zpx_run_c", (DL_FUNC) &zc_zpx_run_c, 6},
+  {"zc_zpx_eval_c", (DL_FUNC) &zc_zpx_eval_c, 7},
   {NULL, NULL, 0}};
 
 void R_init_zumirconsumer(DllInfo *dll) {

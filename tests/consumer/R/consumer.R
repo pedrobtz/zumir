@@ -25,3 +25,30 @@ zc_null_args <- function() .Call(zc_null_args_c)
 zc_interp_compile <- function() .Call(zc_interp_compile_c)
 zc_interp_call <- function(x, a) .Call(zc_interp_call_c, x, as.double(a))
 zc_alloc_status <- function(tier) .Call(zc_alloc_status_c, tier)
+# zupmxode's models (src/zpx.c): m is an entry of the fixture's list.
+zc_zpx_compile <- function(m, tier) {
+  .Call(zc_zpx_compile_c, m$code, m$consts, tier)
+}
+zc_zpx_run <- function(x, block, t, y, par, work) {
+  .Call(
+    zc_zpx_run_c,
+    x,
+    as.integer(block),
+    as.double(t),
+    as.double(y),
+    as.double(par),
+    as.double(work)
+  )
+}
+zc_zpx_eval <- function(m, block, t, y, par, work) {
+  .Call(
+    zc_zpx_eval_c,
+    m$code,
+    m$consts,
+    as.integer(block),
+    as.double(t),
+    as.double(y),
+    as.double(par),
+    as.double(work)
+  )
+}

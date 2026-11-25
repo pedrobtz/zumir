@@ -205,6 +205,13 @@ plans MIR's own tests, `mir-tests` through `mir_function()`, and `c-tests`
 through `c2mir` by the corpus's own rules, on both tiers; `.agents/assurance.md`
 lists every oracle and its gap.
 
+`tests/consumer`'s `test-zupmxode.R`: zupmxode's own lowering and IR
+evaluator (copied into `tests/consumer/src/zpx_*`) on three models' IR
+from zupmxode (`tools/zpx-fixture.R` writes the fixture), bitwise on both
+tiers; `tools/bench-zpx.R` gives `.agents/benchmarks.md` compile time
+against call count. Copy them again when zupmxode's IR or lowering
+changes.
+
 ## Continuous integration
 
 Every workflow calls `pedrobtz/r-actions` at `@v1`, except `coverage.yaml`,

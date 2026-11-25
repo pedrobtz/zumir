@@ -228,7 +228,7 @@ SEXP zumir_mirf_new(SEXP text, SEXP name, SEXP tier, SEXP imports) {
   int status;
   zumir_rctx_compile(z, NULL, "_zumir_call", t, NULL, &status);
   if (status != ZUMIR_ST_OK) {
-    SEXP res = status == ZUMIR_ST_MIR ? zumir_status("mir", z->type, z->message)
+    SEXP res = z->failed ? zumir_status("mir", z->type, z->message)
                                       : zumir_status("context", 0, "cannot compile on this tier");
     UNPROTECT(1);
     return res;

@@ -60,6 +60,8 @@ enum {
   ZUMIR_E_NO_TIER = 3,  /* no tier runs here (zumir_tier() is "none") */
   ZUMIR_E_NOT_FOUND = 4, /* no function of that name in the module */
   ZUMIR_E_ARG = 5,      /* a NULL or invalid argument */
+  /* memory ran out: MIR's (zumir_status() has its message while the
+   * context exists) or zumir's own */
   ZUMIR_E_NO_MEMORY = 6
 };
 

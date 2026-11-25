@@ -344,7 +344,7 @@ static int api_status(zumir_ctx *z, const char **message) {
     return ZUMIR_E_ARG;
   }
   if (message != NULL) *message = r->failed ? r->message : "";
-  return r->failed ? ZUMIR_E_MIR : ZUMIR_OK;
+  return r->failed ? zumir_rctx_failure(r) : ZUMIR_OK;
 }
 
 static void *api_compile(zumir_ctx *z, MIR_module_t module, const char *name, int tier,

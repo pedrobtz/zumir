@@ -242,7 +242,7 @@ which holds a write token and is pinned to a commit:
   are read in `.agents/assurance.md`.
 - `vendor.yaml`: `tools/verify-vendor`, and a pull request that changes
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
-- `coverage.yaml` with `native: true`; `pkgdown.yaml`; `assurance.yaml`
+- `coverage.yaml` with `native: true` and `fail-under: 62`; `pkgdown.yaml`; `assurance.yaml`
   with `ungated-jobs: fail`.
 
 `vendor-upstream.yml` is not called: it compares release tags, and MIR is

@@ -18,6 +18,7 @@ SEXP zc_tier_lock_c(void);
 SEXP zc_null_args_c(void);
 SEXP zc_interp_compile_c(void);
 SEXP zc_interp_call_c(SEXP x, SEXP a);
+SEXP zc_alloc_status_c(SEXP tier);
 
 static const R_CallMethodDef calls[] = {
   {"zc_rhs_c", (DL_FUNC) &zc_rhs_c, 4},
@@ -35,6 +36,7 @@ static const R_CallMethodDef calls[] = {
   {"zc_null_args_c", (DL_FUNC) &zc_null_args_c, 0},
   {"zc_interp_compile_c", (DL_FUNC) &zc_interp_compile_c, 0},
   {"zc_interp_call_c", (DL_FUNC) &zc_interp_call_c, 2},
+  {"zc_alloc_status_c", (DL_FUNC) &zc_alloc_status_c, 1},
   {NULL, NULL, 0}};
 
 void R_init_zumirconsumer(DllInfo *dll) {

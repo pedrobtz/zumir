@@ -132,7 +132,7 @@ SEXP zumir_c2mir_compile(SEXP source, SEXP fname, SEXP tier, SEXP name) {
   int status;
   zumir_rctx_compile(z, NULL, CHAR(STRING_ELT(fname, 0)), t, NULL, &status);
   if (status != ZUMIR_ST_OK) {
-    SEXP e = status == ZUMIR_ST_MIR ? zumir_status("mir", z->type, z->message)
+    SEXP e = z->failed ? zumir_status("mir", z->type, z->message)
              : status == ZUMIR_ST_NOT_FOUND
                ? zumir_status("argument", 0, "no function of that name in the source")
                : zumir_status("context", 0, "cannot compile on this tier");
@@ -301,7 +301,7 @@ SEXP zumir_cfun_new(SEXP source, SEXP tier, SEXP name) {
   int status;
   zumir_rctx_compile(z, NULL, "_zumir_call", t, NULL, &status);
   if (status != ZUMIR_ST_OK) {
-    SEXP res = status == ZUMIR_ST_MIR ? zumir_status("mir", z->type, z->message)
+    SEXP res = z->failed ? zumir_status("mir", z->type, z->message)
                                       : zumir_status("context", 0, "cannot compile on this tier");
     UNPROTECT(1);
     return res;

@@ -34,10 +34,10 @@ jobs:
         || contains(github.event.pull_request.labels.*.name, 'skip-ci:gctorture'))
     uses: pedrobtz/r-actions/.github/workflows/gctorture.yml@v1
     with:
-      profile: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'full' || 'quick' }}
+      profile: ${{ github.event_name == 'workflow_dispatch' && 'full' || 'quick' }}
       # Inverted, because `cond && 0 || 10` is always 10: an expression
       # treats 0 as false.
-      test-timeout-minutes: ${{ (github.event_name != 'schedule' && github.event_name != 'workflow_dispatch') && 10 || 0 }}
+      test-timeout-minutes: ${{ github.event_name != 'workflow_dispatch' && 10 || 0 }}
       timeout-minutes: 240
 
   # A failed run on main otherwise notifies only whoever dispatched it. This
@@ -73,12 +73,12 @@ jobs:
           fi
           # A job that reached timeout-minutes is `cancelled`; that is a
           # failure here too.
-          body="Scheduled gctorture at step 20 ended \`$RESULT\` on ${SHA:0:7}: $RUN"
+          body="Dispatched gctorture at step 20 ended \`$RESULT\` on ${SHA:0:7}: $RUN"
           if [ -n "$open" ]; then
             gh issue comment "$open" --repo "$REPO" --body "$body"
           else
             gh label create gctorture --repo "$REPO" --color B60205 \
-              --description "Scheduled gctorture run is failing" --force
+              --description "Dispatched gctorture run on main is failing" --force
             gh issue create --repo "$REPO" --label gctorture \
-              --title "Scheduled gctorture fails" --body "$body"
+              --title "gctorture fails on main" --body "$body"
           fi

@@ -53,9 +53,9 @@ bench::mark(csum_r(x), csum(x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression      min   median `itr/sec` mem_alloc
 #>   <bch:expr> <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum_r(x)   33.73ms  33.81ms      29.4    7.63MB
-#> 2 csum(x)      2.78ms   2.87ms     348.     7.63MB
-#> 3 cumsum(x)    3.31ms   3.37ms     297.     7.63MB
+#> 1 csum_r(x)   59.83ms  60.35ms      16.6    7.63MB
+#> 2 csum(x)      3.66ms   4.11ms     240.     7.63MB
+#> 3 cumsum(x)    4.27ms   4.47ms     225.     7.63MB
 ```
 
 So
@@ -111,9 +111,9 @@ bench::mark(csum(x), csum_c(x = x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression         min   median `itr/sec` mem_alloc
 #>   <bch:expr>    <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum(x)       870.81µs   2.83ms      361.    7.63MB
-#> 2 csum_c(x = x) 655.72µs   2.59ms      395.    7.63MB
-#> 3 cumsum(x)       1.34ms   3.36ms      305.    7.63MB
+#> 1 csum(x)          1.5ms   4.13ms      251.    7.63MB
+#> 2 csum_c(x = x)   1.07ms   3.67ms      292.    7.63MB
+#> 3 cumsum(x)       4.17ms   4.35ms      228.    7.63MB
 ```
 
 ## Return a value
@@ -242,10 +242,10 @@ zumir_info()
 #> 
 #> $memory
 #> $memory$contexts
-#> [1] 6
+#> [1] 5
 #> 
 #> $memory$bytes
-#> [1] 2772529
+#> [1] 2506940
 
 csum_interp <- mir_compile(csum_r, tier = "interp")
 ```

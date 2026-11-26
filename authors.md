@@ -16,13 +16,12 @@ Source:
 [`DESCRIPTION`](https://github.com/pedrobtz/zumir/blob/main/DESCRIPTION)
 
 Baltazar P (2026). *zumir: Native Code from R Without a Compiler, with
-'MIR'*. R package version 0.0.0.9000,
-<https://pedrobtz.github.io/zumir/>.
+'MIR'*. R package version 0.1.0, <https://pedrobtz.github.io/zumir/>.
 
     @Manual{,
       title = {zumir: Native Code from R Without a Compiler, with 'MIR'},
       author = {Pedro Baltazar},
       year = {2026},
-      note = {R package version 0.0.0.9000},
+      note = {R package version 0.1.0},
       url = {https://pedrobtz.github.io/zumir/},
     }

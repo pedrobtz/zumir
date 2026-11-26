@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">zumir</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.0.0.9000</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.0</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -39,7 +39,7 @@
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.0.0.9000" id="zumir-0009000">zumir 0.0.0.9000<a class="anchor" aria-label="anchor" href="#zumir-0009000"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.1.0" id="zumir-010">zumir 0.1.0<a class="anchor" aria-label="anchor" href="#zumir-010"></a></h2>
 <ul><li><p>Initial CRAN submission.</p></li>
 <li><p>Bundles MIR, Vladimir Makarov’s JIT compiler (core, code generator, interpreter and its C compiler <code>c2mir</code>), at upstream commit <code>dc2c763</code>, with local patches that make it build cleanly under R’s compilers and remove the undefined behaviour and memory errors its own C test corpus found under the sanitizers. MIR can no longer end the R session or print from it: its exits and messages go to zumir. <code>c2mir</code> reads no header file: C code compiles the same on every machine. On a CPU MIR has no code generator for, and on Windows on ARM, the package installs without it.</p></li>
 <li><p><code><a href="../reference/cfunction.html">cfunction()</a></code> compiles one C function, in memory, with MIR’s own C compiler, and returns an R function that calls it: no Rtools, Xcode tools or <code>gcc</code> needed. Output arguments are copies, so the caller’s vectors are never changed, and no system header is read, so a source compiles the same everywhere. Arguments are checked and passed in C, so a call costs under a microsecond.</p></li>

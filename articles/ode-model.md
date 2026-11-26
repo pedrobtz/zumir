@@ -161,9 +161,9 @@ bench::mark(
 #> # A tibble: 3 × 5
 #>   expression       min   median `itr/sec` mem_alloc
 #>   <bch:expr>  <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 R            833.8µs  861.9µs     1154.    18.8KB
-#> 2 mir_compile   62.3µs   69.2µs    14219.    18.8KB
-#> 3 cfunction     37.2µs   38.4µs    25214.    18.8KB
+#> 1 R             1.16ms    1.2ms      832.    18.8KB
+#> 2 mir_compile  75.35µs   79.7µs    12350.    18.8KB
+#> 3 cfunction    41.86µs   49.2µs    20719.    18.8KB
 ```
 
 ## Where zupmxode goes further

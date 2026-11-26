@@ -49,7 +49,7 @@ with nothing to instrument, so it joined with MIR in Stage 2 (#4). Stage 3
 (#5) wires
 `alloc-failure`, with the error trap it exercises; Stage 8 (#8) wires
 `fuzz`, with c2mir, the first parser of untrusted input that needs it;
-Stage 11 (#11) schedules `mutation` over the C tests.
+Stage 11 (#11) wires `mutation` over the C tests, run on dispatch.
 
 **Analyzers (Stage 12, 2026-11-15).** `-fanalyzer` covers zumir's own C and
 gates on findings, on every pull request. Vendored MIR is not analysed:

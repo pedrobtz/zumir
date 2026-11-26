@@ -1,6 +1,6 @@
 Package: zumir
 Title: Native Code from R Without a Compiler, with 'MIR'
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com",
            role = c("aut", "cre", "cph")),
@@ -10,12 +10,13 @@ Authors@R: c(
            comment = "Co-author of the vendored 'MIR' file real-time.h")
   )
 Copyright: See inst/COPYRIGHTS for the vendored 'MIR' library.
-Description: Brings 'MIR', a lightweight just-in-time compiler, to R. Other
-    packages link to it through a versioned C interface to build functions
-    and get native code back, or 'MIR' interpreter code where no code
-    generator exists for the processor. R users can compile a short numeric
-    C function, or a numeric R function in a documented subset of the
-    language, to native code from R, with no system compiler installed.
+Description: Brings 'MIR' (Medium Internal Representation), a lightweight
+    just-in-time compiler, to 'R'. Other packages link to it through a
+    versioned C interface to build functions and get native code back, or
+    'MIR' interpreter code where no code generator exists for the
+    processor. 'R' users can compile a short numeric C function, or a
+    numeric 'R' function in a documented subset of the language, to native
+    code from 'R', with no system compiler installed.
 License: MIT + file LICENSE
 URL: https://pedrobtz.github.io/zumir/, https://github.com/pedrobtz/zumir
 BugReports: https://github.com/pedrobtz/zumir/issues

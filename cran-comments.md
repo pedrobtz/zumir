@@ -40,7 +40,10 @@ win-builder, the macOS builder and R-hub:
 
 * `R CMD check --as-cran` on macOS (R release), Windows (R release and
   R-devel) and Ubuntu (R release and oldrel-1).
-* CRAN-like Linux containers with R-devel.
+* R-devel in CRAN-like Linux containers: `clang23`, `ubuntu-clang` and
+  `ubuntu-gcc16`.
+* Without suggested packages (`nosuggests`) and without long doubles
+  (`nold`).
 * ASan and UBSan, valgrind, LTO, rchk, gctorture and compiler static
   analysers.
 
@@ -49,3 +52,10 @@ win-builder, the macOS builder and R-hub:
 0 errors | 0 warnings | 1 note
 
 * This is a new submission.
+
+## Method References
+
+There are no published references describing the methods in this
+package. MIR itself is described in its repository
+(<https://github.com/vnmakarov/mir>), and zumir's own design follows no
+publication.

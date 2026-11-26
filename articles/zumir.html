@@ -110,9 +110,9 @@ machine.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression      min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   58.69ms  59.06ms      16.9    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      3.74ms   4.16ms     236.     7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    4.32ms   4.64ms     216.     7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   33.73ms  33.81ms      29.4    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      2.78ms   2.87ms     348.     7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    3.31ms   3.37ms     297.     7.63MB</span></span></code></pre></div>
 <p>So <code><a href="../reference/mir_compile.html">mir_compile()</a></code> pays off for a loop that R has no
 built-in for. Examples are a recurrence, where each step needs the one
 before it, a loop that stops early, and one pass that does what several
@@ -158,9 +158,9 @@ interrupt.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression         min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)         1.47ms   4.15ms      246.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)   1.05ms   3.69ms      288.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)       1.91ms   4.42ms      243.    7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)       870.81µs   2.83ms      361.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x) 655.72µs   2.59ms      395.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)       1.34ms   3.36ms      305.    7.63MB</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="return-a-value">Return a value<a class="anchor" aria-label="anchor" href="#return-a-value"></a>

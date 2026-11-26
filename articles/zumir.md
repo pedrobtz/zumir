@@ -53,9 +53,9 @@ bench::mark(csum_r(x), csum(x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression      min   median `itr/sec` mem_alloc
 #>   <bch:expr> <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum_r(x)   58.69ms  59.06ms      16.9    7.63MB
-#> 2 csum(x)      3.74ms   4.16ms     236.     7.63MB
-#> 3 cumsum(x)    4.32ms   4.64ms     216.     7.63MB
+#> 1 csum_r(x)   33.73ms  33.81ms      29.4    7.63MB
+#> 2 csum(x)      2.78ms   2.87ms     348.     7.63MB
+#> 3 cumsum(x)    3.31ms   3.37ms     297.     7.63MB
 ```
 
 So
@@ -111,9 +111,9 @@ bench::mark(csum(x), csum_c(x = x), cumsum(x), min_iterations = 10)[, 1:5]
 #> # A tibble: 3 × 5
 #>   expression         min   median `itr/sec` mem_alloc
 #>   <bch:expr>    <bch:tm> <bch:tm>     <dbl> <bch:byt>
-#> 1 csum(x)         1.47ms   4.15ms      246.    7.63MB
-#> 2 csum_c(x = x)   1.05ms   3.69ms      288.    7.63MB
-#> 3 cumsum(x)       1.91ms   4.42ms      243.    7.63MB
+#> 1 csum(x)       870.81µs   2.83ms      361.    7.63MB
+#> 2 csum_c(x = x) 655.72µs   2.59ms      395.    7.63MB
+#> 3 cumsum(x)       1.34ms   3.36ms      305.    7.63MB
 ```
 
 ## Return a value

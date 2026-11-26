@@ -55,7 +55,8 @@ prelude in `src/zumir_prelude.c` and D6's table in
 and D24 confirmed. Stage 7 added the
 emitter route (`zumir_rf_build`), which builds the module with MIR's API
 from the lowering's instructions; the text route stays, internal
-(`rf_make(route = "text")`), as its oracle. The roadmap in `.agents/roadmap.md` takes it to v0.1.0.
+(`rf_make(route = "text")`), as its oracle. Stage 13 set `Version: 0.1.0`; the roadmap in
+`.agents/roadmap.md` takes it to submission.
 
 Stage 0, the MIR spike, ran outside this repository in
 [`pedrobtz/mirspike`](https://github.com/pedrobtz/mirspike) and decided that

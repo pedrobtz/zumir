@@ -40,8 +40,13 @@ nothing else installed.
 
 ## Installation
 
-zumir is not on CRAN yet. Install the development version from GitHub
-with:
+Install zumir from CRAN:
+
+``` r
+install.packages("zumir")
+```
+
+or the development version from GitHub:
 
 ``` r
 # install.packages("pak")

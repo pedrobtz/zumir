@@ -1,4 +1,4 @@
-# zumir 0.0.0.9000
+# zumir 0.1.0
 
 * Initial CRAN submission.
 

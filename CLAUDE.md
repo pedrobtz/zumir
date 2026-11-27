@@ -215,8 +215,8 @@ changes.
 
 ## Continuous integration
 
-Every workflow calls `pedrobtz/r-actions` at `@v1`, except `coverage.yaml`,
-which holds a write token and is pinned to a commit:
+Every workflow calls `pedrobtz/r-actions` at `@v1`, except `coverage.yaml`
+and `cran-release.yaml`, which hold a write token and are pinned to a commit:
 
 - `R-CMD-check.yaml`: `r-cmd-check.yml`, `profile: auto`, with a Windows
   R-devel row added to `runners` (full profile only).
@@ -252,6 +252,11 @@ which holds a write token and is pinned to a commit:
   `src/vendor/mir/` must change `src/vendor/PROVENANCE`.
 - `coverage.yaml` with `native: true` and `fail-under: 62`; `pkgdown.yaml`; `assurance.yaml`
   with `ungated-jobs: fail`.
+- `cran-release.yaml`: when `CRAN-SUBMISSION` lands on main, tags the
+  submitted commit with the bare version, makes the GitHub release from
+  `NEWS.md` and opens the `.9000` bump pull request. `branches: [main]` is
+  added to r-actions' example so the pull request that carries the file
+  does not release before it merges.
 
 `vendor-upstream.yml` is not called: it compares release tags, and MIR is
 pinned to a commit past the only one (D2), so it would always report a

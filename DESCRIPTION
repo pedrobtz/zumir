@@ -1,6 +1,6 @@
 Package: zumir
 Title: Native Code from R Without a Compiler, with 'MIR'
-Version: 0.1.0
+Version: 0.1.0.9000
 Authors@R: c(
     person("Pedro", "Baltazar", , "pedrobtz@gmail.com",
            role = c("aut", "cre", "cph")),

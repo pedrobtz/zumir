@@ -110,9 +110,9 @@ machine.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression      min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   59.83ms  60.35ms      16.6    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)      3.66ms   4.11ms     240.     7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    4.27ms   4.47ms     225.     7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum_r(x)   59.59ms  60.24ms      16.6    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum(x)       3.8ms   4.03ms     246.     7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)    4.27ms   4.49ms     225.     7.63MB</span></span></code></pre></div>
 <p>So <code><a href="../reference/mir_compile.html">mir_compile()</a></code> pays off for a loop that R has no
 built-in for. Examples are a recurrence, where each step needs the one
 before it, a loop that stops early, and one pass that does what several
@@ -158,9 +158,9 @@ interrupt.</p>
 <span><span class="co">#&gt; <span style="color: #949494;"># A tibble: 3 × 5</span></span></span>
 <span><span class="co">#&gt;   expression         min   median `itr/sec` mem_alloc</span></span>
 <span><span class="co">#&gt;   <span style="color: #949494; font-style: italic;">&lt;bch:expr&gt;</span>    <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:tm&gt;</span>     <span style="color: #949494; font-style: italic;">&lt;dbl&gt;</span> <span style="color: #949494; font-style: italic;">&lt;bch:byt&gt;</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)          1.5ms   4.13ms      251.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)   1.07ms   3.67ms      292.    7.63MB</span></span>
-<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)       4.17ms   4.35ms      228.    7.63MB</span></span></code></pre></div>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">1</span> csum(x)         1.47ms   4.14ms      247.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">2</span> csum_c(x = x)   1.05ms    3.6ms      287.    7.63MB</span></span>
+<span><span class="co">#&gt; <span style="color: #BCBCBC;">3</span> cumsum(x)       4.19ms   4.36ms      230.    7.63MB</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="return-a-value">Return a value<a class="anchor" aria-label="anchor" href="#return-a-value"></a>
@@ -282,10 +282,10 @@ interpreter yourself.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $memory</span></span>
 <span><span class="co">#&gt; $memory$contexts</span></span>
-<span><span class="co">#&gt; [1] 5</span></span>
+<span><span class="co">#&gt; [1] 6</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; $memory$bytes</span></span>
-<span><span class="co">#&gt; [1] 2506940</span></span>
+<span><span class="co">#&gt; [1] 2772529</span></span>
 <span></span>
 <span><span class="va">csum_interp</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mir_compile.html">mir_compile</a></span><span class="op">(</span><span class="va">csum_r</span>, tier <span class="op">=</span> <span class="st">"interp"</span><span class="op">)</span></span></code></pre></div>
 </div>
